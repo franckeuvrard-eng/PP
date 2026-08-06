@@ -1,0 +1,22 @@
+{
+  "name": "PetitPas - Suivi Maternelle",
+  "short_name": "PetitPas",
+  "description": "Application de suivi d'activités petite enfance & maternelle avec QR codes et photos",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F8FAF7",
+  "theme_color": "#4E9F3D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3079/3079165.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3079/3079165.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

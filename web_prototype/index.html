@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PetitPas - Suivi d'Activités Maternelle & Petite Enfance</title>
+  
+  <!-- PWA iOS Metas -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PetitPas">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3079/3079165.png">
+  <meta name="theme-color" content="#4E9F3D">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
+      });
+    }
+  </script>
+  
+  <!-- Fonts Google -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- QR Code Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="app-logo">
+          <div class="logo-icon"><i class="fa-solid fa-child-reaching"></i></div>
+          <div class="logo-text">
+            <span class="brand-title">PetitPas</span>
+            <span class="class-subtitle" id="header-class-name">Classe Petite Section (PS)</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <button class="btn btn-scan-shortcut" id="btn-quick-scan">
+          <i class="fa-solid fa-qrcode"></i>
+          <span>Scan Express</span>
+        </button>
+        <button class="btn btn-icon-only" id="btn-toggle-theme" title="Changer le thème">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="main-nav">
+      <button class="nav-item active" data-target="screen-dashboard">
+        <i class="fa-solid fa-house"></i>
+        <span>Tableau de bord</span>
+      </button>
+      <button class="nav-item" data-target="screen-scan">
+        <div class="scan-nav-badge"><i class="fa-solid fa-camera-retro"></i></div>
+        <span>Scan & Go</span>
+      </button>
+      <button class="nav-item" data-target="screen-children">
+        <i class="fa-solid fa-children"></i>
+        <span>Élèves</span>
+      </button>
+      <button class="nav-item" data-target="screen-qr-print">
+        <i class="fa-solid fa-print"></i>
+        <span>Badges QR</span>
+      </button>
+      <button class="nav-item" data-target="screen-settings">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Paramètres</span>
+      </button>
+    </nav>
+
+    <!-- App Main Content Views -->
+    <main class="main-content">
+
+      <!-- ================= 1. DASHBOARD SCREEN ================= -->
+      <section id="screen-dashboard" class="screen-view active">
+        <!-- Daily Summary Cards -->
+        <div class="stats-banner">
+          <div class="stat-card pastel-green">
+            <div class="stat-icon"><i class="fa-solid fa-user-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-present-count">12 / 12</span>
+              <span class="stat-label">Présents ce jour</span>
+            </div>
+          </div>
+          <div class="stat-card pastel-orange">
+            <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-today-activities">24</span>
+              <span class="stat-label">Activités enregistrées</span>
+            </div>
+          </div>
+          <div class="stat-card pastel-purple">
+            <div class="stat-icon"><i class="fa-solid fa-camera"></i></div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-photos-count">8</span>
+              <span class="stat-label">Photos capturées</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Manual Action Bar -->
+        <div class="section-header">
+          <h2><i class="fa-solid fa-clock-rotate-left"></i> Fil d'actualité du jour</h2>
+          <div class="action-buttons">
+            <button class="btn btn-secondary btn-sm" id="btn-filter-category">
+              <i class="fa-solid fa-filter"></i> Filtrer
+            </button>
+            <button class="btn btn-primary btn-sm" id="btn-manual-add">
+              <i class="fa-solid fa-plus"></i> Saisie Manuelle
+            </button>
+          </div>
+        </div>
+
+        <!-- Category Filters Pill Carousel -->
+        <div class="category-pills" id="dashboard-category-filters">
+          <button class="pill active" data-cat="all">Tous</button>
+          <!-- Category pills injected dynamically -->
+        </div>
+
+        <!-- Timeline List -->
+        <div class="timeline-container" id="timeline-list">
+          <!-- Timeline activity items injected dynamically -->
+        </div>
+      </section>
+
+      <!-- ================= 2. SCAN & GO SCREEN ================= -->
+      <section id="screen-scan" class="screen-view">
+        <div class="scan-workspace">
+          <div class="scan-card-container">
+            <div class="scan-header">
+              <h2><i class="fa-solid fa-qrcode"></i> Association QR Code Express</h2>
+              <p class="scan-subtitle">Scannez le badge de l'élève, puis le QR Code de l'atelier</p>
+            </div>
+
+            <!-- Scanner Viewport / Virtual Scanner -->
+            <div class="scanner-viewport">
+              <div class="camera-frame">
+                <div class="laser-scanner"></div>
+                <div class="view-target"></div>
+                <div class="camera-placeholder" id="camera-feed">
+                  <i class="fa-solid fa-camera camera-bg-icon"></i>
+                  <span id="camera-status-text">Caméra active - En attente de scan...</span>
+                </div>
+              </div>
+
+              <!-- Quick Demo Simulation Bar for testing without printing -->
+              <div class="simulated-qr-bar">
+                <span class="sim-label"><i class="fa-solid fa-vial"></i> Mode Test Rapide (Simulateur QR) :</span>
+                <div class="sim-selectors">
+                  <select id="sim-select-child" class="form-select">
+                    <option value="">-- Choisir un Élève --</option>
+                  </select>
+                  <select id="sim-select-activity" class="form-select">
+                    <option value="">-- Choisir un Atelier --</option>
+                  </select>
+                  <button class="btn btn-accent btn-sm" id="btn-sim-scan">
+                    <i class="fa-solid fa-bolt"></i> Simuler le Scan
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Scan Match Cards -->
+            <div class="scan-matches-grid">
+              <!-- Matched Child Box -->
+              <div class="match-box" id="box-matched-child">
+                <div class="box-badge-header"><i class="fa-solid fa-user"></i> Élève détecté</div>
+                <div class="match-content empty" id="content-matched-child">
+                  <i class="fa-solid fa-qrcode placeholder-qr-icon"></i>
+                  <span>Veuillez scanner le QR Code du badge élève</span>
+                </div>
+              </div>
+
+              <div class="match-arrow"><i class="fa-solid fa-right-left"></i></div>
+
+              <!-- Matched Activity Box -->
+              <div class="match-box" id="box-matched-activity">
+                <div class="box-badge-header"><i class="fa-solid fa-shapes"></i> Atelier détecté</div>
+                <div class="match-content empty" id="content-matched-activity">
+                  <i class="fa-solid fa-qrcode placeholder-qr-icon"></i>
+                  <span>Veuillez scanner le QR Code de l'atelier</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Optional Photo & Emotion Options -->
+            <div class="scan-options-panel">
+              <div class="option-group">
+                <label><i class="fa-solid fa-face-smile"></i> Emotion / État de l'enfant :</label>
+                <div class="emotion-selector" id="scan-emotion-selector">
+                  <!-- Emotion buttons injected dynamically -->
+                </div>
+              </div>
+
+              <div class="option-group photo-capture-group">
+                <label><i class="fa-solid fa-camera"></i> Photo d'illustration (Optionnel) :</label>
+                <div class="photo-input-area">
+                  <input type="file" id="scan-photo-input" accept="image/*" capture="environment" style="display:none">
+                  <button class="btn btn-secondary btn-sm" id="btn-trigger-photo">
+                    <i class="fa-solid fa-camera-retro"></i> Prendre une photo
+                  </button>
+                  <button class="btn btn-outline btn-sm" id="btn-sample-photo">
+                    <i class="fa-solid fa-image"></i> Image d'exemple
+                  </button>
+                  <div class="photo-preview-thumb" id="scan-photo-preview" style="display:none">
+                    <img id="scan-photo-img" src="" alt="Aperçu photo">
+                    <button class="btn-remove-photo" id="btn-remove-photo"><i class="fa-solid fa-xmark"></i></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="option-group">
+                <label><i class="fa-solid fa-comment"></i> Note / Observation pédagogique :</label>
+                <input type="text" id="scan-note-input" class="form-input" placeholder="Ex: A réalisé son bonhomme en autonomie...">
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="scan-actions">
+              <button class="btn btn-primary btn-lg btn-block" id="btn-confirm-association" disabled>
+                <i class="fa-solid fa-check"></i> Valider et Enregistrer l'Activité
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3. CHILDREN MANAGEMENT ================= -->
+      <section id="screen-children" class="screen-view">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-children"></i> Gestion des Élèves (<span id="children-count">0</span>)</h2>
+          <button class="btn btn-primary btn-sm" id="btn-add-child">
+            <i class="fa-solid fa-user-plus"></i> Ajouter un Élève
+          </button>
+        </div>
+
+        <!-- Search & Filter bar -->
+        <div class="search-bar-wrapper">
+          <div class="search-input-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="input-search-child" placeholder="Rechercher un enfant par prénom ou groupe...">
+          </div>
+        </div>
+
+        <!-- Children Cards Grid -->
+        <div class="children-grid" id="children-cards-container">
+          <!-- Children cards injected dynamically -->
+        </div>
+      </section>
+
+      <!-- ================= 4. QR CODES GENERATOR & PRINT ================= -->
+      <section id="screen-qr-print" class="screen-view">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-print"></i> Studio d'Impression des QR Codes</h2>
+          <button class="btn btn-accent btn-sm" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Imprimer les planches
+          </button>
+        </div>
+
+        <p class="section-intro">
+          Générez et imprimez les badges QR des élèves et les cartes d'ateliers à plastifier et afficher dans la classe.
+        </p>
+
+        <!-- Tabs for QR Code sheets -->
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-tab="tab-qr-students">
+            <i class="fa-solid fa-id-badge"></i> Badges Élèves
+          </button>
+          <button class="tab-btn" data-tab="tab-qr-activities">
+            <i class="fa-solid fa-shapes"></i> Etiquettes Ateliers
+          </button>
+        </div>
+
+        <!-- Tab 1: Students Badges Sheet -->
+        <div id="tab-qr-students" class="tab-content active">
+          <div class="printable-sheet grid-badges" id="qr-students-sheet">
+            <!-- Printable student badges injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Activity Cards Sheet -->
+        <div id="tab-qr-activities" class="tab-content">
+          <div class="printable-sheet grid-cards" id="qr-activities-sheet">
+            <!-- Printable activity cards injected dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 5. FULL UI SETTINGS ================= -->
+      <section id="screen-settings" class="screen-view">
+        <div class="settings-container">
+          <h2><i class="fa-solid fa-sliders"></i> Centre de Paramétrage UI</h2>
+          <p class="section-intro">Personnalisez 100% de l'application selon les besoins de votre classe.</p>
+
+          <!-- Settings Accordion / Cards -->
+          <div class="settings-sections">
+            
+            <!-- 5.1 Class Info Config -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <i class="fa-solid fa-school icon-head"></i>
+                <div>
+                  <h3>Informations de la Classe & École</h3>
+                  <p>Nom de la classe, niveau, nom de l'enseignante</p>
+                </div>
+              </div>
+              <div class="settings-card-body">
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label>Nom de la classe :</label>
+                    <input type="text" id="setting-class-name" class="form-input" value="Classe Petite Section (PS)">
+                  </div>
+                  <div class="form-group col-6">
+                    <label>Enseignante / Équipe :</label>
+                    <input type="text" id="setting-teacher-name" class="form-input" value="Mme Dupont">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group col-6">
+                    <label>Niveau principal :</label>
+                    <select id="setting-class-level" class="form-select">
+                      <option value="TPS">Toute Petite Section (TPS)</option>
+                      <option value="PS" selected>Petite Section (PS)</option>
+                      <option value="MS">Moyenne Section (MS)</option>
+                      <option value="GS">Grande Section (GS)</option>
+                      <option value="Multi">Multi-niveaux</option>
+                    </select>
+                  </div>
+                  <div class="form-group col-6">
+                    <label>Année Scolaire :</label>
+                    <input type="text" id="setting-school-year" class="form-input" value="2026-2027">
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-save-class-settings">
+                  <i class="fa-solid fa-floppy-disk"></i> Enregistrer les infos
+                </button>
+              </div>
+            </div>
+
+            <!-- 5.2 Activity Types Manager -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <i class="fa-solid fa-shapes icon-head"></i>
+                <div>
+                  <h3>Gestionnaire des Types d'Activités & Ateliers</h3>
+                  <p>Ajoutez, modifiez ou supprimez les ateliers de la classe</p>
+                </div>
+                <button class="btn btn-secondary btn-sm ms-auto" id="btn-add-activity-type">
+                  <i class="fa-solid fa-plus"></i> Nouvel Atelier
+                </button>
+              </div>
+              <div class="settings-card-body">
+                <div class="activity-types-list" id="activity-types-config-list">
+                  <!-- Configurable activity types list injected dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 5.3 Skills & Competencies Manager -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <i class="fa-solid fa-graduation-cap icon-head"></i>
+                <div>
+                  <h3>Référentiel de Compétences (Cycle 1)</h3>
+                  <p>Personnalisez les domaines d'apprentissage et compétences</p>
+                </div>
+                <button class="btn btn-secondary btn-sm ms-auto" id="btn-add-skill-domain">
+                  <i class="fa-solid fa-plus"></i> Nouveau Domaine
+                </button>
+              </div>
+              <div class="settings-card-body">
+                <div class="skills-domain-list" id="skills-config-list">
+                  <!-- Configurable skill domains list injected dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 5.4 Emotions & States Manager -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <i class="fa-solid fa-face-smile icon-head"></i>
+                <div>
+                  <h3>Liste des Émotions / États</h3>
+                  <p>Ajustez les émotions attribuables lors des ateliers</p>
+                </div>
+              </div>
+              <div class="settings-card-body">
+                <div class="emotions-tags-container" id="emotions-config-tags">
+                  <!-- Emotions tags injected dynamically -->
+                </div>
+                <div class="add-emotion-bar">
+                  <input type="text" id="input-new-emotion-label" class="form-input form-input-sm" placeholder="Ex: Curieux, Concentré...">
+                  <input type="text" id="input-new-emotion-emoji" class="form-input form-input-sm short" placeholder="😊">
+                  <button class="btn btn-secondary btn-sm" id="btn-add-emotion">
+                    <i class="fa-solid fa-plus"></i> Ajouter
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5.5 Backup / Export / Reset -->
+            <div class="settings-card danger-zone">
+              <div class="settings-card-header">
+                <i class="fa-solid fa-database icon-head"></i>
+                <div>
+                  <h3>Données, Sauvegarde & Réinitialisation</h3>
+                  <p>Exporter / Importer les paramètres et données de la classe</p>
+                </div>
+              </div>
+              <div class="settings-card-body">
+                <div class="data-actions-row">
+                  <button class="btn btn-outline" id="btn-export-data">
+                    <i class="fa-solid fa-download"></i> Exporter la sauvegarde (JSON)
+                  </button>
+                  <button class="btn btn-outline" id="btn-import-trigger">
+                    <i class="fa-solid fa-upload"></i> Importer des données
+                  </button>
+                  <input type="file" id="input-import-file" accept=".json" style="display:none">
+                  <button class="btn btn-danger-outline" id="btn-reset-demo">
+                    <i class="fa-solid fa-rotate-left"></i> Recharger les données Démo
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Modal: Add/Edit Child -->
+  <div class="modal-overlay" id="modal-child" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-child-title">Ajouter un Élève</h3>
+        <button class="modal-close" onclick="closeModal('modal-child')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-child">
+          <input type="hidden" id="child-id">
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Prénom <span class="required">*</span> :</label>
+              <input type="text" id="child-firstname" class="form-input" required placeholder="Ex: Léo">
+            </div>
+            <div class="form-group col-6">
+              <label>Nom :</label>
+              <input type="text" id="child-lastname" class="form-input" placeholder="Ex: Martin">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Date de naissance :</label>
+              <input type="date" id="child-birthdate" class="form-input" value="2023-04-12">
+            </div>
+            <div class="form-group col-6">
+              <label>Groupe / Section :</label>
+              <input type="text" id="child-group" class="form-input" placeholder="Ex: Groupe Rouge / PS">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes d'attention (Allergies, Doudou, Remarques) :</label>
+            <input type="text" id="child-notes" class="form-input" placeholder="Ex: Allergie noisettes, a besoin de son doudou la sieste">
+          </div>
+          <div class="form-group">
+            <label>Couleur du Badge :</label>
+            <div class="color-picker-row">
+              <input type="color" id="child-color" class="color-input" value="#4E9F3D">
+              <span class="color-hint">Couleur d'identification visuelle</span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-child')">Annuler</button>
+        <button class="btn btn-primary" id="btn-save-child"><i class="fa-solid fa-check"></i> Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Activity Type -->
+  <div class="modal-overlay" id="modal-activity-type" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-act-title">Ajouter un Type d'Atelier</h3>
+        <button class="modal-close" onclick="closeModal('modal-activity-type')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-activity-type">
+          <input type="hidden" id="act-type-id">
+          <div class="form-group">
+            <label>Nom de l'Atelier <span class="required">*</span> :</label>
+            <input type="text" id="act-type-name" class="form-input" required placeholder="Ex: Atelier Pâte à Modeler">
+          </div>
+          <div class="form-row">
+            <div class="form-group col-6">
+              <label>Catégorie :</label>
+              <select id="act-type-category" class="form-select">
+                <option value="Motricité">Motricité & Mouvement</option>
+                <option value="Créatif">Atelier Créatif & Art</option>
+                <option value="Apprentissage">Éveil & Langage</option>
+                <option value="Bien-être">Repos & Bien-être</option>
+                <option value="Vie pratique">Autonomie & Repas</option>
+              </select>
+            </div>
+            <div class="form-group col-6">
+              <label>Icône FontAwesome :</label>
+              <select id="act-type-icon" class="form-select">
+                <option value="fa-paintbrush">🎨 Paintbrush</option>
+                <option value="fa-shapes">🧩 Shapes</option>
+                <option value="fa-book-open">📖 Book</option>
+                <option value="fa-hands-clapping">👏 Clapping</option>
+                <option value="fa-bed">🛏️ Bed</option>
+                <option value="fa-apple-whole">🍎 Apple</option>
+                <option value="fa-scissors">✂️ Scissors</option>
+                <option value="fa-music">🎵 Music</option>
+                <option value="fa-tree">🌳 Tree / Outdoor</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Couleur d'Atelier :</label>
+            <input type="color" id="act-type-color" class="color-input" value="#FF7043">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-activity-type')">Annuler</button>
+        <button class="btn btn-primary" id="btn-save-activity-type"><i class="fa-solid fa-check"></i> Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Child Detail & Parents Report -->
+  <div class="modal-overlay" id="modal-child-report" style="display:none">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-id-card"></i> Fiche Élève & Transmission Parents</h3>
+        <button class="modal-close" onclick="closeModal('modal-child-report')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="child-report-body">
+        <!-- Content injected dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-child-report')">Fermer</button>
+        <button class="btn btn-accent" onclick="window.print()"><i class="fa-solid fa-print"></i> Imprimer la fiche parent</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
