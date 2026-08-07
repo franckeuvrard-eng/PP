@@ -40,7 +40,15 @@ jobs:
         run: flutter pub run flutter_launcher_icons
 
       - name: Build iOS App
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign -v > ios_build.log || (
+            git config --global user.email "actions@github.com"
+            git config --global user.name "GitHub Actions"
+            git add ios_build.log
+            git commit -m "docs: save ios build failure log [skip ci]"
+            git push origin main
+            exit 1
+          )
 
       - name: Package Payload to IPA
         run: |
