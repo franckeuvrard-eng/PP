@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -39,7 +43,6 @@ class AppStateProvider extends ChangeNotifier {
       childId: "child_1",
       activityTypeId: "act_1",
       timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      emotion: "Joyeux 😊",
       note: "A mélangé du bleu et du jaune pour créer du vert !",
       evaluationStatus: "Acquis 🟢",
     ),
@@ -48,7 +51,6 @@ class AppStateProvider extends ChangeNotifier {
       childId: "child_2",
       activityTypeId: "act_2",
       timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      emotion: "Concentré 🎯",
       note: "A franchi la poutre d'équilibre sans aide.",
       evaluationStatus: "En cours 🟡",
     ),
@@ -173,7 +175,6 @@ class AppStateProvider extends ChangeNotifier {
     if (!await targetDir.exists()) {
       await targetDir.create(recursive: true);
     }
-    // Clean originalPath name from weird chars
     final basename = cleanOriginalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
     final filename = '${DateTime.now().millisecondsSinceEpoch}_$basename';
     final newPath = '${targetDir.path}/$filename';
@@ -185,12 +186,133 @@ class AppStateProvider extends ChangeNotifier {
   // Returns the absolute file path inside the current app documents container
   String? getAbsolutePath(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) return null;
-    // Check if it's already an absolute path
     if (relativePath.startsWith('/') || relativePath.contains(':/') || relativePath.contains(':\\')) {
       return relativePath;
     }
     if (_docsDirPath == null) return null;
     return '$_docsDirPath/$relativePath';
+  }
+
+  // ───────────────── BACKUP EXPORT ─────────────────
+  Future<void> exportFullBackup() async {
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+
+      final archive = Archive();
+
+      // 1. JSON data
+      final backupData = {
+        'version': 2,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'class_settings': _classSettings.toMap(),
+        'children': _children.map((c) => c.toMap()).toList(),
+        'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
+        'activities': _activities.map((l) => l.toMap()).toList(),
+        'evaluation_statuses': _evaluationStatuses,
+        'categories': _categories,
+      };
+      final jsonBytes = utf8.encode(json.encode(backupData));
+      archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
+
+      // 2. Photos
+      for (final subDir in ['profiles', 'workshops', 'activities']) {
+        final dir = Directory('$_docsDirPath/$subDir');
+        if (await dir.exists()) {
+          final files = dir.listSync().whereType<File>().toList();
+          for (final file in files) {
+            final bytes = await file.readAsBytes();
+            final entryName = '$subDir/${file.path.split('/').last}';
+            archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
+          }
+        }
+      }
+
+      // 3. Write ZIP
+      final zipEncoder = ZipEncoder();
+      final zipBytes = zipEncoder.encode(archive);
+      if (zipBytes == null) throw Exception('Erreur lors de la création du ZIP');
+
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final zipPath = '${tempDir.path}/petitpas_backup_$timestamp.zip';
+      await File(zipPath).writeAsBytes(zipBytes);
+
+      // 4. Share
+      await Share.shareXFiles(
+        [XFile(zipPath, mimeType: 'application/zip')],
+        subject: 'Sauvegarde PetitPas',
+        text: 'Backup complet PetitPas incluant toutes les données et photos.',
+      );
+    } catch (e) {
+      debugPrint('Export error: $e');
+      rethrow;
+    }
+  }
+
+  // ───────────────── BACKUP IMPORT ─────────────────
+  Future<String> importFullBackup() async {
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+        allowMultiple: false,
+      );
+
+      if (result == null || result.files.isEmpty) return 'cancelled';
+
+      final zipPath = result.files.first.path;
+      if (zipPath == null) return 'error';
+
+      final bytes = await File(zipPath).readAsBytes();
+      final archive = ZipDecoder().decodeBytes(bytes);
+
+      // Find backup.json
+      ArchiveFile? jsonFile;
+      for (final file in archive) {
+        if (file.name == 'backup.json') {
+          jsonFile = file;
+          break;
+        }
+      }
+      if (jsonFile == null) return 'invalid';
+
+      final jsonStr = utf8.decode(jsonFile.content as Uint8List);
+      final data = json.decode(jsonStr) as Map<String, dynamic>;
+
+      // Restore JSON data
+      _classSettings = ClassSettings.fromMap(data['class_settings']);
+      _children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+      _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
+      _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
+      _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      _categories = List<String>.from(data['categories'] ?? []);
+
+      // Restore photo files
+      for (final file in archive) {
+        if (file.name == 'backup.json') continue;
+        if (file.isFile) {
+          final targetPath = '$_docsDirPath/${file.name}';
+          final targetFile = File(targetPath);
+          await targetFile.parent.create(recursive: true);
+          await targetFile.writeAsBytes(file.content as Uint8List);
+        }
+      }
+
+      await _saveToPrefs();
+      notifyListeners();
+      return 'success';
+    } catch (e) {
+      debugPrint('Import error: $e');
+      return 'error';
+    }
   }
 
   void updateClassSettings(ClassSettings settings) {

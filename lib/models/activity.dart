@@ -5,7 +5,6 @@ class ActivityLog {
   final String childId;
   final String activityTypeId;
   final DateTime timestamp;
-  final String emotion;
   final String? note;
   final List<String> photoPaths;
   final String? evaluationStatus;
@@ -15,7 +14,6 @@ class ActivityLog {
     required this.childId,
     required this.activityTypeId,
     required this.timestamp,
-    required this.emotion,
     this.note,
     this.photoPaths = const [],
     this.evaluationStatus,
@@ -27,7 +25,6 @@ class ActivityLog {
       'childId': childId,
       'activityTypeId': activityTypeId,
       'timestamp': timestamp.toIso8601String(),
-      'emotion': emotion,
       'note': note,
       'photoPaths': photoPaths,
       'evaluationStatus': evaluationStatus,
@@ -40,7 +37,6 @@ class ActivityLog {
       childId: map['childId'] ?? '',
       activityTypeId: map['activityTypeId'] ?? '',
       timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
-      emotion: map['emotion'] ?? '😊 Joyeux',
       note: map['note'],
       photoPaths: List<String>.from(map['photoPaths'] ?? []),
       evaluationStatus: map['evaluationStatus'],

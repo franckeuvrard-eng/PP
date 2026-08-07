@@ -121,7 +121,7 @@ class HomeDashboardScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Child info and Emotion
+                                  // Child info
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -134,10 +134,6 @@ class HomeDashboardScreen extends StatelessWidget {
                                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                           ),
                                         ],
-                                      ),
-                                      Text(
-                                        act.emotion,
-                                        style: const TextStyle(fontSize: 12, color: Color(0xFFFF7043), fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),

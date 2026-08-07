@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:excel/excel.dart' as xl;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
@@ -7,9 +8,12 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../models/activity.dart';
 
 class ChildrenManagerScreen extends StatelessWidget {
   const ChildrenManagerScreen({super.key});
@@ -53,6 +57,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: ListTile(
+                    onTap: () => _showChildHistoryDialog(context, provider, child),
                     leading: _buildChildAvatar(child, provider),
                     title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(child.group ?? 'Sans groupe'),
@@ -61,7 +66,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
-                          onPressed: () => _openPdfPreview(context, child, provider),
+                          onPressed: () => _choosePdfPeriod(context, child, provider),
                           tooltip: 'Générer le rapport PDF',
                         ),
                         IconButton(
@@ -81,6 +86,323 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
+  // ─────────────────── HISTORY POPUP ───────────────────
+  void _showChildHistoryDialog(BuildContext context, AppStateProvider provider, Child child) {
+    final childLogs = provider.activities.where((log) => log.childId == child.id).toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4E9F3D),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    _buildChildAvatarSmall(child, provider),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${child.firstname} ${child.lastname ?? ""}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          if (child.group != null)
+                            Text(child.group!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Logs list
+              Flexible(
+                child: childLogs.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Text('Aucune activité enregistrée.', textAlign: TextAlign.center),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: childLogs.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final log = childLogs[index];
+                          final actType = provider.activityTypes.firstWhere(
+                            (a) => a.id == log.activityTypeId,
+                            orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: '#718096'),
+                          );
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                              child: const Icon(Icons.palette, size: 14, color: Colors.white),
+                            ),
+                            title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp),
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFFA0AEC0))),
+                                if (log.evaluationStatus != null)
+                                  Text(log.evaluationStatus!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                if (log.note != null && log.note!.isNotEmpty)
+                                  Text(log.note!, style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
+                              ],
+                            ),
+                            isThreeLine: true,
+                          );
+                        },
+                      ),
+              ),
+
+              // Export Excel button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _exportToExcel(context, provider, child, childLogs);
+                    },
+                    icon: const Icon(Icons.table_chart, size: 18),
+                    label: const Text('Exporter en Excel'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF217346),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChildAvatarSmall(Child child, AppStateProvider provider) {
+    final absolutePath = provider.getAbsolutePath(child.imagePath);
+    if (absolutePath != null && File(absolutePath).existsSync()) {
+      return CircleAvatar(radius: 22, backgroundImage: FileImage(File(absolutePath)));
+    }
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: Colors.white.withOpacity(0.3),
+      child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  // ─────────────────── EXCEL EXPORT ───────────────────
+  Future<void> _exportToExcel(
+    BuildContext context,
+    AppStateProvider provider,
+    Child child,
+    List<ActivityLog> logs,
+  ) async {
+    try {
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['Activités'];
+      excel.setDefaultSheet('Activités');
+
+      // Header row
+      sheet.appendRow([
+        xl.TextCellValue('Date'),
+        xl.TextCellValue('Atelier'),
+        xl.TextCellValue('Catégorie'),
+        xl.TextCellValue('Statut'),
+        xl.TextCellValue('Observation'),
+      ]);
+
+      // Data rows
+      for (final log in logs) {
+        final actType = provider.activityTypes.firstWhere(
+          (a) => a.id == log.activityTypeId,
+          orElse: () => ActivityType(id: '', name: 'Inconnu', category: '', iconName: '', colorHex: ''),
+        );
+        sheet.appendRow([
+          xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
+          xl.TextCellValue(actType.name),
+          xl.TextCellValue(actType.category),
+          xl.TextCellValue(log.evaluationStatus ?? ''),
+          xl.TextCellValue(log.note ?? ''),
+        ]);
+      }
+
+      final bytes = excel.encode();
+      if (bytes == null) throw Exception('Erreur encodage Excel');
+
+      final tempDir = await getTemporaryDirectory();
+      final filename = 'PetitPas_${child.firstname}_${child.lastname ?? ""}_${DateTime.now().millisecondsSinceEpoch}.xlsx'
+          .replaceAll(' ', '_');
+      final file = File('${tempDir.path}/$filename');
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+        subject: 'Rapport Excel — ${child.firstname}',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur export Excel : $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // ─────────────────── PDF PERIOD PICKER ───────────────────
+  void _choosePdfPeriod(BuildContext context, Child child, AppStateProvider provider) {
+    DateTimeRange? customRange;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.date_range, color: Color(0xFF4E9F3D)),
+                  SizedBox(width: 8),
+                  Text('Période du rapport'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Choisissez la période à inclure dans le rapport PDF :',
+                      style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 12),
+                  _periodButton(
+                    context: context,
+                    label: 'Toute la période',
+                    icon: Icons.all_inclusive,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openPdfPreview(context, child, provider, null, null);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _periodButton(
+                    context: context,
+                    label: 'Ce mois-ci',
+                    icon: Icons.calendar_month,
+                    onTap: () {
+                      final now = DateTime.now();
+                      Navigator.pop(context);
+                      _openPdfPreview(context, child, provider,
+                          DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 0));
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _periodButton(
+                    context: context,
+                    label: 'Semaine en cours',
+                    icon: Icons.view_week,
+                    onTap: () {
+                      final now = DateTime.now();
+                      final monday = now.subtract(Duration(days: now.weekday - 1));
+                      Navigator.pop(context);
+                      _openPdfPreview(context, child, provider,
+                          DateTime(monday.year, monday.month, monday.day),
+                          DateTime(monday.year, monday.month, monday.day + 6, 23, 59));
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _periodButton(
+                    context: context,
+                    label: customRange != null
+                        ? '${DateFormat('dd/MM').format(customRange!.start)} → ${DateFormat('dd/MM').format(customRange!.end)}'
+                        : 'Période personnalisée…',
+                    icon: Icons.tune,
+                    onTap: () async {
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        locale: const Locale('fr', 'FR'),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => customRange = picked);
+                      }
+                    },
+                  ),
+                  if (customRange != null) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _openPdfPreview(context, child, provider, customRange!.start,
+                              customRange!.end.add(const Duration(days: 1)));
+                        },
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text('Générer le PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4E9F3D),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _periodButton({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────── DELETE CHILD ───────────────────
   void _confirmDeleteChild(BuildContext context, AppStateProvider provider, Child child) {
     showDialog(
       context: context,
@@ -116,6 +438,7 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
+  // ─────────────────── ADD/EDIT CHILD DIALOG ───────────────────
   void _openChildDialog(BuildContext context, AppStateProvider provider, {Child? child}) {
     final firstnameController = TextEditingController(text: child?.firstname ?? '');
     final lastnameController = TextEditingController(text: child?.lastname ?? '');
@@ -188,7 +511,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     TextField(controller: lastnameController, decoration: const InputDecoration(labelText: 'Nom')),
                     const SizedBox(height: 14),
-                    
+
                     // Group/Section ComboBox Dropdown
                     DropdownButtonFormField<String>(
                       value: ['Petite Section (PS)', 'Moyenne Section (MS)', 'Grande Section (GS)', 'Groupe Rouge', 'Groupe Bleu', 'Groupe Jaune', 'Groupe Vert'].contains(groupController.text)
@@ -223,7 +546,6 @@ class ChildrenManagerScreen extends StatelessWidget {
                   onPressed: () async {
                     if (firstnameController.text.trim().isEmpty) return;
 
-                    // Handle persistent image copy if changed
                     String? relativeImagePath = child?.imagePath;
                     if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
                       if (selectedImagePath!.contains('profiles/')) {
@@ -260,23 +582,37 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
-  // Sanitizes emojis from PDF text to avoid rendering crashes
+  // ─────────────────── PDF PREVIEW ───────────────────
   String _sanitizeEmoji(String text) {
-    return text.replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{1F900}-\u{1F9FF}|\u{1F1E0}-\u{1F1FF}]', unicode: true), '').trim();
+    return text
+        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{1F900}-\u{1F9FF}|\u{1F1E0}-\u{1F1FF}]',
+            unicode: true), '')
+        .trim();
   }
 
-  Future<void> _openPdfPreview(BuildContext context, Child child, AppStateProvider provider) async {
+  Future<void> _openPdfPreview(
+    BuildContext context,
+    Child child,
+    AppStateProvider provider,
+    DateTime? from,
+    DateTime? to,
+  ) async {
+    String periodLabel = 'Toute la période';
+    if (from != null && to != null) {
+      periodLabel = '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}';
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(
-            title: Text('Aperçu du Rapport - ${child.firstname}'),
+            title: Text('Rapport - ${child.firstname} ($periodLabel)'),
             backgroundColor: const Color(0xFF4E9F3D),
             foregroundColor: Colors.white,
           ),
           body: PdfPreview(
-            build: (format) => _generateReportBytes(child, provider, format),
+            build: (format) => _generateReportBytes(child, provider, format, from, to),
             allowPrinting: true,
             allowSharing: true,
             canChangePageFormat: false,
@@ -285,7 +621,6 @@ class ChildrenManagerScreen extends StatelessWidget {
             pdfFileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
             shareActionExtraBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
             shareActionExtraSubject: 'Rapport d\'activités - ${child.firstname}',
-            // Auto fill destination email if present
             shareActionExtraEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
           ),
         ),
@@ -293,8 +628,23 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
-  Future<Uint8List> _generateReportBytes(Child child, AppStateProvider provider, PdfPageFormat format) async {
-    final childLogs = provider.activities.where((log) => log.childId == child.id).toList();
+  Future<Uint8List> _generateReportBytes(
+    Child child,
+    AppStateProvider provider,
+    PdfPageFormat format,
+    DateTime? from,
+    DateTime? to,
+  ) async {
+    // Filter logs by period
+    var childLogs = provider.activities.where((log) => log.childId == child.id).toList();
+    if (from != null) {
+      childLogs = childLogs.where((l) => l.timestamp.isAfter(from.subtract(const Duration(seconds: 1)))).toList();
+    }
+    if (to != null) {
+      childLogs = childLogs.where((l) => l.timestamp.isBefore(to)).toList();
+    }
+    childLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
     final doc = pw.Document();
 
     // Profile photo bytes
@@ -304,25 +654,32 @@ class ChildrenManagerScreen extends StatelessWidget {
       profileImage = pw.MemoryImage(File(profilePath).readAsBytesSync());
     }
 
+    final periodLabel = (from != null && to != null)
+        ? '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}'
+        : 'Toute la période';
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: format,
         build: (pw.Context context) {
           return [
-            // Header with title and logo preview if exists
             pw.Header(
               level: 0,
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Rapport d\'activités - PetitPas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 11)),
+                  pw.Text('Rapport d\'activités - PetitPas',
+                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
+                      style: const pw.TextStyle(fontSize: 11)),
                 ],
               ),
             ),
+            pw.SizedBox(height: 6),
+            pw.Text('Période : $periodLabel',
+                style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic)),
             pw.SizedBox(height: 14),
 
-            // Profile info row with child avatar
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -330,14 +687,19 @@ class ChildrenManagerScreen extends StatelessWidget {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('Élève : ${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(
+                        '${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}',
+                        style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
                     if (child.group != null && child.group!.isNotEmpty)
-                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}', style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}',
+                          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.email != null && child.email!.isNotEmpty)
-                      pw.Text('Email de contact : ${child.email}', style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                      pw.Text('Email de contact : ${child.email}',
+                          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.notes != null && child.notes!.isNotEmpty) ...[
                       pw.SizedBox(height: 6),
-                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}',
+                          style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
                     ],
                   ],
                 ),
@@ -355,20 +717,21 @@ class ChildrenManagerScreen extends StatelessWidget {
             ),
             pw.SizedBox(height: 16),
 
-            pw.Text('Historique des activités :', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Historique des activités (${childLogs.length}) :',
+                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
             pw.Divider(),
             pw.SizedBox(height: 8),
 
             if (childLogs.isEmpty)
-              pw.Text('Aucune activité enregistrée pour cet élève.', style: const pw.TextStyle(fontSize: 11))
+              pw.Text('Aucune activité enregistrée pour cette période.', style: const pw.TextStyle(fontSize: 11))
             else
               ...childLogs.map((log) {
                 final actType = provider.activityTypes.firstWhere(
                   (a) => a.id == log.activityTypeId,
-                  orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: ''),
+                  orElse: () =>
+                      ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: ''),
                 );
 
-                // Load associated photos bytes
                 final List<pw.MemoryImage> activityImages = [];
                 for (final path in log.photoPaths) {
                   final resolvedPath = provider.getAbsolutePath(path);
@@ -390,31 +753,28 @@ class ChildrenManagerScreen extends StatelessWidget {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text(_sanitizeEmoji(actType.name), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                          pw.Text(_sanitizeEmoji(log.emotion), style: const pw.TextStyle(fontSize: 10)),
+                          pw.Text(_sanitizeEmoji(actType.name),
+                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                          pw.Text(_sanitizeEmoji(actType.category),
+                              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                         ],
                       ),
                       pw.SizedBox(height: 3),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text(
-                            DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp),
-                            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
-                          ),
-                          pw.Text(_sanitizeEmoji(actType.category), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-                        ],
+                      pw.Text(
+                        DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp),
+                        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
                       ),
                       if (log.evaluationStatus != null) ...[
                         pw.SizedBox(height: 4),
-                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
+                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}',
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text(_sanitizeEmoji(log.note!), style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                        pw.Text(_sanitizeEmoji(log.note!),
+                            style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
                       ],
-
-                      // Grid display of activity images
                       if (activityImages.isNotEmpty) ...[
                         pw.SizedBox(height: 8),
                         pw.Wrap(

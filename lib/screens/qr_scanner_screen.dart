@@ -20,10 +20,10 @@ class QrScannerScreen extends StatefulWidget {
 class _QrScannerScreenState extends State<QrScannerScreen> {
   String? _selectedChildId;
   String? _selectedActivityTypeId;
-  String _selectedEmotion = '😊 Joyeux';
   String? _selectedEvaluationStatus;
   final TextEditingController _noteController = TextEditingController();
   final List<String> _selectedPhotoPaths = [];
+  bool _showManualSelection = false;
 
   Future<void> _startQrScanner(BuildContext context, AppStateProvider provider) async {
     final result = await Navigator.push<Map<String, String?>>(
@@ -240,55 +240,123 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
-
-                Row(
-                  children: const [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('OU SÉLECTION MANUELLE', style: TextStyle(fontSize: 10, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold)),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Manual selectors
-                DropdownButtonFormField<String>(
-                  value: _selectedChildId,
-                  decoration: const InputDecoration(
-                    labelText: 'Élève sélectionné',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  items: provider.children.map((c) {
-                    return DropdownMenuItem(
-                      value: c.id,
-                      child: Text('${c.firstname} ${c.lastname ?? ""}'),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedChildId = val),
-                ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _selectedActivityTypeId,
-                  decoration: const InputDecoration(
-                    labelText: 'Atelier sélectionné',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.category),
+
+                // Toggle manual selection
+                GestureDetector(
+                  onTap: () => setState(() => _showManualSelection = !_showManualSelection),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          children: [
+                            Text(
+                              'SÉLECTION MANUELLE',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _showManualSelection ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                              size: 16,
+                              color: const Color(0xFFA0AEC0),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
                   ),
-                  items: provider.activityTypes.map((a) {
-                    return DropdownMenuItem(
-                      value: a.id,
-                      child: Text(a.name),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedActivityTypeId = val),
+                ),
+
+                // Manual selectors (hidden by default)
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 300),
+                  crossFadeState: _showManualSelection ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedChildId,
+                        decoration: const InputDecoration(
+                          labelText: 'Élève sélectionné',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                        items: provider.children.map((c) {
+                          return DropdownMenuItem(
+                            value: c.id,
+                            child: Text('${c.firstname} ${c.lastname ?? ""}'),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedChildId = val),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedActivityTypeId,
+                        decoration: const InputDecoration(
+                          labelText: 'Atelier sélectionné',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.category),
+                        ),
+                        items: provider.activityTypes.map((a) {
+                          return DropdownMenuItem(
+                            value: a.id,
+                            child: Text(a.name),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedActivityTypeId = val),
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 20),
+
+                // Selected items summary when manual is hidden
+                if (!_showManualSelection && (_selectedChildId != null || _selectedActivityTypeId != null)) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FAF0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF4E9F3D).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_selectedChildId != null) ...[
+                          Row(children: [
+                            const Icon(Icons.person, size: 14, color: Color(0xFF4E9F3D)),
+                            const SizedBox(width: 6),
+                            Text(
+                              provider.children.firstWhere((c) => c.id == _selectedChildId,
+                                  orElse: () => Child(id: '', firstname: '?', colorHex: '', avatarText: '')).firstname,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ]),
+                        ],
+                        if (_selectedActivityTypeId != null) ...[
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            const Icon(Icons.category, size: 14, color: Color(0xFF4E9F3D)),
+                            const SizedBox(width: 6),
+                            Text(
+                              provider.activityTypes.firstWhere((a) => a.id == _selectedActivityTypeId,
+                                  orElse: () => ActivityType(id: '', name: '?', category: '', iconName: '', colorHex: '')).name,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ]),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Customizable Evaluation Status
                 if (provider.evaluationStatuses.isNotEmpty) ...[
@@ -309,30 +377,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-
-                // Emotion Selector
-                const Text(
-                  'Humeur / État d\'esprit',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _selectedEmotion,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.mood),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: '😊 Joyeux', child: Text('😊 Joyeux')),
-                    DropdownMenuItem(value: '🎯 Concentré', child: Text('🎯 Concentré')),
-                    DropdownMenuItem(value: '😴 Fatigué', child: Text('😴 Fatigué')),
-                    DropdownMenuItem(value: '😢 Triste', child: Text('😢 Triste')),
-                    DropdownMenuItem(value: '😡 En colère', child: Text('😡 En colère')),
-                  ],
-                  onChanged: (val) => setState(() => _selectedEmotion = val ?? '😊 Joyeux'),
-                ),
-
-                const SizedBox(height: 20),
 
                 // Multi-Photo Selector Widget
                 _buildPhotoSelector(),
@@ -370,7 +414,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             childId: _selectedChildId!,
                             activityTypeId: _selectedActivityTypeId!,
                             timestamp: DateTime.now(),
-                            emotion: _selectedEmotion,
                             note: _noteController.text.trim(),
                             photoPaths: savedRelativePaths,
                             evaluationStatus: _selectedEvaluationStatus,
@@ -786,7 +829,6 @@ class ScannerOverlayPainter extends CustomPainter {
       height: cutOutSize,
     );
 
-    // Draw background with a hole in the middle
     final path = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
       ..addRRect(RRect.fromRectAndRadius(cutoutRect, Radius.circular(borderRadius)))
@@ -794,7 +836,6 @@ class ScannerOverlayPainter extends CustomPainter {
 
     canvas.drawPath(path, backgroundPaint);
 
-    // Draw border around the cutout
     canvas.drawRRect(
       RRect.fromRectAndRadius(cutoutRect, Radius.circular(borderRadius)),
       borderPaint,

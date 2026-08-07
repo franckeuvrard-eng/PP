@@ -45,271 +45,368 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Centre de Paramétrage UI', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text('Centre de Paramétrage', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Personnalisez les ateliers, catégories, statuts, et l\'école', style: TextStyle(color: Color(0xFF718096))),
-
-          const SizedBox(height: 20),
-
-          // Class Settings Card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Informations Classe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _classNameController,
-                    decoration: const InputDecoration(labelText: 'Nom de la classe', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _teacherController,
-                    decoration: const InputDecoration(labelText: 'Enseignante', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 14),
-                  ElevatedButton(
-                    onPressed: () {
-                      provider.updateClassSettings(
-                        ClassSettings(
-                          name: _classNameController.text.trim(),
-                          teacher: _teacherController.text.trim(),
-                          level: provider.classSettings.level,
-                          schoolYear: provider.classSettings.schoolYear,
-                        ),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Paramètres enregistrés')),
-                      );
-                    },
-                    child: const Text('Enregistrer'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
+          const Text('Personnalisez l\'application par sections', style: TextStyle(color: Color(0xFF718096))),
           const SizedBox(height: 16),
 
-          // Evaluation Status Settings Card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Niveaux d\'Évaluation (Statuts)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  const Text('Personnalisez les statuts de suivi des activités', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
-                  const SizedBox(height: 12),
-                  
-                  // Statuses List
-                  ...provider.evaluationStatuses.map((status) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF7FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(status, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                          onPressed: () => _confirmDeleteStatus(context, provider, status),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-
-                  const SizedBox(height: 12),
-
-                  // Add Status form
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _newStatusController,
-                          decoration: const InputDecoration(
-                            hintText: 'Nouveau statut (ex: Acquis 🟢)',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4E9F3D),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(14),
-                        ),
-                        onPressed: () {
-                          final text = _newStatusController.text.trim();
-                          if (text.isNotEmpty) {
-                            final updated = List<String>.from(provider.evaluationStatuses)..add(text);
-                            provider.setEvaluationStatuses(updated);
-                            _newStatusController.clear();
-                          }
-                        },
-                        child: const Icon(Icons.add),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Workshop Categories Settings Card
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Catégories d\'Ateliers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  const Text('Personnalisez les catégories d\'activités proposées', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
-                  const SizedBox(height: 12),
-                  
-                  // Categories List
-                  ...provider.categories.map((category) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF7FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(category, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                          onPressed: () => _confirmDeleteCategory(context, provider, category),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-
-                  const SizedBox(height: 12),
-
-                  // Add Category form
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _newCategoryController,
-                          decoration: const InputDecoration(
-                            hintText: 'Nouvelle catégorie (ex: Sciences)',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4E9F3D),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(14),
-                        ),
-                        onPressed: () {
-                          final text = _newCategoryController.text.trim();
-                          if (text.isNotEmpty) {
-                            final updated = List<String>.from(provider.categories)..add(text);
-                            provider.setCategories(updated);
-                            _newCategoryController.clear();
-                          }
-                        },
-                        child: const Icon(Icons.add),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Activity Types Config Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // ── SECTION 1 : Infos de classe ──
+          _buildSection(
+            icon: Icons.school,
+            title: '🏫  Informations de la classe',
+            color: const Color(0xFF4E9F3D),
             children: [
-              const Text('Ateliers & Activités', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: Color(0xFF4E9F3D)),
-                onPressed: () => _openActivityTypeDialog(context, provider),
+              TextField(
+                controller: _classNameController,
+                decoration: const InputDecoration(labelText: 'Nom de la classe', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _teacherController,
+                decoration: const InputDecoration(labelText: 'Enseignante', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                onPressed: () {
+                  provider.updateClassSettings(
+                    ClassSettings(
+                      name: _classNameController.text.trim(),
+                      teacher: _teacherController.text.trim(),
+                      level: provider.classSettings.level,
+                      schoolYear: provider.classSettings.schoolYear,
+                    ),
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Paramètres enregistrés')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4E9F3D),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Enregistrer'),
               ),
             ],
           ),
 
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: provider.activityTypes.length,
-            itemBuilder: (context, index) {
-              final act = provider.activityTypes[index];
-              final absolutePath = provider.getAbsolutePath(act.imagePath);
+          const SizedBox(height: 12),
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  onTap: () => _openActivityTypeDialog(context, provider, act: act),
-                  leading: absolutePath != null && File(absolutePath).existsSync()
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.file(File(absolutePath), width: 36, height: 36, fit: BoxFit.cover),
-                        )
-                      : CircleAvatar(
-                          backgroundColor: Color(int.parse(act.colorHex.replaceFirst('#', '0xff'))),
-                          radius: 18,
-                          child: const Icon(Icons.palette, color: Colors.white, size: 16),
-                        ),
-                  title: Text(act.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(act.category),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () => _confirmDeleteActivityType(context, provider, act),
+          // ── SECTION 2 : Statuts d'évaluation ──
+          _buildSection(
+            icon: Icons.star_border,
+            title: '📊  Statuts d\'évaluation',
+            color: const Color(0xFFFF7043),
+            children: [
+              const Text('Personnalisez les statuts de suivi des activités',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              const SizedBox(height: 10),
+              ...provider.evaluationStatuses.map((status) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(status, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                      onPressed: () => _confirmDeleteStatus(context, provider, status),
+                    ),
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _newStatusController,
+                      decoration: const InputDecoration(
+                        hintText: 'Nouveau statut (ex: Acquis 🟢)',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF7043),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(14),
+                    ),
+                    onPressed: () {
+                      final text = _newStatusController.text.trim();
+                      if (text.isNotEmpty) {
+                        final updated = List<String>.from(provider.evaluationStatuses)..add(text);
+                        provider.setEvaluationStatuses(updated);
+                        _newStatusController.clear();
+                      }
+                    },
+                    child: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── SECTION 3 : Catégories d'ateliers ──
+          _buildSection(
+            icon: Icons.category,
+            title: '🎨  Catégories d\'ateliers',
+            color: const Color(0xFF7E57C2),
+            children: [
+              const Text('Personnalisez les catégories d\'activités proposées',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+              const SizedBox(height: 10),
+              ...provider.categories.map((category) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(category, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                      onPressed: () => _confirmDeleteCategory(context, provider, category),
+                    ),
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _newCategoryController,
+                      decoration: const InputDecoration(
+                        hintText: 'Nouvelle catégorie (ex: Sciences)',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7E57C2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(14),
+                    ),
+                    onPressed: () {
+                      final text = _newCategoryController.text.trim();
+                      if (text.isNotEmpty) {
+                        final updated = List<String>.from(provider.categories)..add(text);
+                        provider.setCategories(updated);
+                        _newCategoryController.clear();
+                      }
+                    },
+                    child: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── SECTION 4 : Ateliers & Activités ──
+          _buildSection(
+            icon: Icons.palette,
+            title: '🎯  Ateliers & Activités',
+            color: const Color(0xFFFFA726),
+            initiallyExpanded: false,
+            trailing: IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFFA726)),
+              onPressed: () => _openActivityTypeDialog(context, provider),
+              tooltip: 'Ajouter un atelier',
+            ),
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: provider.activityTypes.length,
+                itemBuilder: (context, index) {
+                  final act = provider.activityTypes[index];
+                  final absolutePath = provider.getAbsolutePath(act.imagePath);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      onTap: () => _openActivityTypeDialog(context, provider, act: act),
+                      leading: absolutePath != null && File(absolutePath).existsSync()
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.file(File(absolutePath), width: 36, height: 36, fit: BoxFit.cover),
+                            )
+                          : CircleAvatar(
+                              backgroundColor: Color(int.parse(act.colorHex.replaceFirst('#', '0xff'))),
+                              radius: 18,
+                              child: const Icon(Icons.palette, color: Colors.white, size: 16),
+                            ),
+                      title: Text(act.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(act.category),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _confirmDeleteActivityType(context, provider, act),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── SECTION 5 : Sauvegarde / Import / RAZ ──
+          _buildSection(
+            icon: Icons.backup,
+            title: '🗄️  Sauvegarde & Données',
+            color: const Color(0xFF42A5F5),
+            initiallyExpanded: false,
+            children: [
+              const Text(
+                'Exportez une sauvegarde complète incluant toutes vos données et photos, ou restaurez depuis un fichier ZIP.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF718096)),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await provider.exportFullBackup();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erreur export : $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Exporter la sauvegarde complète'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF42A5F5),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await provider.importFullBackup();
+                    if (!context.mounted) return;
+                    switch (result) {
+                      case 'success':
+                        setState(() {
+                          _classNameController.text = provider.classSettings.name;
+                          _teacherController.text = provider.classSettings.teacher;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sauvegarde restaurée avec succès !'),
+                            backgroundColor: Color(0xFF4E9F3D),
+                          ),
+                        );
+                        break;
+                      case 'cancelled':
+                        break;
+                      case 'invalid':
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Fichier invalide : backup.json manquant.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        break;
+                      default:
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Erreur lors de l\'import.'), backgroundColor: Colors.red),
+                        );
+                    }
+                  },
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Importer une sauvegarde (.zip)'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF42A5F5), width: 1.5),
+                    foregroundColor: const Color(0xFF42A5F5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const Divider(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmSelectiveReset(context, provider),
+                  icon: const Icon(Icons.delete_forever, color: Colors.red),
+                  label: const Text(
+                    'Réinitialisation des données (RAZ)',
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 30),
 
-          // Reset Database Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _confirmSelectiveReset(context, provider),
-              icon: const Icon(Icons.delete_forever, color: Colors.red),
-              label: const Text(
-                'Réinitialisation des données (RAZ)',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red, width: 1.5),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          ),
+          const SizedBox(height: 30),
         ],
       ),
     );
   }
+
+  // ─── Generic collapsible section builder ───
+  Widget _buildSection({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required List<Widget> children,
+    bool initiallyExpanded = true,
+    Widget? trailing,
+  }) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.15),
+          foregroundColor: color,
+          radius: 18,
+          child: Icon(icon, size: 18),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        trailing: trailing ??
+            Icon(Icons.keyboard_arrow_down, color: color),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: children,
+      ),
+    );
+  }
+
+  // ─────────────────── DIALOGS ───────────────────
 
   void _confirmDeleteStatus(BuildContext context, AppStateProvider provider, String status) {
     showDialog(
@@ -319,10 +416,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: const Text('Supprimer ce statut ?'),
           content: Text('Voulez-vous vraiment retirer le statut « $status » ?'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
               onPressed: () {
@@ -346,10 +440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: const Text('Supprimer cette catégorie ?'),
           content: Text('Voulez-vous vraiment retirer la catégorie « $category » ?'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
               onPressed: () {
@@ -379,10 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           content: Text('Voulez-vous vraiment supprimer l\'atelier « ${act.name} » ? Cette action est irréversible.'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
               onPressed: () {
@@ -424,7 +512,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text(
-                      'Sélectionnez les catégories de données que vous souhaitez supprimer définitivement de l\'appareil :',
+                      'Sélectionnez les catégories de données que vous souhaitez supprimer définitivement :',
                       style: TextStyle(fontSize: 13),
                     ),
                     const SizedBox(height: 12),
@@ -456,15 +544,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Annuler'),
-                ),
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                   onPressed: (!clearChildren && !clearActivityTypes && !clearActivities && !resetSettings)
                       ? null
                       : () {
@@ -475,14 +557,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             resetSettings: resetSettings,
                           );
                           Navigator.pop(context);
-
                           if (resetSettings) {
                             setState(() {
-                              _classNameController.text = "Classe Nouvelle (RAZ)";
-                              _teacherController.text = "";
+                              _classNameController.text = 'Classe Nouvelle (RAZ)';
+                              _teacherController.text = '';
                             });
                           }
-
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Données réinitialisées selon vos choix.')),
                           );
@@ -503,8 +583,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final descController = TextEditingController(text: act?.description ?? '');
     String? selectedImagePath = provider.getAbsolutePath(act?.imagePath);
 
-    // Default category dropdown selection
-    String defaultCat = provider.categories.first;
+    String defaultCat = provider.categories.isNotEmpty ? provider.categories.first : 'Général';
     if (act != null && provider.categories.contains(act.category)) {
       defaultCat = act.category;
     } else if (provider.categories.contains(catController.text)) {
@@ -579,22 +658,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 10),
                     TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom de l\'atelier *')),
                     const SizedBox(height: 12),
-
-                    // Category dropdown (ComboBox) instead of text field
-                    DropdownButtonFormField<String>(
-                      value: defaultCat,
-                      decoration: const InputDecoration(labelText: 'Catégorie', border: OutlineInputBorder()),
-                      items: provider.categories.map((c) {
-                        return DropdownMenuItem(value: c, child: Text(c));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          catController.text = val;
-                        }
-                      },
-                    ),
+                    if (provider.categories.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        value: defaultCat,
+                        decoration: const InputDecoration(labelText: 'Catégorie', border: OutlineInputBorder()),
+                        items: provider.categories.map((c) {
+                          return DropdownMenuItem(value: c, child: Text(c));
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            catController.text = val;
+                          }
+                        },
+                      ),
                     const SizedBox(height: 10),
-
                     TextField(
                       controller: descController,
                       decoration: const InputDecoration(labelText: 'Description / Instructions'),
@@ -609,7 +686,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: () async {
                     if (nameController.text.trim().isEmpty) return;
 
-                    // Handle persistent workshop image copy
                     String? relativeImagePath = act?.imagePath;
                     if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
                       if (selectedImagePath!.contains('workshops/')) {
