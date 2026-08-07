@@ -157,7 +157,8 @@ class AppStateProvider extends ChangeNotifier {
     final basename = originalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
     final filename = '${DateTime.now().millisecondsSinceEpoch}_$basename';
     final newPath = '${targetDir.path}/$filename';
-    await File(originalPath).copy(newPath);
+    final bytes = await File(originalPath).readAsBytes();
+    await File(newPath).writeAsBytes(bytes);
     return '$subDir/$filename';
   }
 
