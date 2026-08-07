@@ -440,145 +440,9 @@ class ChildrenManagerScreen extends StatelessWidget {
 
   // ─────────────────── ADD/EDIT CHILD DIALOG ───────────────────
   void _openChildDialog(BuildContext context, AppStateProvider provider, {Child? child}) {
-    final firstnameController = TextEditingController(text: child?.firstname ?? '');
-    final lastnameController = TextEditingController(text: child?.lastname ?? '');
-    final groupController = TextEditingController(text: child?.group ?? 'Petite Section (PS)');
-    final notesController = TextEditingController(text: child?.notes ?? '');
-    final emailController = TextEditingController(text: child?.email ?? '');
-    String? selectedImagePath = provider.getAbsolutePath(child?.imagePath);
-
     showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(child == null ? 'Ajouter un Élève' : 'Modifier Élève'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Avatar / Photo Selection
-                    Center(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final ImagePicker picker = ImagePicker();
-                              final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                              if (image != null) {
-                                final relPath = await provider.saveXFileToDocs(image, 'profiles');
-                                setDialogState(() {
-                                  selectedImagePath = provider.getAbsolutePath(relPath);
-                                });
-                              }
-                            },
-                            child: CircleAvatar(
-                              radius: 42,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage: (selectedImagePath != null &&
-                                      selectedImagePath!.isNotEmpty &&
-                                      File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
-                                  ? FileImage(File(selectedImagePath!.replaceFirst('file://', '')))
-                                  : null,
-                              child: (selectedImagePath == null ||
-                                      selectedImagePath!.isEmpty ||
-                                      !File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
-                                  ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey)
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextButton.icon(
-                            icon: const Icon(Icons.photo_camera, size: 14),
-                            label: const Text('Appareil photo', style: TextStyle(fontSize: 12)),
-                            onPressed: () async {
-                              final ImagePicker picker = ImagePicker();
-                              final XFile? image = await picker.pickImage(source: ImageSource.camera);
-                              if (image != null) {
-                                final relPath = await provider.saveXFileToDocs(image, 'profiles');
-                                setDialogState(() {
-                                  selectedImagePath = provider.getAbsolutePath(relPath);
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(controller: firstnameController, decoration: const InputDecoration(labelText: 'Prénom *')),
-                    const SizedBox(height: 10),
-                    TextField(controller: lastnameController, decoration: const InputDecoration(labelText: 'Nom')),
-                    const SizedBox(height: 14),
-
-                    // Group/Section ComboBox Dropdown
-                    DropdownButtonFormField<String>(
-                      value: ['Petite Section (PS)', 'Moyenne Section (MS)', 'Grande Section (GS)', 'Groupe Rouge', 'Groupe Bleu', 'Groupe Jaune', 'Groupe Vert'].contains(groupController.text)
-                          ? groupController.text
-                          : 'Petite Section (PS)',
-                      decoration: const InputDecoration(labelText: 'Groupe / Section', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'Petite Section (PS)', child: Text('Petite Section (PS)')),
-                        DropdownMenuItem(value: 'Moyenne Section (MS)', child: Text('Moyenne Section (MS)')),
-                        DropdownMenuItem(value: 'Grande Section (GS)', child: Text('Grande Section (GS)')),
-                        DropdownMenuItem(value: 'Groupe Rouge', child: Text('Groupe Rouge')),
-                        DropdownMenuItem(value: 'Groupe Bleu', child: Text('Groupe Bleu')),
-                        DropdownMenuItem(value: 'Groupe Jaune', child: Text('Groupe Jaune')),
-                        DropdownMenuItem(value: 'Groupe Vert', child: Text('Groupe Vert')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          groupController.text = val;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
-                    const SizedBox(height: 10),
-                    TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes (Allergies, etc.)')),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (firstnameController.text.trim().isEmpty) return;
-
-                    String? relativeImagePath = child?.imagePath;
-                    if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
-                      if (selectedImagePath!.contains('profiles/')) {
-                        final filename = selectedImagePath!.split('profiles/').last;
-                        relativeImagePath = 'profiles/$filename';
-                      } else {
-                        relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'profiles');
-                      }
-                    }
-
-                    final newChild = Child(
-                      id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
-                      firstname: firstnameController.text.trim(),
-                      lastname: lastnameController.text.trim(),
-                      group: groupController.text.trim(),
-                      notes: notesController.text.trim(),
-                      email: emailController.text.trim(),
-                      colorHex: child?.colorHex ?? '#4E9F3D',
-                      avatarText: firstnameController.text.trim()[0].toUpperCase(),
-                      imagePath: relativeImagePath,
-                    );
-                    provider.addOrUpdateChild(newChild);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Enregistrer'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => _ChildFormDialog(provider: provider, child: child),
     );
   }
 
@@ -803,5 +667,190 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
 
     return doc.save();
+  }
+}
+
+// ─── Proper StatefulWidget for Child form dialog ───
+class _ChildFormDialog extends StatefulWidget {
+  final AppStateProvider provider;
+  final Child? child;
+
+  const _ChildFormDialog({required this.provider, this.child});
+
+  @override
+  State<_ChildFormDialog> createState() => _ChildFormDialogState();
+}
+
+class _ChildFormDialogState extends State<_ChildFormDialog> {
+  late final TextEditingController _firstnameController;
+  late final TextEditingController _lastnameController;
+  late final TextEditingController _groupController;
+  late final TextEditingController _notesController;
+  late final TextEditingController _emailController;
+  String? _selectedImagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    final child = widget.child;
+    final provider = widget.provider;
+    _firstnameController = TextEditingController(text: child?.firstname ?? '');
+    _lastnameController = TextEditingController(text: child?.lastname ?? '');
+    _groupController = TextEditingController(text: child?.group ?? 'Petite Section (PS)');
+    _notesController = TextEditingController(text: child?.notes ?? '');
+    _emailController = TextEditingController(text: child?.email ?? '');
+    _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
+  }
+
+  @override
+  void dispose() {
+    _firstnameController.dispose();
+    _lastnameController.dispose();
+    _groupController.dispose();
+    _notesController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFromGallery() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null && mounted) {
+      final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
+      if (mounted) {
+        setState(() {
+          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+        });
+      }
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image != null && mounted) {
+      final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
+      if (mounted) {
+        setState(() {
+          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+        });
+      }
+    }
+  }
+
+  bool get _hasValidImage {
+    if (_selectedImagePath == null || _selectedImagePath!.isEmpty) return false;
+    return File(_selectedImagePath!.replaceFirst('file://', '')).existsSync();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    final provider = widget.provider;
+
+    return AlertDialog(
+      title: Text(child == null ? 'Ajouter un Élève' : 'Modifier Élève'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Avatar / Photo Selection
+            Center(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _pickFromGallery,
+                    child: CircleAvatar(
+                      radius: 42,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage: _hasValidImage
+                          ? FileImage(File(_selectedImagePath!.replaceFirst('file://', '')))
+                          : null,
+                      child: !_hasValidImage
+                          ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    icon: const Icon(Icons.photo_camera, size: 14),
+                    label: const Text('Appareil photo', style: TextStyle(fontSize: 12)),
+                    onPressed: _pickFromCamera,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(controller: _firstnameController, decoration: const InputDecoration(labelText: 'Prénom *')),
+            const SizedBox(height: 10),
+            TextField(controller: _lastnameController, decoration: const InputDecoration(labelText: 'Nom')),
+            const SizedBox(height: 14),
+
+            // Group/Section ComboBox Dropdown
+            DropdownButtonFormField<String>(
+              value: ['Petite Section (PS)', 'Moyenne Section (MS)', 'Grande Section (GS)', 'Groupe Rouge', 'Groupe Bleu', 'Groupe Jaune', 'Groupe Vert'].contains(_groupController.text)
+                  ? _groupController.text
+                  : 'Petite Section (PS)',
+              decoration: const InputDecoration(labelText: 'Groupe / Section', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'Petite Section (PS)', child: Text('Petite Section (PS)')),
+                DropdownMenuItem(value: 'Moyenne Section (MS)', child: Text('Moyenne Section (MS)')),
+                DropdownMenuItem(value: 'Grande Section (GS)', child: Text('Grande Section (GS)')),
+                DropdownMenuItem(value: 'Groupe Rouge', child: Text('Groupe Rouge')),
+                DropdownMenuItem(value: 'Groupe Bleu', child: Text('Groupe Bleu')),
+                DropdownMenuItem(value: 'Groupe Jaune', child: Text('Groupe Jaune')),
+                DropdownMenuItem(value: 'Groupe Vert', child: Text('Groupe Vert')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _groupController.text = val;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
+            const SizedBox(height: 10),
+            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Allergies, etc.)')),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+        ElevatedButton(
+          onPressed: () async {
+            if (_firstnameController.text.trim().isEmpty) return;
+
+            String? relativeImagePath = child?.imagePath;
+            if (_selectedImagePath != null && _selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
+              if (_selectedImagePath!.contains('profiles/')) {
+                final filename = _selectedImagePath!.split('profiles/').last;
+                relativeImagePath = 'profiles/$filename';
+              } else {
+                relativeImagePath = await provider.saveImageToDocs(_selectedImagePath!, 'profiles');
+              }
+            }
+
+            final newChild = Child(
+              id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
+              firstname: _firstnameController.text.trim(),
+              lastname: _lastnameController.text.trim(),
+              group: _groupController.text.trim(),
+              notes: _notesController.text.trim(),
+              email: _emailController.text.trim(),
+              colorHex: child?.colorHex ?? '#4E9F3D',
+              avatarText: _firstnameController.text.trim()[0].toUpperCase(),
+              imagePath: relativeImagePath,
+            );
+            provider.addOrUpdateChild(newChild);
+            if (mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Enregistrer'),
+        ),
+      ],
+    );
   }
 }

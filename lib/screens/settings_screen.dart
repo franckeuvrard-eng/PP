@@ -55,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.school,
             title: '🏫  Informations de la classe',
             color: const Color(0xFF4E9F3D),
+            initiallyExpanded: false,
             children: [
               TextField(
                 controller: _classNameController,
@@ -96,6 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.star_border,
             title: '📊  Statuts d\'évaluation',
             color: const Color(0xFFFF7043),
+            initiallyExpanded: false,
             children: [
               const Text('Personnalisez les statuts de suivi des activités',
                   style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
@@ -160,6 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.category,
             title: '🎨  Catégories d\'ateliers',
             color: const Color(0xFF7E57C2),
+            initiallyExpanded: false,
             children: [
               const Text('Personnalisez les catégories d\'activités proposées',
                   style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
@@ -382,7 +385,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required Color color,
     required List<Widget> children,
-    bool initiallyExpanded = true,
+    bool initiallyExpanded = false,
     Widget? trailing,
   }) {
     return Card(
@@ -578,145 +581,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? act}) {
-    final nameController = TextEditingController(text: act?.name ?? '');
-    final catController = TextEditingController(text: act?.category ?? 'Général');
-    final descController = TextEditingController(text: act?.description ?? '');
-    String? selectedImagePath = provider.getAbsolutePath(act?.imagePath);
-
-    String defaultCat = provider.categories.isNotEmpty ? provider.categories.first : 'Général';
-    if (act != null && provider.categories.contains(act.category)) {
-      defaultCat = act.category;
-    } else if (provider.categories.contains(catController.text)) {
-      defaultCat = catController.text;
-    }
-
     showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(act == null ? 'Nouvel Atelier' : 'Modifier l\'Atelier'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Preview Photo
-                    Center(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final ImagePicker picker = ImagePicker();
-                              final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                              if (image != null) {
-                                final relPath = await provider.saveXFileToDocs(image, 'workshops');
-                                setDialogState(() {
-                                  selectedImagePath = provider.getAbsolutePath(relPath);
-                                });
-                              }
-                            },
-                            child: Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey[300]!),
+      builder: (context) => _ActivityTypeFormDialog(provider: provider, act: act),
+    );
+  }
+}
+
+// ─── Proper StatefulWidget for activity type dialog ───
+// Using a full StatefulWidget instead of StatefulBuilder ensures that
+// setState() always works after iOS camera dismissal (full-screen takeover).
+class _ActivityTypeFormDialog extends StatefulWidget {
+  final AppStateProvider provider;
+  final ActivityType? act;
+
+  const _ActivityTypeFormDialog({required this.provider, this.act});
+
+  @override
+  State<_ActivityTypeFormDialog> createState() => _ActivityTypeFormDialogState();
+}
+
+class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _catController;
+  late final TextEditingController _descController;
+  String? _selectedImagePath;
+  late String _selectedCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    final act = widget.act;
+    final provider = widget.provider;
+    _nameController = TextEditingController(text: act?.name ?? '');
+    _catController = TextEditingController(text: act?.category ?? '');
+    _descController = TextEditingController(text: act?.description ?? '');
+    _selectedImagePath = provider.getAbsolutePath(act?.imagePath);
+
+    // Resolve default category
+    if (act != null && provider.categories.contains(act.category)) {
+      _selectedCategory = act.category;
+    } else if (provider.categories.isNotEmpty) {
+      _selectedCategory = provider.categories.first;
+    } else {
+      _selectedCategory = 'Général';
+    }
+    _catController.text = _selectedCategory;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _catController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFromGallery() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null && mounted) {
+      final relPath = await widget.provider.saveXFileToDocs(image, 'workshops');
+      if (mounted) {
+        setState(() {
+          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+        });
+      }
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+    if (image != null && mounted) {
+      final relPath = await widget.provider.saveXFileToDocs(image, 'workshops');
+      if (mounted) {
+        setState(() {
+          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+        });
+      }
+    }
+  }
+
+  bool get _hasValidImage {
+    if (_selectedImagePath == null || _selectedImagePath!.isEmpty) return false;
+    return File(_selectedImagePath!.replaceFirst('file://', '')).existsSync();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final act = widget.act;
+    final provider = widget.provider;
+
+    return AlertDialog(
+      title: Text(act == null ? 'Nouvel Atelier' : 'Modifier l\'Atelier'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Photo preview + picker
+            Center(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _pickFromGallery,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: _hasValidImage
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.file(
+                                File(_selectedImagePath!.replaceFirst('file://', '')),
+                                fit: BoxFit.cover,
                               ),
-                              child: (selectedImagePath != null &&
-                                      selectedImagePath!.isNotEmpty &&
-                                      File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Image.file(
-                                        File(selectedImagePath!.replaceFirst('file://', '')),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : const Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextButton.icon(
-                            icon: const Icon(Icons.photo_camera, size: 14),
-                            label: const Text('Prendre une photo', style: TextStyle(fontSize: 12)),
-                            onPressed: () async {
-                              final ImagePicker picker = ImagePicker();
-                              final XFile? image = await picker.pickImage(source: ImageSource.camera);
-                              if (image != null) {
-                                final relPath = await provider.saveXFileToDocs(image, 'workshops');
-                                setDialogState(() {
-                                  selectedImagePath = provider.getAbsolutePath(relPath);
-                                });
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                            )
+                          : const Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey),
                     ),
-                    const SizedBox(height: 10),
-                    TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom de l\'atelier *')),
-                    const SizedBox(height: 12),
-                    if (provider.categories.isNotEmpty)
-                      DropdownButtonFormField<String>(
-                        value: defaultCat,
-                        decoration: const InputDecoration(labelText: 'Catégorie', border: OutlineInputBorder()),
-                        items: provider.categories.map((c) {
-                          return DropdownMenuItem(value: c, child: Text(c));
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            catController.text = val;
-                          }
-                        },
-                      ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: descController,
-                      decoration: const InputDecoration(labelText: 'Description / Instructions'),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton.icon(
+                    icon: const Icon(Icons.photo_camera, size: 14),
+                    label: const Text('Prendre une photo', style: TextStyle(fontSize: 12)),
+                    onPressed: _pickFromCamera,
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty) return;
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Nom de l\'atelier *'),
+            ),
+            const SizedBox(height: 12),
+            if (provider.categories.isNotEmpty)
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(labelText: 'Catégorie', border: OutlineInputBorder()),
+                items: provider.categories.map((c) {
+                  return DropdownMenuItem(value: c, child: Text(c));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedCategory = val;
+                      _catController.text = val;
+                    });
+                  }
+                },
+              ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(labelText: 'Description / Instructions'),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            if (_nameController.text.trim().isEmpty) return;
 
-                    String? relativeImagePath = act?.imagePath;
-                    if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
-                      if (selectedImagePath!.contains('workshops/')) {
-                        final filename = selectedImagePath!.split('workshops/').last;
-                        relativeImagePath = 'workshops/$filename';
-                      } else {
-                        relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'workshops');
-                      }
-                    }
+            String? relativeImagePath = act?.imagePath;
+            if (_selectedImagePath != null &&
+                _selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
+              if (_selectedImagePath!.contains('workshops/')) {
+                final filename = _selectedImagePath!.split('workshops/').last;
+                relativeImagePath = 'workshops/$filename';
+              } else {
+                relativeImagePath = await provider.saveImageToDocs(_selectedImagePath!, 'workshops');
+              }
+            }
 
-                    final newAct = ActivityType(
-                      id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
-                      name: nameController.text.trim(),
-                      category: catController.text.trim(),
-                      description: descController.text.trim(),
-                      imagePath: relativeImagePath,
-                      iconName: act?.iconName ?? 'palette',
-                      colorHex: act?.colorHex ?? '#FF7043',
-                    );
-                    provider.addOrUpdateActivityType(newAct);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: Text(act == null ? 'Créer' : 'Enregistrer'),
-                ),
-              ],
+            final newAct = ActivityType(
+              id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
+              name: _nameController.text.trim(),
+              category: _catController.text.trim(),
+              description: _descController.text.trim(),
+              imagePath: relativeImagePath,
+              iconName: act?.iconName ?? 'palette',
+              colorHex: act?.colorHex ?? '#FF7043',
             );
+            provider.addOrUpdateActivityType(newAct);
+            if (mounted) {
+              Navigator.pop(context);
+            }
           },
-        );
-      },
+          child: Text(act == null ? 'Créer' : 'Enregistrer'),
+        ),
+      ],
     );
   }
 }
