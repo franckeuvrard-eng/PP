@@ -60,6 +60,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   Future<void> _pickPhotos() async {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
     final ImagePicker picker = ImagePicker();
     showModalBottomSheet(
       context: context,
