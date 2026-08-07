@@ -1,0 +1,15 @@
+Analyzing PP...                                                 
+
+   info • Use 'const' with the constructor to improve performance • lib/screens/children_manager_screen.dart:324:90 • prefer_const_constructors
+   info • Use 'const' with the constructor to improve performance • lib/screens/children_manager_screen.dart:326:75 • prefer_const_constructors
+   info • Unnecessary use of 'toList' in a spread • lib/screens/children_manager_screen.dart:428:18 • unnecessary_to_list_in_spreads
+   info • Use 'const' with the constructor to improve performance • lib/screens/home_dashboard_screen.dart:58:11 • prefer_const_constructors
+   info • Don't use 'BuildContext's across async gaps • lib/screens/qr_scanner_screen.dart:52:30 • use_build_context_synchronously
+   info • Unnecessary use of 'toList' in a spread • lib/screens/qr_scanner_screen.dart:170:18 • unnecessary_to_list_in_spreads
+   info • Use 'const' with the constructor to improve performance • lib/screens/qr_scanner_screen.dart:236:17 • prefer_const_constructors
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/qr_scanner_screen.dart:588:48 • use_build_context_synchronously
+   info • Unnecessary cast • lib/screens/qr_scanner_screen.dart:599:31 • unnecessary_cast
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/qr_scanner_screen.dart:726:43 • use_build_context_synchronously
+   info • Unnecessary use of 'toList' in a spread • lib/screens/settings_screen.dart:128:22 • unnecessary_to_list_in_spreads
+   info • Unnecessary use of 'toList' in a spread • lib/screens/settings_screen.dart:202:22 • unnecessary_to_list_in_spreads
+
