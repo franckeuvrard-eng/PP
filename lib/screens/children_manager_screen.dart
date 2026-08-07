@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../models/activity.dart';
 
 class ChildrenManagerScreen extends StatelessWidget {
   const ChildrenManagerScreen({super.key});
