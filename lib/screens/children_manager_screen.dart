@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
@@ -271,8 +272,8 @@ class ChildrenManagerScreen extends StatelessWidget {
             canChangeOrientation: false,
             initialPageFormat: PdfPageFormat.a4,
             pdfFileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
-            shareActionExtraMailBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
-            shareActionExtraMailSubject: 'Rapport d\'activités - ${child.firstname}',
+            shareActionExtraBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
+            shareActionExtraSubject: 'Rapport d\'activités - ${child.firstname}',
             // Auto fill destination email if present
             shareActionExtraEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
           ),
