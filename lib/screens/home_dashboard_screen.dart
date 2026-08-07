@@ -1,11 +1,31 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/activity.dart';
+import '../models/child.dart';
+import '../models/activity_type.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
+
+  Widget _buildChildAvatar(Child child) {
+    if (child.imagePath != null && child.imagePath!.isNotEmpty && File(child.imagePath!).existsSync()) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: FileImage(File(child.imagePath!)),
+      );
+    }
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+      child: Text(
+        child.avatarText,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,20 +57,10 @@ class HomeDashboardScreen extends StatelessWidget {
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
+            children: const [
+              Text(
                 'Fil d\'actualité du jour',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Saisie'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4E9F3D),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
               ),
             ],
           ),
@@ -73,11 +83,11 @@ class HomeDashboardScreen extends StatelessWidget {
                     final act = activities[index];
                     final child = provider.children.firstWhere(
                       (c) => c.id == act.childId,
-                      orElse: () => provider.children.first,
+                      orElse: () => Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?'),
                     );
                     final actType = provider.activityTypes.firstWhere(
                       (a) => a.id == act.activityTypeId,
-                      orElse: () => provider.activityTypes.first,
+                      orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: '#718096'),
                     );
 
                     return Card(
@@ -89,6 +99,7 @@ class HomeDashboardScreen extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Workshop/Activity icon
                             CircleAvatar(
                               backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
                               child: const Icon(Icons.palette, color: Colors.white),
@@ -98,12 +109,19 @@ class HomeDashboardScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Child info and Emotion
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        '${child.firstname} ${child.lastname ?? ""}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      Row(
+                                        children: [
+                                          _buildChildAvatar(child),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${child.firstname} ${child.lastname ?? ""}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                          ),
+                                        ],
                                       ),
                                       Text(
                                         act.emotion,
@@ -111,22 +129,113 @@ class HomeDashboardScreen extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    actType.name,
-                                    style: const TextStyle(fontSize: 14, color: Color(0xFF718096)),
+                                  const SizedBox(height: 6),
+                                  // Activity Type and Category
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        actType.name,
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF4A5568), fontWeight: FontWeight.w600),
+                                      ),
+                                      Text(
+                                        DateFormat('HH:mm').format(act.timestamp),
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFFA0AEC0)),
+                                      ),
+                                    ],
                                   ),
-                                  if (act.note != null && act.note!.isNotEmpty) ...[
+                                  
+                                  // Evaluation Status pill
+                                  if (act.evaluationStatus != null) ...[
                                     const SizedBox(height: 6),
                                     Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEDF2F7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        act.evaluationStatus!,
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+                                      ),
+                                    ),
+                                  ],
+
+                                  // Observation Note
+                                  if (act.note != null && act.note!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF8FAF7),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFFEDF2F7)),
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                                        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF4A5568)),
+                                      ),
+                                    ),
+                                  ],
+
+                                  // Attached Photo Gallery Carousel
+                                  if (act.photoPaths.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 90,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: act.photoPaths.length,
+                                        itemBuilder: (context, photoIndex) {
+                                          final path = act.photoPaths[photoIndex];
+                                          if (!File(path).existsSync()) return const SizedBox();
+                                          return GestureDetector(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => Dialog(
+                                                  backgroundColor: Colors.transparent,
+                                                  insetPadding: const EdgeInsets.all(10),
+                                                  child: Stack(
+                                                    alignment: Alignment.center,
+                                                    children: [
+                                                      InteractiveViewer(
+                                                        child: ClipRRect(
+                                                          borderRadius: BorderRadius.circular(16),
+                                                          child: Image.file(File(path), fit: BoxFit.contain),
+                                                        ),
+                                                      ),
+                                                      Positioned(
+                                                        top: 10,
+                                                        right: 10,
+                                                        child: CircleAvatar(
+                                                          backgroundColor: Colors.black54,
+                                                          child: IconButton(
+                                                            icon: const Icon(Icons.close, color: Colors.white),
+                                                            onPressed: () => Navigator.pop(context),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: const EdgeInsets.only(right: 8),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: Image.file(
+                                                  File(path),
+                                                  width: 90,
+                                                  height: 90,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ),
                                   ],

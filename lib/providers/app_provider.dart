@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -21,12 +22,12 @@ class AppStateProvider extends ChangeNotifier {
   ];
 
   List<ActivityType> _activityTypes = [
-    ActivityType(id: "act_1", name: "Atelier Peinture & Arts", category: "Créatif", iconName: "palette", colorHex: "#FF7043"),
-    ActivityType(id: "act_2", name: "Motricité & Parcours", category: "Motricité", iconName: "fitness_center", colorHex: "#4E9F3D"),
-    ActivityType(id: "act_3", name: "Coin Lecture & Contes", category: "Apprentissage", iconName: "menu_book", colorHex: "#7E57C2"),
-    ActivityType(id: "act_4", name: "Graphisme & Tracés", category: "Apprentissage", iconName: "edit", colorHex: "#FFA726"),
-    ActivityType(id: "act_5", name: "Sieste & Temps Calme", category: "Bien-être", iconName: "bed", colorHex: "#42A5F5"),
-    ActivityType(id: "act_6", name: "Repas & Goûter", category: "Vie pratique", iconName: "restaurant", colorHex: "#8D6E63"),
+    ActivityType(id: "act_1", name: "Peinture & Arts", category: "Créatif", iconName: "palette", colorHex: "#FF7043", description: "Atelier peinture, dessin libre ou dirigé, collages."),
+    ActivityType(id: "act_2", name: "Motricité & Parcours", category: "Motricité", iconName: "fitness_center", colorHex: "#4E9F3D", description: "Parcours gymnique, lancer, jeux d'opposition, danse."),
+    ActivityType(id: "act_3", name: "Lecture & Contes", category: "Apprentissage", iconName: "menu_book", colorHex: "#7E57C2", description: "Écoute de contes, manipulation d'albums, langage oral."),
+    ActivityType(id: "act_4", name: "Graphisme & Tracés", category: "Apprentissage", iconName: "edit", colorHex: "#FFA726", description: "Exercices de motricité fine, tracés de lignes, ronds."),
+    ActivityType(id: "act_5", name: "Temps Calme", category: "Bien-être", iconName: "bed", colorHex: "#42A5F5", description: "Sieste pour les PS, relaxation, écoute musicale douce."),
+    ActivityType(id: "act_6", name: "Repas & Goûter", category: "Vie pratique", iconName: "restaurant", colorHex: "#8D6E63", description: "Autonomie à la cantine, propreté, rangement."),
   ];
 
   List<ActivityLog> _activities = [
@@ -37,6 +38,7 @@ class AppStateProvider extends ChangeNotifier {
       timestamp: DateTime.now().subtract(const Duration(hours: 1)),
       emotion: "Joyeux 😊",
       note: "A mélangé du bleu et du jaune pour créer du vert !",
+      evaluationStatus: "Acquis 🟢",
     ),
     ActivityLog(
       id: "log_2",
@@ -45,16 +47,81 @@ class AppStateProvider extends ChangeNotifier {
       timestamp: DateTime.now().subtract(const Duration(hours: 2)),
       emotion: "Concentré 🎯",
       note: "A franchi la poutre d'équilibre sans aide.",
+      evaluationStatus: "En cours 🟡",
     ),
   ];
+
+  List<String> _evaluationStatuses = [
+    'Non acquis 🔴',
+    'En cours 🟡',
+    'Acquis 🟢',
+  ];
+
+  AppStateProvider() {
+    _loadFromPrefs();
+  }
 
   ClassSettings get classSettings => _classSettings;
   List<Child> get children => List.unmodifiable(_children);
   List<ActivityType> get activityTypes => List.unmodifiable(_activityTypes);
   List<ActivityLog> get activities => List.unmodifiable(_activities);
+  List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
+
+  Future<void> _loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final settingsJson = prefs.getString('class_settings');
+      if (settingsJson != null) {
+        _classSettings = ClassSettings.fromJson(settingsJson);
+      }
+
+      final childrenJson = prefs.getString('children');
+      if (childrenJson != null) {
+        final List<dynamic> decoded = json.decode(childrenJson);
+        _children = decoded.map((c) => Child.fromMap(c)).toList();
+      }
+
+      final activityTypesJson = prefs.getString('activity_types');
+      if (activityTypesJson != null) {
+        final List<dynamic> decoded = json.decode(activityTypesJson);
+        _activityTypes = decoded.map((a) => ActivityType.fromMap(a)).toList();
+      }
+
+      final activitiesJson = prefs.getString('activities');
+      if (activitiesJson != null) {
+        final List<dynamic> decoded = json.decode(activitiesJson);
+        _activities = decoded.map((l) => ActivityLog.fromMap(l)).toList();
+      }
+
+      final evaluationStatusesJson = prefs.getString('evaluation_statuses');
+      if (evaluationStatusesJson != null) {
+        final List<dynamic> decoded = json.decode(evaluationStatusesJson);
+        _evaluationStatuses = List<String>.from(decoded);
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading preferences: $e');
+    }
+  }
+
+  Future<void> _saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('class_settings', _classSettings.toJson());
+      await prefs.setString('children', json.encode(_children.map((c) => c.toMap()).toList()));
+      await prefs.setString('activity_types', json.encode(_activityTypes.map((a) => a.toMap()).toList()));
+      await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
+      await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
+    } catch (e) {
+      debugPrint('Error saving preferences: $e');
+    }
+  }
 
   void updateClassSettings(ClassSettings settings) {
     _classSettings = settings;
+    _saveToPrefs();
     notifyListeners();
   }
 
@@ -65,11 +132,13 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       _children.add(child);
     }
+    _saveToPrefs();
     notifyListeners();
   }
 
   void deleteChild(String id) {
     _children.removeWhere((c) => c.id == id);
+    _saveToPrefs();
     notifyListeners();
   }
 
@@ -80,29 +149,52 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       _activityTypes.add(actType);
     }
+    _saveToPrefs();
     notifyListeners();
   }
 
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
+    _saveToPrefs();
     notifyListeners();
   }
 
   void logActivity(ActivityLog activity) {
     _activities.insert(0, activity);
+    _saveToPrefs();
     notifyListeners();
   }
 
-  void resetData() {
-    _classSettings = ClassSettings(
-      name: "Classe Nouvelle (RAZ)",
-      teacher: "",
-      level: "PS",
-      schoolYear: "2026-2027",
-    );
-    _children = [];
-    _activityTypes = [];
-    _activities = [];
+  void setEvaluationStatuses(List<String> statuses) {
+    _evaluationStatuses = statuses;
+    _saveToPrefs();
+    notifyListeners();
+  }
+
+  void resetSelectiveData({
+    required bool clearChildren,
+    required bool clearActivityTypes,
+    required bool clearActivities,
+    required bool resetSettings,
+  }) {
+    if (clearChildren) {
+      _children = [];
+    }
+    if (clearActivityTypes) {
+      _activityTypes = [];
+    }
+    if (clearActivities) {
+      _activities = [];
+    }
+    if (resetSettings) {
+      _classSettings = ClassSettings(
+        name: "Classe Nouvelle (RAZ)",
+        teacher: "",
+        level: "PS",
+        schoolYear: "2026-2027",
+      );
+    }
+    _saveToPrefs();
     notifyListeners();
   }
 }

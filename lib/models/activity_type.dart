@@ -6,6 +6,8 @@ class ActivityType {
   final String category;
   final String iconName;
   final String colorHex;
+  final String? description;
+  final String? imagePath;
 
   ActivityType({
     required this.id,
@@ -13,6 +15,8 @@ class ActivityType {
     required this.category,
     required this.iconName,
     required this.colorHex,
+    this.description,
+    this.imagePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -22,6 +26,8 @@ class ActivityType {
       'category': category,
       'iconName': iconName,
       'colorHex': colorHex,
+      'description': description,
+      'imagePath': imagePath,
     };
   }
 
@@ -32,6 +38,8 @@ class ActivityType {
       category: map['category'] ?? 'Général',
       iconName: map['iconName'] ?? 'palette',
       colorHex: map['colorHex'] ?? '#FF7043',
+      description: map['description'],
+      imagePath: map['imagePath'],
     );
   }
 

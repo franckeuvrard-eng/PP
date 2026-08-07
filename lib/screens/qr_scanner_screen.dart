@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/activity.dart';
 import '../models/child.dart';
@@ -19,7 +21,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   String? _selectedChildId;
   String? _selectedActivityTypeId;
   String _selectedEmotion = '😊 Joyeux';
+  String? _selectedEvaluationStatus;
   final TextEditingController _noteController = TextEditingController();
+  final List<String> _selectedPhotoPaths = [];
 
   Future<void> _startQrScanner(BuildContext context, AppStateProvider provider) async {
     final result = await Navigator.push<Map<String, String?>>(
@@ -55,9 +59,130 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     }
   }
 
+  Future<void> _pickPhotos() async {
+    final ImagePicker picker = ImagePicker();
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Sélectionner de la galerie (multiples)'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final List<XFile> images = await picker.pickMultiImage();
+                  if (images.isNotEmpty) {
+                    setState(() {
+                      _selectedPhotoPaths.addAll(images.map((img) => img.path));
+                    });
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Prendre une photo'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await picker.pickImage(source: ImageSource.camera);
+                  if (image != null) {
+                    setState(() {
+                      _selectedPhotoPaths.add(image.path);
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhotoSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Photos associées',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 84,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              GestureDetector(
+                onTap: _pickPhotos,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: const Icon(Icons.add_a_photo, color: Colors.grey, size: 24),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ..._selectedPhotoPaths.asMap().entries.map((entry) {
+                final int index = entry.key;
+                final String path = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.file(
+                          File(path),
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedPhotoPaths.removeAt(index);
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
+
+    // Default selection of evaluation status if null
+    if (_selectedEvaluationStatus == null && provider.evaluationStatuses.isNotEmpty) {
+      _selectedEvaluationStatus = provider.evaluationStatuses.first;
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -156,6 +281,26 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
                 const SizedBox(height: 20),
 
+                // Customizable Evaluation Status
+                if (provider.evaluationStatuses.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    value: _selectedEvaluationStatus,
+                    decoration: const InputDecoration(
+                      labelText: 'Statut de l\'évaluation',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.star_border),
+                    ),
+                    items: provider.evaluationStatuses.map((status) {
+                      return DropdownMenuItem(
+                        value: status,
+                        child: Text(status),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedEvaluationStatus = val),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // Emotion Selector
                 const Text(
                   'Humeur / État d\'esprit',
@@ -178,7 +323,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   onChanged: (val) => setState(() => _selectedEmotion = val ?? '😊 Joyeux'),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
+
+                // Multi-Photo Selector Widget
+                _buildPhotoSelector(),
+
+                const SizedBox(height: 20),
 
                 TextField(
                   controller: _noteController,
@@ -201,6 +351,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             timestamp: DateTime.now(),
                             emotion: _selectedEmotion,
                             note: _noteController.text.trim(),
+                            photoPaths: List<String>.from(_selectedPhotoPaths),
+                            evaluationStatus: _selectedEvaluationStatus,
                           );
                           provider.logActivity(log);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -210,6 +362,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             _selectedChildId = null;
                             _selectedActivityTypeId = null;
                             _noteController.clear();
+                            _selectedPhotoPaths.clear();
                           });
                         }
                       : null,
