@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -57,6 +59,17 @@ class AppStateProvider extends ChangeNotifier {
     'Acquis 🟢',
   ];
 
+  List<String> _categories = [
+    'Apprentissage',
+    'Créatif',
+    'Motricité',
+    'Bien-être',
+    'Vie pratique',
+    'Général',
+  ];
+
+  String? _docsDirPath;
+
   AppStateProvider() {
     _loadFromPrefs();
   }
@@ -66,9 +79,13 @@ class AppStateProvider extends ChangeNotifier {
   List<ActivityType> get activityTypes => List.unmodifiable(_activityTypes);
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
+  List<String> get categories => List.unmodifiable(_categories);
 
   Future<void> _loadFromPrefs() async {
     try {
+      final directory = await getApplicationDocumentsDirectory();
+      _docsDirPath = directory.path;
+
       final prefs = await SharedPreferences.getInstance();
 
       final settingsJson = prefs.getString('class_settings');
@@ -100,6 +117,12 @@ class AppStateProvider extends ChangeNotifier {
         _evaluationStatuses = List<String>.from(decoded);
       }
 
+      final categoriesJson = prefs.getString('categories');
+      if (categoriesJson != null) {
+        final List<dynamic> decoded = json.decode(categoriesJson);
+        _categories = List<String>.from(decoded);
+      }
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading preferences: $e');
@@ -114,9 +137,39 @@ class AppStateProvider extends ChangeNotifier {
       await prefs.setString('activity_types', json.encode(_activityTypes.map((a) => a.toMap()).toList()));
       await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
       await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
+      await prefs.setString('categories', json.encode(_categories));
     } catch (e) {
       debugPrint('Error saving preferences: $e');
     }
+  }
+
+  // Copies an absolute picked image path to the App Documents directory and returns a relative path
+  Future<String> saveImageToDocs(String originalPath, String subDir) async {
+    if (_docsDirPath == null) {
+      final directory = await getApplicationDocumentsDirectory();
+      _docsDirPath = directory.path;
+    }
+    final targetDir = Directory('$_docsDirPath/$subDir');
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+    // Clean originalPath name from weird chars
+    final basename = originalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
+    final filename = '${DateTime.now().millisecondsSinceEpoch}_$basename';
+    final newPath = '${targetDir.path}/$filename';
+    await File(originalPath).copy(newPath);
+    return '$subDir/$filename';
+  }
+
+  // Returns the absolute file path inside the current app documents container
+  String? getAbsolutePath(String? relativePath) {
+    if (relativePath == null || relativePath.isEmpty) return null;
+    // Check if it's already an absolute path
+    if (relativePath.startsWith('/') || relativePath.contains(':/') || relativePath.contains(':\\')) {
+      return relativePath;
+    }
+    if (_docsDirPath == null) return null;
+    return '$_docsDirPath/$relativePath';
   }
 
   void updateClassSettings(ClassSettings settings) {
@@ -167,6 +220,12 @@ class AppStateProvider extends ChangeNotifier {
 
   void setEvaluationStatuses(List<String> statuses) {
     _evaluationStatuses = statuses;
+    _saveToPrefs();
+    notifyListeners();
+  }
+
+  void setCategories(List<String> categories) {
+    _categories = categories;
     _saveToPrefs();
     notifyListeners();
   }

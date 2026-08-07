@@ -10,11 +10,12 @@ import '../models/activity_type.dart';
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
 
-  Widget _buildChildAvatar(Child child) {
-    if (child.imagePath != null && child.imagePath!.isNotEmpty && File(child.imagePath!).existsSync()) {
+  Widget _buildChildAvatar(Child child, AppStateProvider provider) {
+    final absolutePath = provider.getAbsolutePath(child.imagePath);
+    if (absolutePath != null && File(absolutePath).existsSync()) {
       return CircleAvatar(
         radius: 20,
-        backgroundImage: FileImage(File(child.imagePath!)),
+        backgroundImage: FileImage(File(absolutePath)),
       );
     }
     return CircleAvatar(
@@ -99,11 +100,20 @@ class HomeDashboardScreen extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Workshop/Activity icon
-                            CircleAvatar(
-                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                              child: const Icon(Icons.palette, color: Colors.white),
-                            ),
+                            // Workshop/Activity icon or cover image if exists
+                            () {
+                              final workshopImagePath = provider.getAbsolutePath(actType.imagePath);
+                              if (workshopImagePath != null && File(workshopImagePath).existsSync()) {
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(File(workshopImagePath), width: 40, height: 40, fit: BoxFit.cover),
+                                );
+                              }
+                              return CircleAvatar(
+                                backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                                child: const Icon(Icons.palette, color: Colors.white),
+                              );
+                            }(),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
@@ -115,7 +125,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                     children: [
                                       Row(
                                         children: [
-                                          _buildChildAvatar(child),
+                                          _buildChildAvatar(child, provider),
                                           const SizedBox(width: 8),
                                           Text(
                                             '${child.firstname} ${child.lastname ?? ""}',
@@ -189,7 +199,8 @@ class HomeDashboardScreen extends StatelessWidget {
                                         itemCount: act.photoPaths.length,
                                         itemBuilder: (context, photoIndex) {
                                           final path = act.photoPaths[photoIndex];
-                                          if (!File(path).existsSync()) return const SizedBox();
+                                          final resolvedPath = provider.getAbsolutePath(path);
+                                          if (resolvedPath == null || !File(resolvedPath).existsSync()) return const SizedBox();
                                           return GestureDetector(
                                             onTap: () {
                                               showDialog(
@@ -203,7 +214,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                                       InteractiveViewer(
                                                         child: ClipRRect(
                                                           borderRadius: BorderRadius.circular(16),
-                                                          child: Image.file(File(path), fit: BoxFit.contain),
+                                                          child: Image.file(File(resolvedPath), fit: BoxFit.contain),
                                                         ),
                                                       ),
                                                       Positioned(
@@ -227,7 +238,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                               child: ClipRRect(
                                                 borderRadius: BorderRadius.circular(12),
                                                 child: Image.file(
-                                                  File(path),
+                                                  File(resolvedPath),
                                                   width: 90,
                                                   height: 90,
                                                   fit: BoxFit.cover,

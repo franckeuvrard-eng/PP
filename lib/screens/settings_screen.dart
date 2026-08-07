@@ -17,6 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _classNameController;
   late TextEditingController _teacherController;
   final TextEditingController _newStatusController = TextEditingController();
+  final TextEditingController _newCategoryController = TextEditingController();
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _classNameController.dispose();
     _teacherController.dispose();
     _newStatusController.dispose();
+    _newCategoryController.dispose();
     super.dispose();
   }
 
@@ -45,7 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           const Text('Centre de Paramétrage UI', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Personnalisez les ateliers, statuts, et l\'école', style: TextStyle(color: Color(0xFF718096))),
+          const Text('Personnalisez les ateliers, catégories, statuts, et l\'école', style: TextStyle(color: Color(0xFF718096))),
 
           const SizedBox(height: 20),
 
@@ -166,6 +168,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
+          // Workshop Categories Settings Card
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Catégories d\'Ateliers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  const Text('Personnalisez les catégories d\'activités proposées', style: TextStyle(fontSize: 11, color: Color(0xFF718096))),
+                  const SizedBox(height: 12),
+                  
+                  // Categories List
+                  ...provider.categories.map((category) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        title: Text(category, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                          onPressed: () => _confirmDeleteCategory(context, provider, category),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+
+                  const SizedBox(height: 12),
+
+                  // Add Category form
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _newCategoryController,
+                          decoration: const InputDecoration(
+                            hintText: 'Nouvelle catégorie (ex: Sciences)',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4E9F3D),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(14),
+                        ),
+                        onPressed: () {
+                          final text = _newCategoryController.text.trim();
+                          if (text.isNotEmpty) {
+                            final updated = List<String>.from(provider.categories)..add(text);
+                            provider.setCategories(updated);
+                            _newCategoryController.clear();
+                          }
+                        },
+                        child: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
           // Activity Types Config Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -184,15 +260,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             itemCount: provider.activityTypes.length,
             itemBuilder: (context, index) {
               final act = provider.activityTypes[index];
+              final absolutePath = provider.getAbsolutePath(act.imagePath);
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   onTap: () => _openActivityTypeDialog(context, provider, act: act),
-                  leading: act.imagePath != null && act.imagePath!.isNotEmpty && File(act.imagePath!).existsSync()
+                  leading: absolutePath != null && File(absolutePath).existsSync()
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(6),
-                          child: Image.file(File(act.imagePath!), width: 36, height: 36, fit: BoxFit.cover),
+                          child: Image.file(File(absolutePath), width: 36, height: 36, fit: BoxFit.cover),
                         )
                       : CircleAvatar(
                           backgroundColor: Color(int.parse(act.colorHex.replaceFirst('#', '0xff'))),
@@ -250,6 +328,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () {
                 final updated = List<String>.from(provider.evaluationStatuses)..remove(status);
                 provider.setEvaluationStatuses(updated);
+                Navigator.pop(context);
+              },
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteCategory(BuildContext context, AppStateProvider provider, String category) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Supprimer cette catégorie ?'),
+          content: Text('Voulez-vous vraiment retirer la catégorie « $category » ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () {
+                final updated = List<String>.from(provider.categories)..remove(category);
+                provider.setCategories(updated);
                 Navigator.pop(context);
               },
               child: const Text('Supprimer'),
@@ -396,7 +501,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameController = TextEditingController(text: act?.name ?? '');
     final catController = TextEditingController(text: act?.category ?? 'Général');
     final descController = TextEditingController(text: act?.description ?? '');
-    String? selectedImagePath = act?.imagePath;
+    String? selectedImagePath = provider.getAbsolutePath(act?.imagePath);
+
+    // Default category dropdown selection
+    String defaultCat = provider.categories.first;
+    if (act != null && provider.categories.contains(act.category)) {
+      defaultCat = act.category;
+    } else if (provider.categories.contains(catController.text)) {
+      defaultCat = catController.text;
+    }
 
     showDialog(
       context: context,
@@ -458,9 +571,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 10),
                     TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nom de l\'atelier *')),
+                    const SizedBox(height: 12),
+
+                    // Category dropdown (ComboBox) instead of text field
+                    DropdownButtonFormField<String>(
+                      value: defaultCat,
+                      decoration: const InputDecoration(labelText: 'Catégorie', border: OutlineInputBorder()),
+                      items: provider.categories.map((c) {
+                        return DropdownMenuItem(value: c, child: Text(c));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          catController.text = val;
+                        }
+                      },
+                    ),
                     const SizedBox(height: 10),
-                    TextField(controller: catController, decoration: const InputDecoration(labelText: 'Catégorie')),
-                    const SizedBox(height: 10),
+
                     TextField(
                       controller: descController,
                       decoration: const InputDecoration(labelText: 'Description / Instructions'),
@@ -472,19 +599,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (nameController.text.trim().isEmpty) return;
+
+                    // Handle persistent workshop image copy
+                    String? relativeImagePath = act?.imagePath;
+                    if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
+                      relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'workshops');
+                    }
+
                     final newAct = ActivityType(
                       id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
                       name: nameController.text.trim(),
                       category: catController.text.trim(),
                       description: descController.text.trim(),
-                      imagePath: selectedImagePath,
+                      imagePath: relativeImagePath,
                       iconName: act?.iconName ?? 'palette',
                       colorHex: act?.colorHex ?? '#FF7043',
                     );
                     provider.addOrUpdateActivityType(newAct);
-                    Navigator.pop(context);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
                   },
                   child: Text(act == null ? 'Créer' : 'Enregistrer'),
                 ),

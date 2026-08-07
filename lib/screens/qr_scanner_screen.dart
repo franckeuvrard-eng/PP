@@ -343,7 +343,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
                 ElevatedButton.icon(
                   onPressed: (_selectedChildId != null && _selectedActivityTypeId != null)
-                      ? () {
+                      ? () async {
+                          // Copy all picked photos permanently to Documents
+                          final List<String> savedRelativePaths = [];
+                          for (final absPath in _selectedPhotoPaths) {
+                            if (File(absPath).existsSync()) {
+                              final relPath = await provider.saveImageToDocs(absPath, 'activities');
+                              savedRelativePaths.add(relPath);
+                            }
+                          }
+
                           final log = ActivityLog(
                             id: 'log_${DateTime.now().millisecondsSinceEpoch}',
                             childId: _selectedChildId!,
@@ -351,19 +360,21 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             timestamp: DateTime.now(),
                             emotion: _selectedEmotion,
                             note: _noteController.text.trim(),
-                            photoPaths: List<String>.from(_selectedPhotoPaths),
+                            photoPaths: savedRelativePaths,
                             evaluationStatus: _selectedEvaluationStatus,
                           );
                           provider.logActivity(log);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Activité enregistrée avec succès !')),
-                          );
-                          setState(() {
-                            _selectedChildId = null;
-                            _selectedActivityTypeId = null;
-                            _noteController.clear();
-                            _selectedPhotoPaths.clear();
-                          });
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Activité enregistrée avec succès !')),
+                            );
+                            setState(() {
+                              _selectedChildId = null;
+                              _selectedActivityTypeId = null;
+                              _noteController.clear();
+                              _selectedPhotoPaths.clear();
+                            });
+                          }
                         }
                       : null,
                   icon: const Icon(Icons.check),
@@ -633,7 +644,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
               ),
             ),
 
-          // Footer info panel
+          // Floating info panel
           Positioned(
             bottom: MediaQuery.of(context).padding.bottom + 20,
             left: 20,

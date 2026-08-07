@@ -13,11 +13,12 @@ import '../models/activity_type.dart';
 class ChildrenManagerScreen extends StatelessWidget {
   const ChildrenManagerScreen({super.key});
 
-  Widget _buildChildAvatar(Child child) {
-    if (child.imagePath != null && child.imagePath!.isNotEmpty && File(child.imagePath!).existsSync()) {
+  Widget _buildChildAvatar(Child child, AppStateProvider provider) {
+    final absolutePath = provider.getAbsolutePath(child.imagePath);
+    if (absolutePath != null && File(absolutePath).existsSync()) {
       return CircleAvatar(
         radius: 24,
-        backgroundImage: FileImage(File(child.imagePath!)),
+        backgroundImage: FileImage(File(absolutePath)),
       );
     }
     return CircleAvatar(
@@ -51,7 +52,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: ListTile(
-                    leading: _buildChildAvatar(child),
+                    leading: _buildChildAvatar(child, provider),
                     title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(child.group ?? 'Sans groupe'),
                     trailing: Row(
@@ -59,7 +60,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
-                          onPressed: () => _generateAndShareReport(context, child, provider),
+                          onPressed: () => _openPdfPreview(context, child, provider),
                           tooltip: 'Générer le rapport PDF',
                         ),
                         IconButton(
@@ -120,7 +121,7 @@ class ChildrenManagerScreen extends StatelessWidget {
     final groupController = TextEditingController(text: child?.group ?? 'Petite Section (PS)');
     final notesController = TextEditingController(text: child?.notes ?? '');
     final emailController = TextEditingController(text: child?.email ?? '');
-    String? selectedImagePath = child?.imagePath;
+    String? selectedImagePath = provider.getAbsolutePath(child?.imagePath);
 
     showDialog(
       context: context,
@@ -212,8 +213,15 @@ class ChildrenManagerScreen extends StatelessWidget {
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (firstnameController.text.trim().isEmpty) return;
+
+                    // Handle persistent image copy if changed
+                    String? relativeImagePath = child?.imagePath;
+                    if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
+                      relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'profiles');
+                    }
+
                     final newChild = Child(
                       id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
                       firstname: firstnameController.text.trim(),
@@ -223,10 +231,12 @@ class ChildrenManagerScreen extends StatelessWidget {
                       email: emailController.text.trim(),
                       colorHex: child?.colorHex ?? '#4E9F3D',
                       avatarText: firstnameController.text.trim()[0].toUpperCase(),
-                      imagePath: selectedImagePath,
+                      imagePath: relativeImagePath,
                     );
                     provider.addOrUpdateChild(newChild);
-                    Navigator.pop(context);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
                   },
                   child: const Text('Enregistrer'),
                 ),
@@ -243,50 +253,121 @@ class ChildrenManagerScreen extends StatelessWidget {
     return text.replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{1F900}-\u{1F9FF}|\u{1F1E0}-\u{1F1FF}]', unicode: true), '').trim();
   }
 
-  Future<void> _generateAndShareReport(BuildContext context, Child child, AppStateProvider provider) async {
-    final childLogs = provider.activities.where((log) => log.childId == child.id).toList();
+  Future<void> _openPdfPreview(BuildContext context, Child child, AppStateProvider provider) async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text('Aperçu du Rapport - ${child.firstname}'),
+            backgroundColor: const Color(0xFF4E9F3D),
+            foregroundColor: Colors.white,
+          ),
+          body: PdfPreview(
+            build: (format) => _generateReportBytes(child, provider),
+            allowPrinting: true,
+            allowSharing: true,
+            canChangePageFormat: false,
+            canChangeOrientation: false,
+            initialPageFormat: PdfPageFormat.a4,
+            pdfFileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
+            shareActionExtraMailBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
+            shareActionExtraMailSubject: 'Rapport d\'activités - ${child.firstname}',
+            // Auto fill destination email if present
+            shareActionExtraEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
+          ),
+        ),
+      ),
+    );
+  }
 
+  Future<Uint8List> _generateReportBytes(Child child, AppStateProvider provider) async {
+    final childLogs = provider.activities.where((log) => log.childId == child.id).toList();
     final doc = pw.Document();
+
+    // Profile photo bytes
+    pw.MemoryImage? profileImage;
+    final profilePath = provider.getAbsolutePath(child.imagePath);
+    if (profilePath != null && File(profilePath).existsSync()) {
+      profileImage = pw.MemoryImage(File(profilePath).readAsBytesSync());
+    }
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return [
+            // Header with title and logo preview if exists
             pw.Header(
               level: 0,
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Rapport d\'activités - PetitPas', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 12)),
+                  pw.Text('Rapport d\'activités - PetitPas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 11)),
                 ],
               ),
             ),
-            pw.SizedBox(height: 20),
-            pw.Text('Élève : ${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-            if (child.group != null && child.group!.isNotEmpty)
-              pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}', style: const pw.TextStyle(fontSize: 12)),
-            if (child.email != null && child.email!.isNotEmpty)
-              pw.Text('Email de contact : ${child.email}', style: const pw.TextStyle(fontSize: 12)),
-            if (child.notes != null && child.notes!.isNotEmpty) ...[
-              pw.SizedBox(height: 10),
-              pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}', style: const pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
-            ],
-            pw.SizedBox(height: 20),
-            pw.Text('Historique des activités :', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 14),
+
+            // Profile info row with child avatar
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Élève : ${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
+                    if (child.group != null && child.group!.isNotEmpty)
+                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                    if (child.email != null && child.email!.isNotEmpty)
+                      pw.Text('Email de contact : ${child.email}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                    if (child.notes != null && child.notes!.isNotEmpty) ...[
+                      pw.SizedBox(height: 6),
+                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}', style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                    ],
+                  ],
+                ),
+                if (profileImage != null)
+                  pw.Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const pw.BoxDecoration(
+                      borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
+                      color: PdfColors.grey100,
+                    ),
+                    clipBehavior: pw.Clip.antiAlias,
+                    child: pw.Image(profileImage, fit: pw.BoxFit.cover),
+                  ),
+              ],
+            ),
+            pw.SizedBox(height: 16),
+
+            pw.Text('Historique des activités :', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
             pw.Divider(),
-            pw.SizedBox(height: 10),
+            pw.SizedBox(height: 8),
+
             if (childLogs.isEmpty)
-              pw.Text('Aucune activité enregistrée pour cet élève.')
+              pw.Text('Aucune activité enregistrée pour cet élève.', style: const pw.TextStyle(fontSize: 11))
             else
               ...childLogs.map((log) {
                 final actType = provider.activityTypes.firstWhere(
                   (a) => a.id == log.activityTypeId,
                   orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: ''),
                 );
+
+                // Load associated photos bytes
+                final List<pw.MemoryImage> activityImages = [];
+                for (final path in log.photoPaths) {
+                  final resolvedPath = provider.getAbsolutePath(path);
+                  if (resolvedPath != null && File(resolvedPath).existsSync()) {
+                    activityImages.add(pw.MemoryImage(File(resolvedPath).readAsBytesSync()));
+                  }
+                }
+
                 return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 10),
+                  margin: const pw.EdgeInsets.only(bottom: 12),
                   padding: const pw.EdgeInsets.all(8),
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(color: PdfColors.grey300),
@@ -298,11 +379,11 @@ class ChildrenManagerScreen extends StatelessWidget {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text(_sanitizeEmoji(actType.name), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          pw.Text(_sanitizeEmoji(log.emotion)),
+                          pw.Text(_sanitizeEmoji(actType.name), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                          pw.Text(_sanitizeEmoji(log.emotion), style: const pw.TextStyle(fontSize: 10)),
                         ],
                       ),
-                      pw.SizedBox(height: 4),
+                      pw.SizedBox(height: 3),
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
@@ -315,11 +396,32 @@ class ChildrenManagerScreen extends StatelessWidget {
                       ),
                       if (log.evaluationStatus != null) ...[
                         pw.SizedBox(height: 4),
-                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
+                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text(_sanitizeEmoji(log.note!), style: const pw.TextStyle(fontSize: 11, fontStyle: pw.FontStyle.italic)),
+                        pw.Text(_sanitizeEmoji(log.note!), style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                      ],
+
+                      // Grid display of activity images
+                      if (activityImages.isNotEmpty) ...[
+                        pw.SizedBox(height: 8),
+                        pw.Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: activityImages.map((img) {
+                            return pw.Container(
+                              width: 70,
+                              height: 70,
+                              decoration: const pw.BoxDecoration(
+                                borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+                                color: PdfColors.grey100,
+                              ),
+                              clipBehavior: pw.Clip.antiAlias,
+                              child: pw.Image(img, fit: pw.BoxFit.cover),
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ],
                   ),
@@ -330,53 +432,6 @@ class ChildrenManagerScreen extends StatelessWidget {
       ),
     );
 
-    final bytes = await doc.save();
-    final filename = 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_');
-
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('Rapport de ${child.firstname}'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Destinataire : ${child.email != null && child.email!.isNotEmpty ? child.email : "Aucun email renseigné"}'),
-                const SizedBox(height: 12),
-                const Text('Vous pouvez partager ce PDF par mail, l\'imprimer ou le sauvegarder.'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Annuler'),
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.share),
-                label: const Text('Partager / Email'),
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await Printing.sharePdf(bytes: bytes, filename: filename);
-                },
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.print),
-                label: const Text('Imprimer'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[200],
-                  foregroundColor: Colors.black87,
-                ),
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await Printing.layoutPdf(onLayout: (format) => bytes);
-                },
-              ),
-            ],
-          );
-        },
-      );
-    }
+    return doc.save();
   }
 }
