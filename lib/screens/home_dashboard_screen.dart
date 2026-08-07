@@ -101,19 +101,22 @@ class HomeDashboardScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Workshop/Activity icon or cover image if exists
-                            () {
-                              final workshopImagePath = provider.getAbsolutePath(actType.imagePath);
-                              if (workshopImagePath != null && File(workshopImagePath).existsSync()) {
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(File(workshopImagePath), width: 40, height: 40, fit: BoxFit.cover),
-                                );
-                              }
-                              return CircleAvatar(
-                                backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                                child: const Icon(Icons.palette, color: Colors.white),
-                              );
-                            }(),
+                            (actType.imagePath != null &&
+                                    provider.getAbsolutePath(actType.imagePath) != null &&
+                                    File(provider.getAbsolutePath(actType.imagePath)!).existsSync())
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(provider.getAbsolutePath(actType.imagePath)!),
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : CircleAvatar(
+                                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                                    child: const Icon(Icons.palette, color: Colors.white),
+                                  ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
