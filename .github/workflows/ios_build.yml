@@ -40,19 +40,7 @@ jobs:
         run: flutter pub run flutter_launcher_icons
 
       - name: Build iOS App
-        run: |
-          flutter build ios --release --no-codesign -v > ios_build.log 2>&1 || (
-            echo "===== BUILD LOG FAILURE TAIL ====="
-            tail -n 150 ios_build.log
-            exit 1
-          )
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build-log
-          path: ios_build.log
+        run: flutter build ios --release --no-codesign
 
       - name: Package Payload to IPA
         run: |
