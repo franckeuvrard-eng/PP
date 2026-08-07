@@ -116,8 +116,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
+          const SizedBox(height: 30),
+          
+          // Reset Database Button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmReset(context, provider),
+              icon: const Icon(Icons.delete_forever, color: Colors.red),
+              label: const Text(
+                'Réinitialiser toutes les données (RAZ)',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  void _confirmReset(BuildContext context, AppStateProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Réinitialisation (RAZ)'),
+            ],
+          ),
+          content: const Text(
+            'Êtes-vous sûr de vouloir supprimer TOUTES les données ?\n\n'
+            'Cette action supprimera tous les élèves, ateliers et historiques d\'activités de manière définitive.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                provider.resetData();
+                Navigator.pop(context);
+                
+                // Reset text controllers
+                setState(() {
+                  _classNameController.text = "Classe Nouvelle (RAZ)";
+                  _teacherController.text = "";
+                });
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Données réinitialisées avec succès !')),
+                );
+              },
+              child: const Text('Confirmer la RAZ'),
+            ),
+          ],
+        );
+      },
     );
   }
 

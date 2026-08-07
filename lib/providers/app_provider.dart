@@ -92,4 +92,17 @@ class AppStateProvider extends ChangeNotifier {
     _activities.insert(0, activity);
     notifyListeners();
   }
+
+  void resetData() {
+    _classSettings = ClassSettings(
+      name: "Classe Nouvelle (RAZ)",
+      teacher: "",
+      level: "PS",
+      schoolYear: "2026-2027",
+    );
+    _children = [];
+    _activityTypes = [];
+    _activities = [];
+    notifyListeners();
+  }
 }
