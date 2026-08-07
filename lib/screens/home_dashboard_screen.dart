@@ -22,17 +22,7 @@ class HomeDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  title: 'Présents',
-                  value: '${provider.children.length} / ${provider.children.length}',
-                  icon: Icons.check_circle_outline,
-                  color: const Color(0xFFE8F5E9),
-                  textColor: const Color(0xFF2E7D32),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildStatCard(
-                  title: 'Activités',
+                  title: 'Activités enregistrées aujourd\'hui',
                   value: '${activities.length}',
                   icon: Icons.bolt,
                   color: const Color(0xFFFFF3E0),

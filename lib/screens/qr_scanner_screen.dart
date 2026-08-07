@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../providers/app_provider.dart';
@@ -256,6 +258,15 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
   );
   bool _isClosed = false;
 
+  // Feedback states
+  String? _scanMessage;
+  bool _isErrorMessage = false;
+  Timer? _messageTimer;
+
+  // Duplicate prevention
+  String? _lastScannedValue;
+  DateTime? _lastScanTime;
+
   @override
   void initState() {
     super.initState();
@@ -265,8 +276,31 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
 
   @override
   void dispose() {
+    _messageTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showScanMessage(String message, {required bool isError}) {
+    _messageTimer?.cancel();
+    setState(() {
+      _scanMessage = message;
+      _isErrorMessage = isError;
+    });
+    _messageTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _scanMessage = null;
+        });
+      }
+    });
+  }
+
+  void _triggerErrorVibration() {
+    HapticFeedback.vibrate();
+    Future.delayed(const Duration(milliseconds: 150), () {
+      HapticFeedback.vibrate();
+    });
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -277,26 +311,49 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
       final String? rawValue = barcode.rawValue;
       if (rawValue == null) continue;
 
+      final now = DateTime.now();
+      if (_lastScannedValue == rawValue &&
+          _lastScanTime != null &&
+          now.difference(_lastScanTime!).inSeconds < 2) {
+        continue;
+      }
+
+      _lastScannedValue = rawValue;
+      _lastScanTime = now;
+
       debugPrint('Detected QR Code: $rawValue');
 
       if (rawValue.startsWith('PETITPAS:CHILD:')) {
         final childId = rawValue.replaceFirst('PETITPAS:CHILD:', '');
-        final childExists = widget.children.any((c) => c.id == childId);
-        if (childExists && _scannedChildId != childId) {
+        final childIndex = widget.children.indexWhere((c) => c.id == childId);
+        if (childIndex >= 0) {
+          HapticFeedback.mediumImpact();
           setState(() {
             _scannedChildId = childId;
           });
+          _showScanMessage('Élève détecté : ${widget.children[childIndex].firstname}', isError: false);
           _checkAndAutoClose();
+        } else {
+          _triggerErrorVibration();
+          _showScanMessage('Élève inconnu dans la base', isError: true);
         }
       } else if (rawValue.startsWith('PETITPAS:ACT:')) {
         final actId = rawValue.replaceFirst('PETITPAS:ACT:', '');
-        final actExists = widget.activityTypes.any((a) => a.id == actId);
-        if (actExists && _scannedActivityTypeId != actId) {
+        final actIndex = widget.activityTypes.indexWhere((a) => a.id == actId);
+        if (actIndex >= 0) {
+          HapticFeedback.mediumImpact();
           setState(() {
             _scannedActivityTypeId = actId;
           });
+          _showScanMessage('Atelier détecté : ${widget.activityTypes[actIndex].name}', isError: false);
           _checkAndAutoClose();
+        } else {
+          _triggerErrorVibration();
+          _showScanMessage('Atelier inconnu dans la base', isError: true);
         }
+      } else {
+        _triggerErrorVibration();
+        _showScanMessage('QR Code non reconnu par PetitPas', isError: true);
       }
     }
   }
@@ -304,7 +361,8 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
   void _checkAndAutoClose() {
     if (_scannedChildId != null && _scannedActivityTypeId != null) {
       _isClosed = true;
-      Future.delayed(const Duration(milliseconds: 1500), () {
+      Future.delayed(const Duration(milliseconds: 1200), () async {
+        await _controller.stop();
         if (mounted) {
           Navigator.pop(context, {
             'childId': _scannedChildId,
@@ -361,7 +419,10 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    await _controller.stop();
+                    if (mounted) Navigator.pop(context);
+                  },
                 ),
                 const Text(
                   'Scanner Express',
@@ -384,6 +445,40 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
               ],
             ),
           ),
+
+          // Floating notification banner inside camera preview
+          if (_scanMessage != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 70,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isErrorMessage ? Colors.red.withOpacity(0.9) : const Color(0xFF4E9F3D).withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black38, blurRadius: 10, offset: Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isErrorMessage ? Icons.error_outline : Icons.check_circle_outline,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _scanMessage!,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Footer info panel
           Positioned(
@@ -461,11 +556,14 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        onPressed: () {
-                          Navigator.pop(context, {
-                            'childId': _scannedChildId,
-                            'activityTypeId': _scannedActivityTypeId,
-                          });
+                        onPressed: () async {
+                          await _controller.stop();
+                          if (mounted) {
+                            Navigator.pop(context, {
+                              'childId': _scannedChildId,
+                              'activityTypeId': _scannedActivityTypeId,
+                            });
+                          }
                         },
                         child: const Text('Valider la sélection', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
