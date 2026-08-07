@@ -143,8 +143,8 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
-  // Copies an absolute picked image path to the App Documents directory and returns a relative path
   Future<String> saveImageToDocs(String originalPath, String subDir) async {
+    final cleanOriginalPath = originalPath.replaceFirst('file://', '');
     if (_docsDirPath == null) {
       final directory = await getApplicationDocumentsDirectory();
       _docsDirPath = directory.path;
@@ -154,10 +154,10 @@ class AppStateProvider extends ChangeNotifier {
       await targetDir.create(recursive: true);
     }
     // Clean originalPath name from weird chars
-    final basename = originalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
+    final basename = cleanOriginalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
     final filename = '${DateTime.now().millisecondsSinceEpoch}_$basename';
     final newPath = '${targetDir.path}/$filename';
-    final bytes = await File(originalPath).readAsBytes();
+    final bytes = await File(cleanOriginalPath).readAsBytes();
     await File(newPath).writeAsBytes(bytes);
     return '$subDir/$filename';
   }

@@ -139,7 +139,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.file(
-                          File(path),
+                          File(path.replaceFirst('file://', '')),
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,

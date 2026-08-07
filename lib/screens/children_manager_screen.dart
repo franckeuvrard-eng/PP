@@ -152,10 +152,14 @@ class ChildrenManagerScreen extends StatelessWidget {
                             child: CircleAvatar(
                               radius: 42,
                               backgroundColor: Colors.grey[200],
-                              backgroundImage: (selectedImagePath != null && selectedImagePath!.isNotEmpty && File(selectedImagePath!).existsSync())
-                                  ? FileImage(File(selectedImagePath!))
+                              backgroundImage: (selectedImagePath != null &&
+                                      selectedImagePath!.isNotEmpty &&
+                                      File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
+                                  ? FileImage(File(selectedImagePath!.replaceFirst('file://', '')))
                                   : null,
-                              child: (selectedImagePath == null || selectedImagePath!.isEmpty || !File(selectedImagePath!).existsSync())
+                              child: (selectedImagePath == null ||
+                                      selectedImagePath!.isEmpty ||
+                                      !File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
                                   ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey)
                                   : null,
                             ),

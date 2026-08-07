@@ -544,10 +544,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: Colors.grey[300]!),
                               ),
-                              child: (selectedImagePath != null && selectedImagePath!.isNotEmpty && File(selectedImagePath!).existsSync())
+                              child: (selectedImagePath != null &&
+                                      selectedImagePath!.isNotEmpty &&
+                                      File(selectedImagePath!.replaceFirst('file://', '')).existsSync())
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
-                                      child: Image.file(File(selectedImagePath!), fit: BoxFit.cover),
+                                      child: Image.file(
+                                        File(selectedImagePath!.replaceFirst('file://', '')),
+                                        fit: BoxFit.cover,
+                                      ),
                                     )
                                   : const Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey),
                             ),
