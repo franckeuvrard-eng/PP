@@ -266,7 +266,7 @@ class ChildrenManagerScreen extends StatelessWidget {
             foregroundColor: Colors.white,
           ),
           body: PdfPreview(
-            build: (format) => _generateReportBytes(child, provider),
+            build: (format) => _generateReportBytes(child, provider, format),
             allowPrinting: true,
             allowSharing: true,
             canChangePageFormat: false,
@@ -283,7 +283,7 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
-  Future<Uint8List> _generateReportBytes(Child child, AppStateProvider provider) async {
+  Future<Uint8List> _generateReportBytes(Child child, AppStateProvider provider, PdfPageFormat format) async {
     final childLogs = provider.activities.where((log) => log.childId == child.id).toList();
     final doc = pw.Document();
 
@@ -296,7 +296,7 @@ class ChildrenManagerScreen extends StatelessWidget {
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: format,
         build: (pw.Context context) {
           return [
             // Header with title and logo preview if exists
