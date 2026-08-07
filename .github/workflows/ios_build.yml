@@ -31,6 +31,7 @@ jobs:
           mv ios/Runner/Info.plist Info.plist.bak
           flutter create --project-name=petitpas --platforms=ios .
           mv Info.plist.bak ios/Runner/Info.plist
+          rm -rf test
 
       - name: Install dependencies
         run: flutter pub get

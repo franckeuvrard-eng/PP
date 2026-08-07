@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
-import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 

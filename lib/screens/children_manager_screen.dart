@@ -10,7 +10,6 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
-import '../models/activity.dart';
 
 class ChildrenManagerScreen extends StatelessWidget {
   const ChildrenManagerScreen({super.key});
@@ -322,12 +321,12 @@ class ChildrenManagerScreen extends StatelessWidget {
                   children: [
                     pw.Text('Élève : ${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}', style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
                     if (child.group != null && child.group!.isNotEmpty)
-                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}', style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.email != null && child.email!.isNotEmpty)
-                      pw.Text('Email de contact : ${child.email}', style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                      pw.Text('Email de contact : ${child.email}', style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.notes != null && child.notes!.isNotEmpty) ...[
                       pw.SizedBox(height: 6),
-                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}', style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
+                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}', style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
                     ],
                   ],
                 ),
@@ -339,7 +338,6 @@ class ChildrenManagerScreen extends StatelessWidget {
                       borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
                       color: PdfColors.grey100,
                     ),
-                    clipBehavior: pw.Clip.antiAlias,
                     child: pw.Image(profileImage, fit: pw.BoxFit.cover),
                   ),
               ],
@@ -402,7 +400,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text(_sanitizeEmoji(log.note!), style: const pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
+                        pw.Text(_sanitizeEmoji(log.note!), style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
                       ],
 
                       // Grid display of activity images
@@ -419,7 +417,6 @@ class ChildrenManagerScreen extends StatelessWidget {
                                 borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
                                 color: PdfColors.grey100,
                               ),
-                              clipBehavior: pw.Clip.antiAlias,
                               child: pw.Image(img, fit: pw.BoxFit.cover),
                             );
                           }).toList(),
