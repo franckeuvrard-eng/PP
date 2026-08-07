@@ -148,39 +148,63 @@ class AppStateProvider extends ChangeNotifier {
 
   // Saves an XFile (from image_picker) directly to Documents using native byte stream
   Future<String> saveXFileToDocs(XFile xfile, String subDir) async {
-    if (_docsDirPath == null) {
-      final directory = await getApplicationDocumentsDirectory();
-      _docsDirPath = directory.path;
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+      final targetDir = Directory('$_docsDirPath/$subDir');
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+
+      Uint8List bytes;
+      try {
+        bytes = await xfile.readAsBytes();
+      } catch (_) {
+        final cleanPath = xfile.path.replaceFirst('file://', '');
+        bytes = await File(cleanPath).readAsBytes();
+      }
+
+      if (bytes.isEmpty) {
+        final cleanPath = xfile.path.replaceFirst('file://', '');
+        final f = File(cleanPath);
+        if (await f.exists()) {
+          bytes = await f.readAsBytes();
+        }
+      }
+
+      final filename = '${DateTime.now().millisecondsSinceEpoch}_${xfile.hashCode}.jpg';
+      final newPath = '${targetDir.path}/$filename';
+      await File(newPath).writeAsBytes(bytes, flush: true);
+      debugPrint('Successfully saved image to: $newPath (${bytes.length} bytes)');
+      return '$subDir/$filename';
+    } catch (e) {
+      debugPrint('Error saving XFile to docs: $e');
+      rethrow;
     }
-    final targetDir = Directory('$_docsDirPath/$subDir');
-    if (!await targetDir.exists()) {
-      await targetDir.create(recursive: true);
-    }
-    final bytes = await xfile.readAsBytes();
-    final rawName = xfile.name.isNotEmpty ? xfile.name : xfile.path.split('/').last;
-    final basename = rawName.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
-    final filename = '${DateTime.now().millisecondsSinceEpoch}_${basename.isEmpty ? "photo.jpg" : basename}';
-    final newPath = '${targetDir.path}/$filename';
-    await File(newPath).writeAsBytes(bytes);
-    return '$subDir/$filename';
   }
 
   Future<String> saveImageToDocs(String originalPath, String subDir) async {
-    final cleanOriginalPath = originalPath.replaceFirst('file://', '');
-    if (_docsDirPath == null) {
-      final directory = await getApplicationDocumentsDirectory();
-      _docsDirPath = directory.path;
+    try {
+      final cleanOriginalPath = originalPath.replaceFirst('file://', '');
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+      final targetDir = Directory('$_docsDirPath/$subDir');
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+      final filename = '${DateTime.now().millisecondsSinceEpoch}_${cleanOriginalPath.hashCode}.jpg';
+      final newPath = '${targetDir.path}/$filename';
+      final bytes = await File(cleanOriginalPath).readAsBytes();
+      await File(newPath).writeAsBytes(bytes, flush: true);
+      return '$subDir/$filename';
+    } catch (e) {
+      debugPrint('Error saving image to docs: $e');
+      rethrow;
     }
-    final targetDir = Directory('$_docsDirPath/$subDir');
-    if (!await targetDir.exists()) {
-      await targetDir.create(recursive: true);
-    }
-    final basename = cleanOriginalPath.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
-    final filename = '${DateTime.now().millisecondsSinceEpoch}_$basename';
-    final newPath = '${targetDir.path}/$filename';
-    final bytes = await File(cleanOriginalPath).readAsBytes();
-    await File(newPath).writeAsBytes(bytes);
-    return '$subDir/$filename';
   }
 
   // Returns the absolute file path inside the current app documents container

@@ -74,15 +74,23 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 title: const Text('Sélectionner de la galerie (multiples)'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final List<XFile> images = await picker.pickMultiImage();
-                  for (final img in images) {
-                    final relPath = await provider.saveXFileToDocs(img, 'activities');
-                    final absPath = provider.getAbsolutePath(relPath);
-                    if (absPath != null) {
-                      setState(() {
-                        _selectedPhotoPaths.add(absPath);
-                      });
+                  try {
+                    final List<XFile> images = await picker.pickMultiImage(
+                      maxWidth: 1200,
+                      maxHeight: 1200,
+                      imageQuality: 85,
+                    );
+                    for (final img in images) {
+                      final relPath = await provider.saveXFileToDocs(img, 'activities');
+                      final absPath = provider.getAbsolutePath(relPath);
+                      if (absPath != null && mounted) {
+                        setState(() {
+                          _selectedPhotoPaths.add(absPath);
+                        });
+                      }
                     }
+                  } catch (e) {
+                    debugPrint('Error picking multi image: $e');
                   }
                 },
               ),
@@ -91,15 +99,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 title: const Text('Prendre une photo'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final XFile? image = await picker.pickImage(source: ImageSource.camera);
-                  if (image != null) {
-                    final relPath = await provider.saveXFileToDocs(image, 'activities');
-                    final absPath = provider.getAbsolutePath(relPath);
-                    if (absPath != null) {
-                      setState(() {
-                        _selectedPhotoPaths.add(absPath);
-                      });
+                  try {
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.camera,
+                      maxWidth: 1200,
+                      maxHeight: 1200,
+                      imageQuality: 85,
+                    );
+                    if (image != null && mounted) {
+                      final relPath = await provider.saveXFileToDocs(image, 'activities');
+                      final absPath = provider.getAbsolutePath(relPath);
+                      if (absPath != null && mounted) {
+                        setState(() {
+                          _selectedPhotoPaths.add(absPath);
+                        });
+                      }
                     }
+                  } catch (e) {
+                    debugPrint('Error taking camera photo: $e');
                   }
                 },
               ),

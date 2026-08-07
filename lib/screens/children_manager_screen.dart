@@ -713,28 +713,46 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   }
 
   Future<void> _pickFromGallery() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null && mounted) {
-      final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
-      if (mounted) {
-        setState(() {
-          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-        });
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
+        if (mounted) {
+          setState(() {
+            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+          });
+        }
       }
+    } catch (e) {
+      debugPrint('Error picking gallery profile image: $e');
     }
   }
 
   Future<void> _pickFromCamera() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.camera);
-    if (image != null && mounted) {
-      final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
-      if (mounted) {
-        setState(() {
-          _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-        });
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
+        if (mounted) {
+          setState(() {
+            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+          });
+        }
       }
+    } catch (e) {
+      debugPrint('Error picking camera profile image: $e');
     }
   }
 
