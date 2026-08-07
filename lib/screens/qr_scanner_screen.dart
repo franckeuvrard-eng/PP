@@ -74,10 +74,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 onTap: () async {
                   Navigator.pop(context);
                   final List<XFile> images = await picker.pickMultiImage();
-                  if (images.isNotEmpty) {
-                    setState(() {
-                      _selectedPhotoPaths.addAll(images.map((img) => img.path));
-                    });
+                  for (final img in images) {
+                    final relPath = await provider.saveXFileToDocs(img, 'activities');
+                    final absPath = provider.getAbsolutePath(relPath);
+                    if (absPath != null) {
+                      setState(() {
+                        _selectedPhotoPaths.add(absPath);
+                      });
+                    }
                   }
                 },
               ),
@@ -88,9 +92,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   Navigator.pop(context);
                   final XFile? image = await picker.pickImage(source: ImageSource.camera);
                   if (image != null) {
-                    setState(() {
-                      _selectedPhotoPaths.add(image.path);
-                    });
+                    final relPath = await provider.saveXFileToDocs(image, 'activities');
+                    final absPath = provider.getAbsolutePath(relPath);
+                    if (absPath != null) {
+                      setState(() {
+                        _selectedPhotoPaths.add(absPath);
+                      });
+                    }
                   }
                 },
               ),
@@ -347,7 +355,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           // Copy all picked photos permanently to Documents
                           final List<String> savedRelativePaths = [];
                           for (final absPath in _selectedPhotoPaths) {
-                            if (File(absPath).existsSync()) {
+                            if (absPath.contains('activities/')) {
+                              final filename = absPath.split('activities/').last;
+                              savedRelativePaths.add('activities/$filename');
+                            } else if (File(absPath.replaceFirst('file://', '')).existsSync()) {
                               final relPath = await provider.saveImageToDocs(absPath, 'activities');
                               savedRelativePaths.add(relPath);
                             }

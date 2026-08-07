@@ -144,8 +144,9 @@ class ChildrenManagerScreen extends StatelessWidget {
                               final ImagePicker picker = ImagePicker();
                               final XFile? image = await picker.pickImage(source: ImageSource.gallery);
                               if (image != null) {
+                                final relPath = await provider.saveXFileToDocs(image, 'profiles');
                                 setDialogState(() {
-                                  selectedImagePath = image.path;
+                                  selectedImagePath = provider.getAbsolutePath(relPath);
                                 });
                               }
                             },
@@ -172,8 +173,9 @@ class ChildrenManagerScreen extends StatelessWidget {
                               final ImagePicker picker = ImagePicker();
                               final XFile? image = await picker.pickImage(source: ImageSource.camera);
                               if (image != null) {
+                                final relPath = await provider.saveXFileToDocs(image, 'profiles');
                                 setDialogState(() {
-                                  selectedImagePath = image.path;
+                                  selectedImagePath = provider.getAbsolutePath(relPath);
                                 });
                               }
                             },
@@ -224,7 +226,12 @@ class ChildrenManagerScreen extends StatelessWidget {
                     // Handle persistent image copy if changed
                     String? relativeImagePath = child?.imagePath;
                     if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
-                      relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'profiles');
+                      if (selectedImagePath!.contains('profiles/')) {
+                        final filename = selectedImagePath!.split('profiles/').last;
+                        relativeImagePath = 'profiles/$filename';
+                      } else {
+                        relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'profiles');
+                      }
                     }
 
                     final newChild = Child(

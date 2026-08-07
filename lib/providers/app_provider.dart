@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -141,6 +142,25 @@ class AppStateProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error saving preferences: $e');
     }
+  }
+
+  // Saves an XFile (from image_picker) directly to Documents using native byte stream
+  Future<String> saveXFileToDocs(XFile xfile, String subDir) async {
+    if (_docsDirPath == null) {
+      final directory = await getApplicationDocumentsDirectory();
+      _docsDirPath = directory.path;
+    }
+    final targetDir = Directory('$_docsDirPath/$subDir');
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+    final bytes = await xfile.readAsBytes();
+    final rawName = xfile.name.isNotEmpty ? xfile.name : xfile.path.split('/').last;
+    final basename = rawName.replaceAll(RegExp(r'[^a-zA-Z0-9_\.-]'), '');
+    final filename = '${DateTime.now().millisecondsSinceEpoch}_${basename.isEmpty ? "photo.jpg" : basename}';
+    final newPath = '${targetDir.path}/$filename';
+    await File(newPath).writeAsBytes(bytes);
+    return '$subDir/$filename';
   }
 
   Future<String> saveImageToDocs(String originalPath, String subDir) async {

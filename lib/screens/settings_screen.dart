@@ -531,8 +531,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               final ImagePicker picker = ImagePicker();
                               final XFile? image = await picker.pickImage(source: ImageSource.gallery);
                               if (image != null) {
+                                final relPath = await provider.saveXFileToDocs(image, 'workshops');
                                 setDialogState(() {
-                                  selectedImagePath = image.path;
+                                  selectedImagePath = provider.getAbsolutePath(relPath);
                                 });
                               }
                             },
@@ -565,8 +566,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               final ImagePicker picker = ImagePicker();
                               final XFile? image = await picker.pickImage(source: ImageSource.camera);
                               if (image != null) {
+                                final relPath = await provider.saveXFileToDocs(image, 'workshops');
                                 setDialogState(() {
-                                  selectedImagePath = image.path;
+                                  selectedImagePath = provider.getAbsolutePath(relPath);
                                 });
                               }
                             },
@@ -610,7 +612,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // Handle persistent workshop image copy
                     String? relativeImagePath = act?.imagePath;
                     if (selectedImagePath != null && selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
-                      relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'workshops');
+                      if (selectedImagePath!.contains('workshops/')) {
+                        final filename = selectedImagePath!.split('workshops/').last;
+                        relativeImagePath = 'workshops/$filename';
+                      } else {
+                        relativeImagePath = await provider.saveImageToDocs(selectedImagePath!, 'workshops');
+                      }
                     }
 
                     final newAct = ActivityType(
