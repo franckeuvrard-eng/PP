@@ -32,6 +32,9 @@ class HomeDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final activities = provider.activities;
+    final now = DateTime.now();
+    final todayActivities = activities.where((a) => a.timestamp.year == now.year && a.timestamp.month == now.month && a.timestamp.day == now.day).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -44,10 +47,10 @@ class HomeDashboardScreen extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   title: 'Aujourd\'hui',
-                  value: '${activities.length}',
+                  value: '${todayActivities.length}',
                   icon: Icons.bolt,
-                  color: const Color(0xFFFFF3E0),
-                  textColor: const Color(0xFFE65100),
+                  color: isDark ? const Color(0xFF3B2E15) : const Color(0xFFFFF3E0),
+                  textColor: isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
                 ),
               ),
               const SizedBox(width: 12),
@@ -60,8 +63,8 @@ class HomeDashboardScreen extends StatelessWidget {
                     title: 'Statistiques',
                     value: 'Analyses',
                     icon: Icons.bar_chart,
-                    color: const Color(0xFFE3F2FD),
-                    textColor: const Color(0xFF1565C0),
+                    color: isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD),
+                    textColor: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
                   ),
                 ),
               ),
@@ -84,19 +87,22 @@ class HomeDashboardScreen extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Timeline List
-          activities.isEmpty
-              ? const Center(
+          todayActivities.isEmpty
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Text('Aucune activité enregistrée pour le moment.'),
+                    padding: const EdgeInsets.all(40),
+                    child: Text(
+                      'Aucune activité enregistrée aujourd\'hui.',
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                    ),
                   ),
                 )
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: activities.length,
+                  itemCount: todayActivities.length,
                   itemBuilder: (context, index) {
-                    final act = activities[index];
+                    final act = todayActivities[index];
                     final child = provider.children.firstWhere(
                       (c) => c.id == act.childId,
                       orElse: () => Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?'),
@@ -160,11 +166,11 @@ class HomeDashboardScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         actType.name,
-                                        style: const TextStyle(fontSize: 13, color: Color(0xFF4A5568), fontWeight: FontWeight.w600),
+                                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontWeight: FontWeight.w600),
                                       ),
                                       Text(
                                         DateFormat('HH:mm').format(act.timestamp),
-                                        style: const TextStyle(fontSize: 11, color: Color(0xFFA0AEC0)),
+                                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                                       ),
                                     ],
                                   ),
@@ -175,12 +181,12 @@ class HomeDashboardScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFEDF2F7),
+                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
                                         act.evaluationStatus!,
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                                       ),
                                     ),
                                   ],
@@ -192,13 +198,13 @@ class HomeDashboardScreen extends StatelessWidget {
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAF7),
+                                        color: Theme.of(context).colorScheme.surfaceContainerLow,
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: const Color(0xFFEDF2F7)),
+                                        border: Border.all(color: Theme.of(context).dividerColor),
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF4A5568)),
+                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                                       ),
                                     ),
                                   ],

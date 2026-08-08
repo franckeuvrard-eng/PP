@@ -292,6 +292,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         label: const Text('Pack Mathématiques & Logic'),
                         onPressed: () => _importPack(context, provider, 'maths'),
                       ),
+                      ActionChip(
+                        avatar: const Icon(Icons.music_note, size: 16),
+                        label: const Text('Pack Éveil Musical & Sonore'),
+                        onPressed: () => _importPack(context, provider, 'musique'),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.science, size: 16),
+                        label: const Text('Pack Découverte du Monde'),
+                        onPressed: () => _importPack(context, provider, 'decouverte'),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.record_voice_over, size: 16),
+                        label: const Text('Pack Langage & Communication'),
+                        onPressed: () => _importPack(context, provider, 'langage'),
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.self_improvement, size: 16),
+                        label: const Text('Pack Vivre Ensemble & Émotions'),
+                        onPressed: () => _importPack(context, provider, 'vivre_ensemble'),
+                      ),
                     ],
                   ),
                 ],
@@ -356,6 +376,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ActivityType(id: 'p_m1', name: 'Tri par Couleur & Forme', category: 'Mathématiques', iconName: 'category', colorHex: '#3F51B5', description: 'Classer des objets selon la couleur ou la forme géométrique.'),
         ActivityType(id: 'p_m2', name: 'Dénombrement (1 à 3)', category: 'Mathématiques', iconName: 'pin', colorHex: '#009688', description: 'Dénombrer de petites collections d\'objets jusqu\'à 3.'),
         ActivityType(id: 'p_m3', name: 'Algorithme Simple AB-AB', category: 'Logic', iconName: 'alt_route', colorHex: '#673AB7', description: 'Poursuivre une suite logique alternant deux couleurs.'),
+      ];
+    } else if (packKey == 'musique') {
+      pack = [
+        ActivityType(id: 'p_mu1', name: 'Comptines & Chansons', category: 'Éveil Musical', iconName: 'music_note', colorHex: '#E91E63', description: 'Apprentissage de comptines et chansons à gestes.'),
+        ActivityType(id: 'p_mu2', name: 'Instruments de Percussion', category: 'Éveil Musical', iconName: 'piano', colorHex: '#F44336', description: 'Découverte des instruments à percussion (maracas, claves, tambourin).'),
+        ActivityType(id: 'p_mu3', name: 'Écoute & Reconnaissance Sonore', category: 'Éveil Musical', iconName: 'hearing', colorHex: '#9C27B0', description: 'Identifier des sons familiers, bruits d\'animaux, instruments.'),
+      ];
+    } else if (packKey == 'decouverte') {
+      pack = [
+        ActivityType(id: 'p_d1', name: 'Jardinage & Nature', category: 'Découverte du Monde', iconName: 'yard', colorHex: '#4CAF50', description: 'Planter des graines, observer la croissance, les saisons.'),
+        ActivityType(id: 'p_d2', name: 'Expériences Sensorielles', category: 'Découverte du Monde', iconName: 'science', colorHex: '#00BCD4', description: 'Bacs sensoriels (eau, sable, terre), transvasements.'),
+        ActivityType(id: 'p_d3', name: 'Animaux & Environnement', category: 'Découverte du Monde', iconName: 'pets', colorHex: '#8BC34A', description: 'Observer et classer des animaux familiers, élevage de chenilles.'),
+      ];
+    } else if (packKey == 'langage') {
+      pack = [
+        ActivityType(id: 'p_l1', name: 'Imagier & Vocabulaire', category: 'Langage', iconName: 'image', colorHex: '#FF5722', description: 'Nommer des objets, enrichir le vocabulaire avec des imagiers.'),
+        ActivityType(id: 'p_l2', name: 'Jeux de Rôle & Marionnettes', category: 'Langage', iconName: 'theater_comedy', colorHex: '#795548', description: 'Dialoguer en situation de jeu, coin dînette, marionnettes.'),
+        ActivityType(id: 'p_l3', name: 'Albums & Langage Oral', category: 'Langage', iconName: 'auto_stories', colorHex: '#607D8B', description: 'Raconter une histoire à partir d\'images séquentielles.'),
+      ];
+    } else if (packKey == 'vivre_ensemble') {
+      pack = [
+        ActivityType(id: 'p_ve1', name: 'Règles de Vie & Conseil', category: 'Vivre Ensemble', iconName: 'groups', colorHex: '#3F51B5', description: 'Établir les règles de la classe, conseil d\'élèves.'),
+        ActivityType(id: 'p_ve2', name: 'Émotions & Bien-être', category: 'Vivre Ensemble', iconName: 'emoji_emotions', colorHex: '#FFEB3B', description: 'Identifier et exprimer ses émotions (roue des émotions, album Le monstre des couleurs).'),
+        ActivityType(id: 'p_ve3', name: 'Jeux Coopératifs', category: 'Vivre Ensemble', iconName: 'handshake', colorHex: '#00BCD4', description: 'Jeux collectifs favorisant l\'entraide et le partage.'),
       ];
     }
 
@@ -575,6 +619,11 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   void _openResetDialog(BuildContext context, AppStateProvider provider) {
     bool clearActivities = false;
     bool clearChildren = false;
+    bool clearActivityTypes = false;
+    bool resetSettings = false;
+    bool clearEvaluationStatuses = false;
+    bool clearCategories = false;
+    bool clearPhotos = false;
 
     showDialog(
       context: context,
@@ -582,37 +631,93 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         return StatefulBuilder(
           builder: (context, setSt) {
             return AlertDialog(
-              title: const Text('Réinitialisation Sélective'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
+              title: const Row(
                 children: [
-                  CheckboxListTile(
-                    title: const Text('Effacer tout l\'historique des activités'),
-                    value: clearActivities,
-                    onChanged: (v) => setSt(() => clearActivities = v ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text('Effacer la liste des élèves'),
-                    value: clearChildren,
-                    onChanged: (v) => setSt(() => clearChildren = v ?? false),
-                  ),
+                  Icon(Icons.warning_amber_rounded, color: Colors.red),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Réinitialisation Sélective')),
                 ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Cochez les données à effacer :', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      title: const Text('📋 Historique des activités'),
+                      subtitle: const Text('Toutes les observations enregistrées'),
+                      value: clearActivities,
+                      onChanged: (v) => setSt(() => clearActivities = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('👦 Liste des élèves'),
+                      subtitle: const Text('Prénoms, groupes, photos de profil'),
+                      value: clearChildren,
+                      onChanged: (v) => setSt(() => clearChildren = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('🎨 Catalogue des ateliers'),
+                      subtitle: const Text('Tous les types d\'ateliers configurés'),
+                      value: clearActivityTypes,
+                      onChanged: (v) => setSt(() => clearActivityTypes = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('📊 Niveaux d\'évaluation'),
+                      subtitle: const Text('Remettre les statuts par défaut'),
+                      value: clearEvaluationStatuses,
+                      onChanged: (v) => setSt(() => clearEvaluationStatuses = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('📁 Catégories / Domaines'),
+                      subtitle: const Text('Remettre les catégories par défaut'),
+                      value: clearCategories,
+                      onChanged: (v) => setSt(() => clearCategories = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('🏫 Profil de classe'),
+                      subtitle: const Text('Nom de classe, enseignant, école, année'),
+                      value: resetSettings,
+                      onChanged: (v) => setSt(() => resetSettings = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
+                      title: const Text('📷 Photos & médias'),
+                      subtitle: const Text('Supprimer toutes les photos stockées'),
+                      value: clearPhotos,
+                      onChanged: (v) => setSt(() => clearPhotos = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-                ElevatedButton(
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.delete_forever),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                   onPressed: () {
                     provider.resetSelectiveData(
                       clearChildren: clearChildren,
-                      clearActivityTypes: false,
+                      clearActivityTypes: clearActivityTypes,
                       clearActivities: clearActivities,
-                      resetSettings: false,
+                      resetSettings: resetSettings,
+                      clearEvaluationStatuses: clearEvaluationStatuses,
+                      clearCategories: clearCategories,
+                      clearPhotos: clearPhotos,
                     );
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Données réinitialisées')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Données réinitialisées avec succès ✅'), backgroundColor: Colors.red),
+                    );
                   },
-                  child: const Text('Confirmer Réinitialisation'),
+                  label: const Text('Confirmer la RAZ'),
                 ),
               ],
             );

@@ -529,6 +529,9 @@ class AppStateProvider extends ChangeNotifier {
     required bool clearActivityTypes,
     required bool clearActivities,
     required bool resetSettings,
+    bool clearEvaluationStatuses = false,
+    bool clearCategories = false,
+    bool clearPhotos = false,
   }) {
     if (clearChildren) {
       _children = [];
@@ -539,6 +542,23 @@ class AppStateProvider extends ChangeNotifier {
     if (clearActivities) {
       _activities = [];
     }
+    if (clearEvaluationStatuses) {
+      _evaluationStatuses = [
+        'Non acquis 🔴',
+        'En cours 🟡',
+        'Acquis 🟢',
+      ];
+    }
+    if (clearCategories) {
+      _categories = [
+        'Apprentissage',
+        'Créatif',
+        'Motricité',
+        'Bien-être',
+        'Vie pratique',
+        'Général',
+      ];
+    }
     if (resetSettings) {
       _classSettings = ClassSettings(
         name: "Classe Nouvelle (RAZ)",
@@ -547,7 +567,27 @@ class AppStateProvider extends ChangeNotifier {
         schoolYear: "2026-2027",
       );
     }
+    if (clearPhotos) {
+      _deleteAllPhotos();
+    }
     _saveToPrefs();
     notifyListeners();
+  }
+
+  Future<void> _deleteAllPhotos() async {
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+      for (final subDir in ['profiles', 'workshops', 'activities', 'settings']) {
+        final dir = Directory('$_docsDirPath/$subDir');
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting photos: $e');
+    }
   }
 }

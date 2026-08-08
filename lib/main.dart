@@ -58,12 +58,19 @@ class PetitPasApp extends StatelessWidget {
         fontFamily: 'Outfit',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
-          primary: const Color(0xFF4E9F3D),
-          secondary: const Color(0xFFFF7043),
+          primary: const Color(0xFF66BB6A),
+          secondary: const Color(0xFFFF8A65),
           surface: const Color(0xFF1E293B),
+          onSurface: Colors.white,
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1E293B),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        dividerColor: const Color(0xFF334155),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1E293B),
           elevation: 0,
@@ -74,6 +81,32 @@ class PetitPasApp extends StatelessWidget {
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Color(0xFF1E293B),
+          selectedItemColor: Color(0xFF66BB6A),
+          unselectedItemColor: Color(0xFF94A3B8),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF334155),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF475569))),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF475569))),
+          labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFFE2E8F0)),
+          bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
+          titleMedium: TextStyle(color: Colors.white),
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFF1E293B),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Color(0xFF334155),
+          contentTextStyle: TextStyle(color: Colors.white),
         ),
       ),
       localizationsDelegates: const [
