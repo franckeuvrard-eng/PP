@@ -678,7 +678,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
                 category: _catController.text.trim(),
                 description: _descController.text.trim(),
                 iconName: act?.iconName ?? 'palette',
-                colorHex: _colorHex,
+                colorHex: act?.colorHex ?? '#FF7043',
                 imagePath: _relativeImagePath,
               );
               provider.addOrUpdateActivityType(newAct);
