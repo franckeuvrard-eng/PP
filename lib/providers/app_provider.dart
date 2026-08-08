@@ -474,6 +474,8 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
+
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
     _saveToPrefs();
