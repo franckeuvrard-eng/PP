@@ -41,7 +41,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate App Launcher Icons
-        run: flutter pub run flutter_launcher_icons
+        run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true
 
       - name: Build iOS App
         env:
@@ -53,7 +53,7 @@ jobs:
       - name: Package Payload to IPA
         run: |
           mkdir -p Payload
-          mv build/ios/iphoneos/Runner.app Payload/
+          cp -R build/ios/iphoneos/Runner.app Payload/
           zip -r PetitPas_v1.3.0.ipa Payload
 
       - name: Upload IPA Artifact
