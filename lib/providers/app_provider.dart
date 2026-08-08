@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -206,8 +207,8 @@ class AppStateProvider extends ChangeNotifier {
       // Evict Flutter Image Cache for this path to guarantee immediate UI refresh
       try {
         await FileImage(File(targetPath)).evict();
-        PaintingBinding.instance.imageCache.clear();
-        PaintingBinding.instance.imageCache.clearLiveImages();
+        imageCache.clear();
+        imageCache.clearLiveImages();
       } catch (cacheErr) {
         debugPrint('[Photo Cache Evict] $cacheErr');
       }
