@@ -516,12 +516,18 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? activityType}) {
     final nameCtrl = TextEditingController(text: activityType?.name ?? '');
     final descCtrl = TextEditingController(text: activityType?.description ?? '');
-    String cat = activityType?.category ?? (provider.categories.isNotEmpty ? provider.categories.first : 'Autre');
+    String cat = (activityType != null && provider.categories.contains(activityType.category))
+        ? activityType.category
+        : (provider.categories.isNotEmpty ? provider.categories.first : 'Général');
     String color = activityType?.colorHex ?? '#4E9F3D';
 
     showDialog(
       context: context,
       builder: (context) {
+        final categoriesList = provider.categories.contains(cat) 
+            ? provider.categories 
+            : [...provider.categories, cat];
+
         return AlertDialog(
           title: Text(activityType == null ? 'Ajouter un Atelier' : 'Modifier l\'Atelier'),
           content: Column(
@@ -532,7 +538,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               DropdownButtonFormField<String>(
                 value: cat,
                 decoration: const InputDecoration(labelText: 'Domaine / Catégorie'),
-                items: provider.categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: categoriesList.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (val) {
                   if (val != null) cat = val;
                 },
