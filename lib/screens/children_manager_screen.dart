@@ -676,6 +676,19 @@ class ChildrenManagerScreen extends StatelessWidget {
 
     return doc.save();
   }
+
+  void _openEditActivityLog(BuildContext context, AppStateProvider provider, ActivityLog log, ActivityType actType, Child child) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _EditActivityLogScreen(
+          activityLog: log,
+          actType: actType,
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Proper StatefulWidget for Child form dialog ───
@@ -847,19 +860,6 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _openEditActivityLog(BuildContext context, AppStateProvider provider, ActivityLog log, ActivityType actType, Child child) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => _EditActivityLogScreen(
-          activityLog: log,
-          actType: actType,
-          child: child,
         ),
       ),
     );
