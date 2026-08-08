@@ -24,9 +24,12 @@ class PetitPasApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appProvider = Provider.of<AppStateProvider>(context);
+
     return MaterialApp(
       title: 'PetitPas - Suivi Maternelle',
       debugShowCheckedModeBanner: false,
+      themeMode: appProvider.themeMode,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Outfit',
@@ -35,6 +38,7 @@ class PetitPasApp extends StatelessWidget {
           primary: const Color(0xFF4E9F3D),
           secondary: const Color(0xFFFF7043),
           surface: const Color(0xFFF8FAF7),
+          brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAF7),
         appBarTheme: const AppBarTheme(
@@ -44,6 +48,29 @@ class PetitPasApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Color(0xFF2D3748)),
           titleTextStyle: TextStyle(
             color: Color(0xFF2D3748),
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Outfit',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4E9F3D),
+          primary: const Color(0xFF4E9F3D),
+          secondary: const Color(0xFFFF7043),
+          surface: const Color(0xFF1E293B),
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E293B),
+          elevation: 0,
+          scrolledUnderElevation: 1,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),

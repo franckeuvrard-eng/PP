@@ -16,8 +16,18 @@ import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../services/excel_export_service.dart';
 
-class ChildrenManagerScreen extends StatelessWidget {
+enum ChildFilterMode { all, pendingToday, evaluatedToday }
+
+class ChildrenManagerScreen extends StatefulWidget {
   const ChildrenManagerScreen({super.key});
+
+  @override
+  State<ChildrenManagerScreen> createState() => _ChildrenManagerScreenState();
+}
+
+class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
+  String _searchQuery = '';
+  ChildFilterMode _filterMode = ChildFilterMode.all;
 
   Widget _buildChildAvatar(Child child, AppStateProvider provider) {
     final absolutePath = provider.getAbsolutePath(child.imagePath);
@@ -34,9 +44,41 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
+    final now = DateTime.now();
+
+    final allChildren = provider.children;
+
+    // Calculate today activity counts per child
+    final Map<String, int> todayActivityCounts = {};
+    for (var child in allChildren) {
+      final count = provider.activities.where((act) => act.childId == child.id && _isSameDay(act.timestamp, now)).length;
+      todayActivityCounts[child.id] = count;
+    }
+
+    final pendingTodayCount = allChildren.where((c) => (todayActivityCounts[c.id] ?? 0) == 0).length;
+    final evaluatedTodayCount = allChildren.where((c) => (todayActivityCounts[c.id] ?? 0) > 0).length;
+
+    // Filter list
+    final filteredChildren = allChildren.where((child) {
+      // 1. Text Search
+      final nameMatches = '${child.firstname} ${child.lastname ?? ""}'.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (child.group ?? "").toLowerCase().contains(_searchQuery.toLowerCase());
+      if (!nameMatches) return false;
+
+      // 2. Status Filter
+      final todayCount = todayActivityCounts[child.id] ?? 0;
+      if (_filterMode == ChildFilterMode.pendingToday && todayCount > 0) return false;
+      if (_filterMode == ChildFilterMode.evaluatedToday && todayCount == 0) return false;
+
+      return true;
+    }).toList();
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -45,45 +87,142 @@ class ChildrenManagerScreen extends StatelessWidget {
         icon: const Icon(Icons.person_add, color: Colors.white),
         label: const Text('Ajouter Élève', style: TextStyle(color: Colors.white)),
       ),
-      body: provider.children.isEmpty
-          ? const Center(
-              child: Text('Aucun élève enregistré. Ajoutez-en un !'),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.children.length,
-              itemBuilder: (context, index) {
-                final child = provider.children[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: ListTile(
-                    onTap: () => _showChildHistoryDialog(context, provider, child),
-                    leading: _buildChildAvatar(child, provider),
-                    title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(child.group ?? 'Sans groupe'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
-                          onPressed: () => _choosePdfPeriod(context, child, provider),
-                          tooltip: 'Générer le rapport PDF',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Color(0xFF718096)),
-                          onPressed: () => _openChildDialog(context, provider, child: child),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _confirmDeleteChild(context, provider, child),
-                        ),
-                      ],
+      body: Column(
+        children: [
+          // ── SEARCH & FILTER HEADER ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher un élève, groupe...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setState(() => _searchQuery = ''),
+                          )
+                        : null,
+                    filled: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-                );
-              },
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: Text('Tous (${allChildren.length})'),
+                        selected: _filterMode == ChildFilterMode.all,
+                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        checkmarkColor: const Color(0xFF4E9F3D),
+                        onSelected: (_) => setState(() => _filterMode = ChildFilterMode.all),
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: Text('⏳ En attente ($pendingTodayCount)'),
+                        selected: _filterMode == ChildFilterMode.pendingToday,
+                        selectedColor: Colors.amber.withOpacity(0.2),
+                        checkmarkColor: Colors.amber.shade900,
+                        onSelected: (_) => setState(() => _filterMode = ChildFilterMode.pendingToday),
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: Text('✅ Évalués aujourd\'hui ($evaluatedTodayCount)'),
+                        selected: _filterMode == ChildFilterMode.evaluatedToday,
+                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        checkmarkColor: const Color(0xFF4E9F3D),
+                        onSelected: (_) => setState(() => _filterMode = ChildFilterMode.evaluatedToday),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
+
+          // ── CHILDREN LIST ──
+          Expanded(
+            child: filteredChildren.isEmpty
+                ? const Center(
+                    child: Text('Aucun élève ne correspond à la recherche.'),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: filteredChildren.length,
+                    itemBuilder: (context, index) {
+                      final child = filteredChildren[index];
+                      final todayCount = todayActivityCounts[child.id] ?? 0;
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: ListTile(
+                          onTap: () => _showChildHistoryDialog(context, provider, child),
+                          leading: _buildChildAvatar(child, provider),
+                          title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(child.group ?? 'Sans groupe', style: const TextStyle(fontSize: 12)),
+                              const SizedBox(height: 4),
+                              todayCount > 0
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF4E9F3D).withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '✅ $todayCount activité(s) aujourd\'hui',
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D)),
+                                      ),
+                                    )
+                                  : Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '⏳ En attente d\'activité',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                      ),
+                                    ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
+                                onPressed: () => _choosePdfPeriod(context, child, provider),
+                                tooltip: 'Générer le rapport PDF',
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Color(0xFF718096)),
+                                onPressed: () => _openChildDialog(context, provider, child: child),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                onPressed: () => _confirmDeleteChild(context, provider, child),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

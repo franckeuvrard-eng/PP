@@ -429,13 +429,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             evaluationStatus: _selectedEvaluationStatus,
                           );
                           provider.logActivity(log);
+                          HapticFeedback.mediumImpact();
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Activité enregistrée avec succès !')),
-                            );
+                            _showAnimatedSuccessOverlay(context, 'Activité enregistrée avec succès ! 🎉');
                             setState(() {
                               _selectedChildId = null;
                               _selectedActivityTypeId = null;
+                              _selectedEvaluationStatus = null;
                               _noteController.clear();
                               _selectedPhotoPaths.clear();
                             });
@@ -455,7 +455,63 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             ),
           ),
         ],
-      ),
+  void _showAnimatedSuccessOverlay(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        Future.delayed(const Duration(milliseconds: 1400), () {
+          if (context.mounted) Navigator.pop(context);
+        });
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.elasticOut,
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4E9F3D).withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF4E9F3D),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 48),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

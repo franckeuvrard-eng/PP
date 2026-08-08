@@ -87,10 +87,9 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> _loadFromPrefs() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
       final directory = await getApplicationDocumentsDirectory();
       _docsDirPath = directory.path;
-
-      final prefs = await SharedPreferences.getInstance();
 
       final settingsJson = prefs.getString('class_settings');
       if (settingsJson != null) {
@@ -100,19 +99,19 @@ class AppStateProvider extends ChangeNotifier {
       final childrenJson = prefs.getString('children');
       if (childrenJson != null) {
         final List<dynamic> decoded = json.decode(childrenJson);
-        _children = decoded.map((c) => Child.fromMap(c)).toList();
+        _children = decoded.map((item) => Child.fromMap(item)).toList();
       }
 
-      final activityTypesJson = prefs.getString('activity_types');
-      if (activityTypesJson != null) {
-        final List<dynamic> decoded = json.decode(activityTypesJson);
-        _activityTypes = decoded.map((a) => ActivityType.fromMap(a)).toList();
+      final typesJson = prefs.getString('activity_types');
+      if (typesJson != null) {
+        final List<dynamic> decoded = json.decode(typesJson);
+        _activityTypes = decoded.map((item) => ActivityType.fromMap(item)).toList();
       }
 
       final activitiesJson = prefs.getString('activities');
       if (activitiesJson != null) {
         final List<dynamic> decoded = json.decode(activitiesJson);
-        _activities = decoded.map((l) => ActivityLog.fromMap(l)).toList();
+        _activities = decoded.map((item) => ActivityLog.fromMap(item)).toList();
       }
 
       final evaluationStatusesJson = prefs.getString('evaluation_statuses');
@@ -125,6 +124,17 @@ class AppStateProvider extends ChangeNotifier {
       if (categoriesJson != null) {
         final List<dynamic> decoded = json.decode(categoriesJson);
         _categories = List<String>.from(decoded);
+      }
+
+      final themeStr = prefs.getString('theme_mode');
+      if (themeStr != null) {
+        if (themeStr == 'light') {
+          _themeMode = ThemeMode.light;
+        } else if (themeStr == 'dark') {
+          _themeMode = ThemeMode.dark;
+        } else {
+          _themeMode = ThemeMode.system;
+        }
       }
 
       notifyListeners();
@@ -142,6 +152,11 @@ class AppStateProvider extends ChangeNotifier {
       await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
       await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
       await prefs.setString('categories', json.encode(_categories));
+      
+      String themeStr = 'system';
+      if (_themeMode == ThemeMode.light) themeStr = 'light';
+      if (_themeMode == ThemeMode.dark) themeStr = 'dark';
+      await prefs.setString('theme_mode', themeStr);
     } catch (e) {
       debugPrint('Error saving preferences: $e');
     }
@@ -437,7 +452,18 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addOrUpdateActivityType(ActivityType actType) {
+  void importActivityTypePack(List<ActivityType> newTypes) {
+    for (var act in newTypes) {
+      final existingIndex = _activityTypes.indexWhere((a) => a.name.toLowerCase().trim() == act.name.toLowerCase().trim());
+      if (existingIndex == -1) {
+        _activityTypes.add(act);
+      }
+    }
+    _saveToPrefs();
+    notifyListeners();
+  }
+
+  void saveActivityType(ActivityType actType) {
     final index = _activityTypes.indexWhere((a) => a.id == actType.id);
     if (index >= 0) {
       _activityTypes[index] = actType;
