@@ -14,6 +14,7 @@ import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
+import '../services/excel_export_service.dart';
 
 class ChildrenManagerScreen extends StatelessWidget {
   const ChildrenManagerScreen({super.key});
@@ -186,18 +187,32 @@ class ChildrenManagerScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _exportToExcel(context, provider, child, childLogs);
+                  child: Builder(
+                    builder: (btnContext) {
+                      return ElevatedButton.icon(
+                        onPressed: () {
+                          final box = btnContext.findRenderObject() as RenderBox?;
+                          final Rect? sharePositionOrigin = box != null && box.hasSize
+                              ? box.localToGlobal(Offset.zero) & box.size
+                              : null;
+                          Navigator.pop(context);
+                          ExcelExportService.exportSingleChild(
+                            context: context,
+                            provider: provider,
+                            child: child,
+                            logs: childLogs,
+                            sharePositionOrigin: sharePositionOrigin,
+                          );
+                        },
+                        icon: const Icon(Icons.table_chart, size: 18),
+                        label: const Text('Exporter en Excel'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF217346),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
                     },
-                    icon: const Icon(Icons.table_chart, size: 18),
-                    label: const Text('Exporter en Excel'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF217346),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
                   ),
                 ),
               ),
@@ -220,63 +235,7 @@ class ChildrenManagerScreen extends StatelessWidget {
     );
   }
 
-  // ─────────────────── EXCEL EXPORT ───────────────────
-  Future<void> _exportToExcel(
-    BuildContext context,
-    AppStateProvider provider,
-    Child child,
-    List<ActivityLog> logs,
-  ) async {
-    try {
-      final excel = xl.Excel.createExcel();
-      final sheet = excel['Activités'];
-      excel.setDefaultSheet('Activités');
 
-      // Header row
-      sheet.appendRow([
-        xl.TextCellValue('Date'),
-        xl.TextCellValue('Atelier'),
-        xl.TextCellValue('Catégorie'),
-        xl.TextCellValue('Statut'),
-        xl.TextCellValue('Observation'),
-      ]);
-
-      // Data rows
-      for (final log in logs) {
-        final actType = provider.activityTypes.firstWhere(
-          (a) => a.id == log.activityTypeId,
-          orElse: () => ActivityType(id: '', name: 'Inconnu', category: '', iconName: '', colorHex: ''),
-        );
-        sheet.appendRow([
-          xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
-          xl.TextCellValue(actType.name),
-          xl.TextCellValue(actType.category),
-          xl.TextCellValue(log.evaluationStatus ?? ''),
-          xl.TextCellValue(log.note ?? ''),
-        ]);
-      }
-
-      final bytes = excel.encode();
-      if (bytes == null) throw Exception('Erreur encodage Excel');
-
-      final tempDir = await getTemporaryDirectory();
-      final filename = 'PetitPas_${child.firstname}_${child.lastname ?? ""}_${DateTime.now().millisecondsSinceEpoch}.xlsx'
-          .replaceAll(' ', '_');
-      final file = File('${tempDir.path}/$filename');
-      await file.writeAsBytes(bytes);
-
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Rapport Excel — ${child.firstname}',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur export Excel : $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
 
   // ─────────────────── PDF PERIOD PICKER ───────────────────
   void _choosePdfPeriod(BuildContext context, Child child, AppStateProvider provider) {
