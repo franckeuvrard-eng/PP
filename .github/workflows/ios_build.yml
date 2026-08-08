@@ -41,9 +41,13 @@ jobs:
         run: flutter pub get
 
       - name: Generate App Launcher Icons
-        run: dart run flutter_launcher_icons
+        run: flutter pub run flutter_launcher_icons
 
       - name: Build iOS App
+        env:
+          CODE_SIGNING_ALLOWED: 'NO'
+          CODE_SIGNING_REQUIRED: 'NO'
+          CODE_SIGN_IDENTITY: ''
         run: flutter build ios --release --no-codesign
 
       - name: Package Payload to IPA
