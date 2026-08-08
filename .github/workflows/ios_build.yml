@@ -31,7 +31,6 @@ jobs:
           mv ios/Runner/Info.plist Info.plist.bak
           flutter create --project-name=petitpas --platforms=ios .
           mv Info.plist.bak ios/Runner/Info.plist
-          echo "platform :ios, '14.0'" > ios/Podfile
           echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
@@ -39,7 +38,12 @@ jobs:
           rm -rf test
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          if [ -f ios/Podfile ]; then
+            sed -i '' 's/# platform :ios/platform :ios/g' ios/Podfile
+            sed -i '' "s/platform :ios, .*/platform :ios, '14.0'/g" ios/Podfile
+          fi
 
       - name: Generate App Launcher Icons
         run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true
