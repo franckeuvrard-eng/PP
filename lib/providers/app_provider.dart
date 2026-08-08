@@ -72,6 +72,8 @@ class AppStateProvider extends ChangeNotifier {
     'Général',
   ];
 
+  ThemeMode _themeMode = ThemeMode.system;
+
   String? _docsDirPath;
 
   AppStateProvider() {
@@ -84,6 +86,13 @@ class AppStateProvider extends ChangeNotifier {
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
   List<String> get categories => List.unmodifiable(_categories);
+  ThemeMode get themeMode => _themeMode;
+
+  void setThemeMode(ThemeMode mode) {
+    _themeMode = mode;
+    _saveToPrefs();
+    notifyListeners();
+  }
 
   Future<void> _loadFromPrefs() async {
     try {
