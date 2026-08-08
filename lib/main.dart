@@ -65,7 +65,7 @@ class PetitPasApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: const Color(0xFF1E293B),
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -99,7 +99,7 @@ class PetitPasApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
           titleMedium: TextStyle(color: Colors.white),
         ),
-        dialogTheme: const DialogThemeData(
+        dialogTheme: const DialogTheme(
           backgroundColor: Color(0xFF1E293B),
           titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),

@@ -93,7 +93,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(40),
                     child: Text(
                       'Aucune activité enregistrée aujourd\'hui.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                     ),
                   ),
                 )
@@ -166,11 +166,11 @@ class HomeDashboardScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         actType.name,
-                                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontWeight: FontWeight.w600),
+                                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600),
                                       ),
                                       Text(
                                         DateFormat('HH:mm').format(act.timestamp),
-                                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                                       ),
                                     ],
                                   ),
@@ -181,7 +181,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                        color: Theme.of(context).colorScheme.surfaceVariant,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -198,13 +198,13 @@ class HomeDashboardScreen extends StatelessWidget {
                                       width: double.infinity,
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                        color: Theme.of(context).colorScheme.surface,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(color: Theme.of(context).dividerColor),
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                                       ),
                                     ),
                                   ],
