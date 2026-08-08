@@ -845,7 +845,6 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                 icon: const Icon(Icons.save),
                 label: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              ),
             ),
           ],
         ),
