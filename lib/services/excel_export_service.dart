@@ -26,7 +26,7 @@ class ExcelExportService {
       excel.setDefaultSheet(sheetName);
 
       // Header row
-      sheet.appendRow([
+      sheet.appendRow(<xl.CellValue?>[
         xl.TextCellValue('Date'),
         xl.TextCellValue('Élève'),
         xl.TextCellValue('Atelier'),
@@ -41,7 +41,7 @@ class ExcelExportService {
           (a) => a.id == log.activityTypeId,
           orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: 'Général', iconName: '', colorHex: ''),
         );
-        sheet.appendRow([
+        sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue('${child.firstname} ${child.lastname ?? ""}'),
           xl.TextCellValue(actType.name),
@@ -93,7 +93,7 @@ class ExcelExportService {
       excel.setDefaultSheet(sheetName);
 
       // Header row
-      sheet.appendRow([
+      sheet.appendRow(<xl.CellValue?>[
         xl.TextCellValue('Date'),
         xl.TextCellValue('Prénom Élève'),
         xl.TextCellValue('Nom Élève'),
@@ -112,7 +112,7 @@ class ExcelExportService {
           (a) => a.id == log.activityTypeId,
           orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: 'Général', iconName: '', colorHex: ''),
         );
-        sheet.appendRow([
+        sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue(child?.firstname ?? 'Élève inconnu'),
           xl.TextCellValue(child?.lastname ?? ''),
