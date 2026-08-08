@@ -647,7 +647,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     } else {
       _selectedCategory = 'Général';
     }
-    _catController.text = _selectedCategory;
+    _catController.text = _selectedCategory ?? 'Général';
   }
 
   @override
