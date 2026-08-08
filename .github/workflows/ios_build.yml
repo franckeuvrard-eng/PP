@@ -31,50 +31,35 @@ jobs:
           mv ios/Runner/Info.plist Info.plist.bak
           flutter create --project-name=petitpas --platforms=ios .
           mv Info.plist.bak ios/Runner/Info.plist
-          cat << 'EOF' > ios/Podfile
-          platform :ios, '14.0'
-
-          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-
-          project 'Runner', {
-            'Debug' => :debug,
-            'Profile' => :release,
-            'Release' => :release,
-          }
-
-          def flutter_root
-            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-            unless File.exist?(generated_xcode_build_settings_path)
-              raise "#{generated_xcode_build_settings_path} must exist. Try running `flutter pub get` first."
-            end
-
-            File.foreach(generated_xcode_build_settings_path) do |line|
-              matches = line.match(/FLUTTER_ROOT\=(.*)/)
-              return matches[1].strip if matches
-            end
-            raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig and running `flutter pub get`."
-          end
-
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
-
-          flutter_ios_podfile_setup
-
-          target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
-
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-          end
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-              end
-            end
-          end
-          EOF
+          echo "platform :ios, '14.0'" > ios/Podfile
+          echo "ENV['COCOAPODS_DISABLE_STATS'] = 'true'" >> ios/Podfile
+          echo "project 'Runner', {'Debug' => :debug, 'Profile' => :release, 'Release' => :release}" >> ios/Podfile
+          echo "def flutter_root" >> ios/Podfile
+          echo "  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)" >> ios/Podfile
+          echo "  unless File.exist?(generated_xcode_build_settings_path)" >> ios/Podfile
+          echo "    raise \"generated_xcode_build_settings_path must exist.\"" >> ios/Podfile
+          echo "  end" >> ios/Podfile
+          echo "  File.foreach(generated_xcode_build_settings_path) do |line|" >> ios/Podfile
+          echo "    matches = line.match(/FLUTTER_ROOT\=(.*)/)" >> ios/Podfile
+          echo "    return matches[1].strip if matches" >> ios/Podfile
+          echo "  end" >> ios/Podfile
+          echo "  raise \"FLUTTER_ROOT not found in generated_xcode_build_settings_path\"" >> ios/Podfile
+          echo "end" >> ios/Podfile
+          echo "require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)" >> ios/Podfile
+          echo "flutter_ios_podfile_setup" >> ios/Podfile
+          echo "target 'Runner' do" >> ios/Podfile
+          echo "  use_frameworks!" >> ios/Podfile
+          echo "  use_modular_headers!" >> ios/Podfile
+          echo "  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))" >> ios/Podfile
+          echo "end" >> ios/Podfile
+          echo "post_install do |installer|" >> ios/Podfile
+          echo "  installer.pods_project.targets.each do |target|" >> ios/Podfile
+          echo "    flutter_additional_ios_build_settings(target)" >> ios/Podfile
+          echo "    target.build_configurations.each do |config|" >> ios/Podfile
+          echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'" >> ios/Podfile
+          echo "    end" >> ios/Podfile
+          echo "  end" >> ios/Podfile
+          echo "end" >> ios/Podfile
           echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
