@@ -35,8 +35,6 @@ jobs:
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
           echo "DEVELOPMENT_TEAM=0000000000" >> ios/Flutter/Release.xcconfig
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' ios/Runner.xcodeproj/project.pbxproj || true
-          sed -i '' 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = 0000000000;/g' ios/Runner.xcodeproj/project.pbxproj || true
           rm -rf test
 
       - name: Install dependencies
