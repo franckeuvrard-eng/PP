@@ -455,6 +455,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
   void _showAnimatedSuccessOverlay(BuildContext context, String message) {
     showDialog(
       context: context,
