@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
@@ -46,7 +48,87 @@ class PetitPasApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainNavigationFrame(),
+      home: const LockScreen(),
+    );
+  }
+}
+
+class LockScreen extends StatefulWidget {
+  const LockScreen({super.key});
+
+  @override
+  State<LockScreen> createState() => _LockScreenState();
+}
+
+class _LockScreenState extends State<LockScreen> {
+  final LocalAuthentication auth = LocalAuthentication();
+  bool _isAuthenticated = false;
+  bool _isAuthenticating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authenticate();
+  }
+
+  Future<void> _authenticate() async {
+    bool authenticated = false;
+    try {
+      setState(() {
+        _isAuthenticating = true;
+      });
+      authenticated = await auth.authenticate(
+        localizedReason: 'Veuillez vous authentifier pour accéder à l\'espace enseignant.',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: false,
+        ),
+      );
+    } on PlatformException catch (e) {
+      debugPrint('Auth error: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _isAuthenticated = authenticated;
+      _isAuthenticating = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isAuthenticated) {
+      return const MainNavigationFrame();
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF4E9F3D),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline, size: 80, color: Colors.white),
+            const SizedBox(height: 20),
+            const Text(
+              'Application Verrouillée',
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 40),
+            if (_isAuthenticating)
+              const CircularProgressIndicator(color: Colors.white)
+            else
+              ElevatedButton.icon(
+                onPressed: _authenticate,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('S\'authentifier (FaceID / Code)'),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4E9F3D),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

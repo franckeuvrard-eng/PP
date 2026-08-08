@@ -24,6 +24,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIStatusBarHidden</key>
+	<false/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>L'application utilise FaceID pour sécuriser l'accès à l'espace enseignant.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>PetitPas utilise la caméra pour scanner les QR Codes des élèves et des ateliers en classe, ainsi que pour prendre des photos des activités.</string>
 	<key>NSMicrophoneUsageDescription</key>

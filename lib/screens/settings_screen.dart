@@ -607,10 +607,19 @@ class _ActivityTypeFormDialog extends StatefulWidget {
 class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _catController;
-  late final TextEditingController _descController;
-  String? _relativeImagePath;
+  late  final _descController = TextEditingController();
+  String? _selectedCategory;
+  String _relativeImagePath = '';
   String? _selectedImagePath;
-  late String _selectedCategory;
+  List<String> _selectedDomains = [];
+
+  final List<String> _cycle1Domains = [
+    'Mobiliser le langage',
+    'Activité physique',
+    'Activités artistiques',
+    'Structurer sa pensée',
+    'Explorer le monde',
+  ];
 
   @override
   void initState() {
@@ -619,9 +628,16 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     final provider = widget.provider;
     _nameController = TextEditingController(text: act?.name ?? '');
     _catController = TextEditingController(text: act?.category ?? '');
-    _descController = TextEditingController(text: act?.description ?? '');
-    _relativeImagePath = act?.imagePath;
-    _selectedImagePath = provider.getAbsolutePath(act?.imagePath);
+    _descController.text = act?.description ?? '';
+    
+    if (act != null) {
+      _selectedDomains = List.from(act.pedagogicalDomains);
+    }
+    
+    if (act?.imagePath != null) {
+      _relativeImagePath = act!.imagePath!;
+      _selectedImagePath = provider.getAbsolutePath(act.imagePath);
+    }
 
     // Resolve default category
     if (act != null && provider.categories.contains(act.category)) {
@@ -668,27 +684,6 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     return Scaffold(
       appBar: AppBar(
         title: Text(act == null ? 'Ajouter un type d\'activité' : 'Modifier le type'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              if (_nameController.text.trim().isEmpty) return;
-              final newAct = ActivityType(
-                id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
-                name: _nameController.text.trim(),
-                category: _catController.text.trim(),
-                description: _descController.text.trim(),
-                iconName: act?.iconName ?? 'palette',
-                colorHex: act?.colorHex ?? '#FF7043',
-                imagePath: _relativeImagePath,
-              );
-              provider.addOrUpdateActivityType(newAct);
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -756,6 +751,68 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
               controller: _descController,
               decoration: const InputDecoration(labelText: 'Description / Instructions'),
               maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Domaines Pédagogiques (Cycle 1)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _cycle1Domains.map((domain) {
+                final isSelected = _selectedDomains.contains(domain);
+                return FilterChip(
+                  label: Text(domain, style: const TextStyle(fontSize: 12)),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                  checkmarkColor: const Color(0xFF4E9F3D),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedDomains.add(domain);
+                      } else {
+                        _selectedDomains.remove(domain);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (_nameController.text.trim().isEmpty) return;
+                  final newAct = ActivityType(
+                    id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
+                    name: _nameController.text.trim(),
+                    category: _catController.text.trim(),
+                    description: _descController.text.trim(),
+                    iconName: act?.iconName ?? 'palette',
+                    colorHex: act?.colorHex ?? '#FF7043',
+                    imagePath: _relativeImagePath,
+                    pedagogicalDomains: _selectedDomains,
+                  );
+                  provider.addOrUpdateActivityType(newAct);
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4E9F3D),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.save),
+                label: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),

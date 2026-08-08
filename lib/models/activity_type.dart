@@ -8,6 +8,7 @@ class ActivityType {
   final String colorHex;
   final String? description;
   final String? imagePath;
+  final List<String> pedagogicalDomains;
 
   ActivityType({
     required this.id,
@@ -17,6 +18,7 @@ class ActivityType {
     required this.colorHex,
     this.description,
     this.imagePath,
+    this.pedagogicalDomains = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +30,7 @@ class ActivityType {
       'colorHex': colorHex,
       'description': description,
       'imagePath': imagePath,
+      'pedagogicalDomains': pedagogicalDomains,
     };
   }
 
@@ -40,6 +43,7 @@ class ActivityType {
       colorHex: map['colorHex'] ?? '#FF7043',
       description: map['description'],
       imagePath: map['imagePath'],
+      pedagogicalDomains: List<String>.from(map['pedagogicalDomains'] ?? []),
     );
   }
 

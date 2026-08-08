@@ -743,30 +743,6 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     return Scaffold(
       appBar: AppBar(
         title: Text(child == null ? 'Ajouter un Élève' : 'Modifier Élève'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              if (_firstnameController.text.trim().isEmpty) return;
-
-              final newChild = Child(
-                id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
-                firstname: _firstnameController.text.trim(),
-                lastname: _lastnameController.text.trim(),
-                group: _groupController.text.trim(),
-                notes: _notesController.text.trim(),
-                email: _emailController.text.trim(),
-                colorHex: child?.colorHex ?? '#4E9F3D',
-                avatarText: _firstnameController.text.trim()[0].toUpperCase(),
-                imagePath: _relativeImagePath,
-              );
-              provider.addOrUpdateChild(newChild);
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -832,6 +808,39 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
             TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
             const SizedBox(height: 10),
             TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Allergies, etc.)')),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (_firstnameController.text.trim().isEmpty) return;
+
+                  final newChild = Child(
+                    id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
+                    firstname: _firstnameController.text.trim(),
+                    lastname: _lastnameController.text.trim(),
+                    group: _groupController.text.trim(),
+                    notes: _notesController.text.trim(),
+                    email: _emailController.text.trim(),
+                    colorHex: child?.colorHex ?? '#4E9F3D',
+                    avatarText: _firstnameController.text.trim()[0].toUpperCase(),
+                    imagePath: _relativeImagePath,
+                  );
+                  provider.addOrUpdateChild(newChild);
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4E9F3D),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.save),
+                label: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
         ),
       ),
