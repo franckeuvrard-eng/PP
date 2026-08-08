@@ -453,11 +453,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            final zipPath = await provider.exportFullBackupZip();
-                            if (zipPath != null && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Sauvegarde ZIP créée et prête à être partagée !')),
-                              );
+                            try {
+                              await provider.exportFullBackup();
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Erreur export: $e'), backgroundColor: Colors.red),
+                                );
+                              }
                             }
                           },
                           icon: const Icon(Icons.download),
@@ -469,11 +472,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            final success = await provider.importFullBackupZip();
-                            if (success && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Données restaurées avec succès ! 🎉'), backgroundColor: Color(0xFF4E9F3D)),
-                              );
+                            final res = await provider.importFullBackup();
+                            if (mounted) {
+                              if (res == 'success') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Données restaurées avec succès ! 🎉'), backgroundColor: Color(0xFF4E9F3D)),
+                                );
+                              } else if (res == 'invalid') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Fichier de sauvegarde invalide.'), backgroundColor: Colors.red),
+                                );
+                              }
                             }
                           },
                           icon: const Icon(Icons.upload),
