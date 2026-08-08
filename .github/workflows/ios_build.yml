@@ -51,12 +51,13 @@ jobs:
           CODE_SIGNING_ALLOWED: 'NO'
           CODE_SIGNING_REQUIRED: 'NO'
           CODE_SIGN_IDENTITY: ''
-        run: flutter build ios --release --no-codesign
+        run: flutter build ipa --release --no-codesign
 
       - name: Package Payload to IPA
         run: |
           mkdir -p Payload
-          mv build/ios/iphoneos/Runner.app Payload/
+          APP_PATH=$(find build/ios -name "Runner.app" | head -n 1)
+          cp -R "$APP_PATH" Payload/
           zip -r PetitPas_v1.3.0.ipa Payload
 
       - name: Upload IPA Artifact
