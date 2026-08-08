@@ -165,6 +165,27 @@ class AppStateProvider extends ChangeNotifier {
         return null;
       }
 
+      // CRITICAL FOR IOS CAMERA: Read bytes IMMEDIATELY from XFile buffer
+      // before iOS dismissViewController purges temporary /tmp/ files!
+      Uint8List bytes;
+      try {
+        bytes = await image.readAsBytes();
+      } catch (readErr) {
+        debugPrint('[Photo] readAsBytes failed: $readErr, trying File fallback');
+        final cleanSourcePath = image.path.replaceFirst('file://', '');
+        final sourceFile = File(cleanSourcePath);
+        if (await sourceFile.exists()) {
+          bytes = await sourceFile.readAsBytes();
+        } else {
+          bytes = Uint8List(0);
+        }
+      }
+
+      if (bytes.isEmpty) {
+        debugPrint('[Photo Error] Could not read bytes for picked image');
+        return null;
+      }
+
       if (_docsDirPath == null) {
         final directory = await getApplicationDocumentsDirectory();
         _docsDirPath = directory.path;
@@ -175,41 +196,23 @@ class AppStateProvider extends ChangeNotifier {
         await targetDir.create(recursive: true);
       }
 
-      final cleanSourcePath = image.path.replaceFirst('file://', '');
-      final sourceFile = File(cleanSourcePath);
       final filename = '${subDir}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final targetPath = '${targetDir.path}/$filename';
 
-      if (await sourceFile.exists()) {
-        try {
-          // Attempt direct OS file copy (Fast, 0 RAM overhead, ultra-reliable on iOS)
-          await sourceFile.copy(targetPath);
-          final copiedFile = File(targetPath);
-          if (await copiedFile.exists() && (await copiedFile.length()) > 0) {
-            debugPrint('[Photo Success] Copied file directly to $targetPath');
-            return '$subDir/$filename';
-          }
-        } catch (copyErr) {
-          debugPrint('[Photo Warning] Direct copy failed, falling back to byte stream: $copyErr');
-        }
-      }
+      // Write bytes directly to permanent Documents storage with flush
+      await File(targetPath).writeAsBytes(bytes, flush: true);
+      debugPrint('[Photo Success] Wrote ${bytes.length} bytes to permanent path: $targetPath');
 
-      // Fallback: Read bytes from XFile or File
-      Uint8List bytes;
+      // Evict Flutter Image Cache for this path to guarantee immediate UI refresh
       try {
-        bytes = await image.readAsBytes();
-      } catch (_) {
-        bytes = await sourceFile.readAsBytes();
+        await FileImage(File(targetPath)).evict();
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+      } catch (cacheErr) {
+        debugPrint('[Photo Cache Evict] $cacheErr');
       }
 
-      if (bytes.isNotEmpty) {
-        await File(targetPath).writeAsBytes(bytes, flush: true);
-        debugPrint('[Photo Success] Wrote ${bytes.length} bytes to $targetPath');
-        return '$subDir/$filename';
-      }
-
-      debugPrint('[Photo Error] Image file and bytes were empty for path $cleanSourcePath');
-      return null;
+      return '$subDir/$filename';
     } catch (e, stack) {
       debugPrint('[Photo Exception] Failed to pick/save photo: $e\n$stack');
       return null;
