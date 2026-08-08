@@ -35,6 +35,9 @@ jobs:
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
           echo "DEVELOPMENT_TEAM=0000000000" >> ios/Flutter/Release.xcconfig
+          echo "platform :ios, '14.0'" > ios/Podfile.tmp
+          cat ios/Podfile >> ios/Podfile.tmp
+          mv ios/Podfile.tmp ios/Podfile
           rm -rf test
 
       - name: Install dependencies
