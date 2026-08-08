@@ -460,6 +460,21 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateActivityLog(ActivityLog updatedActivity) {
+    final index = _activities.indexWhere((a) => a.id == updatedActivity.id);
+    if (index >= 0) {
+      _activities[index] = updatedActivity;
+      _saveToPrefs();
+      notifyListeners();
+    }
+  }
+
+  void deleteActivityLog(String id) {
+    _activities.removeWhere((a) => a.id == id);
+    _saveToPrefs();
+    notifyListeners();
+  }
+
   void setEvaluationStatuses(List<String> statuses) {
     _evaluationStatuses = statuses;
     _saveToPrefs();

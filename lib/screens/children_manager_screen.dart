@@ -153,6 +153,10 @@ class ChildrenManagerScreen extends StatelessWidget {
                           );
                           return ListTile(
                             dense: true,
+                            onTap: () {
+                              Navigator.pop(context); // Close history dialog
+                              _openEditActivityLog(context, provider, log, actType, child);
+                            },
                             leading: CircleAvatar(
                               radius: 16,
                               backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
@@ -170,6 +174,7 @@ class ChildrenManagerScreen extends StatelessWidget {
                                   Text(log.note!, style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
                               ],
                             ),
+                            trailing: const Icon(Icons.edit, size: 16, color: Color(0xFF718096)),
                             isThreeLine: true,
                           );
                         },
@@ -831,6 +836,166 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                   if (mounted) {
                     Navigator.pop(context);
                   }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4E9F3D),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.save),
+                label: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openEditActivityLog(BuildContext context, AppStateProvider provider, ActivityLog log, ActivityType actType, Child child) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _EditActivityLogScreen(
+          activityLog: log,
+          actType: actType,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _EditActivityLogScreen extends StatefulWidget {
+  final ActivityLog activityLog;
+  final ActivityType actType;
+  final Child child;
+
+  const _EditActivityLogScreen({
+    required this.activityLog,
+    required this.actType,
+    required this.child,
+  });
+
+  @override
+  State<_EditActivityLogScreen> createState() => _EditActivityLogScreenState();
+}
+
+class _EditActivityLogScreenState extends State<_EditActivityLogScreen> {
+  late TextEditingController _noteController;
+  String? _evaluationStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteController = TextEditingController(text: widget.activityLog.note);
+    _evaluationStatus = widget.activityLog.evaluationStatus;
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<AppStateProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Modifier l\'activité'),
+        backgroundColor: const Color(0xFF4E9F3D),
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.white),
+            tooltip: 'Supprimer',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Supprimer l\'activité ?'),
+                  content: const Text('Cette action est irréversible.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+                    TextButton(
+                      onPressed: () {
+                        provider.deleteActivityLog(widget.activityLog.id);
+                        Navigator.pop(context); // close alert
+                        Navigator.pop(context); // close edit screen
+                      },
+                      child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: Color(int.parse(widget.actType.colorHex.replaceFirst('#', '0xff'))),
+                child: const Icon(Icons.palette, color: Colors.white),
+              ),
+              title: Text(widget.actType.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(DateFormat('dd/MM/yyyy à HH:mm').format(widget.activityLog.timestamp)),
+            ),
+            const SizedBox(height: 24),
+            const Text('Évaluation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: provider.evaluationStatuses.map((status) {
+                final isSelected = _evaluationStatus == status;
+                return ChoiceChip(
+                  label: Text(status),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                  onSelected: (selected) {
+                    setState(() {
+                      _evaluationStatus = selected ? status : null;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _noteController,
+              decoration: const InputDecoration(
+                labelText: 'Notes / Observations',
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
+              maxLines: 4,
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final updated = ActivityLog(
+                    id: widget.activityLog.id,
+                    childId: widget.activityLog.childId,
+                    activityTypeId: widget.activityLog.activityTypeId,
+                    timestamp: widget.activityLog.timestamp,
+                    photoPaths: widget.activityLog.photoPaths,
+                    note: _noteController.text.trim(),
+                    evaluationStatus: _evaluationStatus,
+                  );
+                  provider.updateActivityLog(updated);
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4E9F3D),

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import 'statistics_screen.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
@@ -42,11 +43,26 @@ class HomeDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  title: 'Activités enregistrées aujourd\'hui',
+                  title: 'Aujourd\'hui',
                   value: '${activities.length}',
                   icon: Icons.bolt,
                   color: const Color(0xFFFFF3E0),
                   textColor: const Color(0xFFE65100),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const StatisticsScreen()));
+                  },
+                  child: _buildStatCard(
+                    title: 'Statistiques',
+                    value: 'Analyses',
+                    icon: Icons.bar_chart,
+                    color: const Color(0xFFE3F2FD),
+                    textColor: const Color(0xFF1565C0),
+                  ),
                 ),
               ),
             ],
