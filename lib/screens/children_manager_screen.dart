@@ -687,6 +687,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
   late final TextEditingController _groupController;
   late final TextEditingController _notesController;
   late final TextEditingController _emailController;
+  String? _relativeImagePath;
   String? _selectedImagePath;
 
   @override
@@ -699,6 +700,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     _groupController = TextEditingController(text: child?.group ?? 'Petite Section (PS)');
     _notesController = TextEditingController(text: child?.notes ?? '');
     _emailController = TextEditingController(text: child?.email ?? '');
+    _relativeImagePath = child?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
   }
 
@@ -712,47 +714,16 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     super.dispose();
   }
 
-  Future<void> _pickFromGallery() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (image != null && mounted) {
-        final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
-        if (mounted) {
-          setState(() {
-            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error picking gallery profile image: $e');
-    }
-  }
-
-  Future<void> _pickFromCamera() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (image != null && mounted) {
-        final relPath = await widget.provider.saveXFileToDocs(image, 'profiles');
-        if (mounted) {
-          setState(() {
-            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error picking camera profile image: $e');
+  Future<void> _pickPhoto(ImageSource source) async {
+    final relPath = await widget.provider.pickAndSavePhoto(
+      source: source,
+      subDir: 'profiles',
+    );
+    if (relPath != null && mounted) {
+      setState(() {
+        _relativeImagePath = relPath;
+        _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+      });
     }
   }
 
@@ -777,7 +748,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               child: Column(
                 children: [
                   GestureDetector(
-                    onTap: _pickFromGallery,
+                    onTap: () => _pickPhoto(ImageSource.gallery),
                     child: CircleAvatar(
                       radius: 42,
                       backgroundColor: Colors.grey[200],
@@ -793,7 +764,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
                   TextButton.icon(
                     icon: const Icon(Icons.photo_camera, size: 14),
                     label: const Text('Appareil photo', style: TextStyle(fontSize: 12)),
-                    onPressed: _pickFromCamera,
+                    onPressed: () => _pickPhoto(ImageSource.camera),
                   ),
                 ],
               ),
@@ -840,16 +811,6 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
           onPressed: () async {
             if (_firstnameController.text.trim().isEmpty) return;
 
-            String? relativeImagePath = child?.imagePath;
-            if (_selectedImagePath != null && _selectedImagePath != provider.getAbsolutePath(child?.imagePath)) {
-              if (_selectedImagePath!.contains('profiles/')) {
-                final filename = _selectedImagePath!.split('profiles/').last;
-                relativeImagePath = 'profiles/$filename';
-              } else {
-                relativeImagePath = await provider.saveImageToDocs(_selectedImagePath!, 'profiles');
-              }
-            }
-
             final newChild = Child(
               id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
               firstname: _firstnameController.text.trim(),
@@ -859,7 +820,7 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
               email: _emailController.text.trim(),
               colorHex: child?.colorHex ?? '#4E9F3D',
               avatarText: _firstnameController.text.trim()[0].toUpperCase(),
-              imagePath: relativeImagePath,
+              imagePath: _relativeImagePath,
             );
             provider.addOrUpdateChild(newChild);
             if (mounted) {

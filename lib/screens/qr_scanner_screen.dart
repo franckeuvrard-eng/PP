@@ -99,24 +99,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 title: const Text('Prendre une photo'),
                 onTap: () async {
                   Navigator.pop(context);
-                  try {
-                    final XFile? image = await picker.pickImage(
-                      source: ImageSource.camera,
-                      maxWidth: 1200,
-                      maxHeight: 1200,
-                      imageQuality: 85,
-                    );
-                    if (image != null && mounted) {
-                      final relPath = await provider.saveXFileToDocs(image, 'activities');
-                      final absPath = provider.getAbsolutePath(relPath);
-                      if (absPath != null && mounted) {
-                        setState(() {
-                          _selectedPhotoPaths.add(absPath);
-                        });
-                      }
+                  final relPath = await provider.pickAndSavePhoto(
+                    source: ImageSource.camera,
+                    subDir: 'activities',
+                  );
+                  if (relPath != null) {
+                    final absPath = provider.getAbsolutePath(relPath);
+                    if (absPath != null && mounted) {
+                      setState(() {
+                        _selectedPhotoPaths.add(absPath);
+                      });
                     }
-                  } catch (e) {
-                    debugPrint('Error taking camera photo: $e');
                   }
                 },
               ),

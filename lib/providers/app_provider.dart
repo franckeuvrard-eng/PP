@@ -146,6 +146,76 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
+  // ─── ULTRA-ROBUST PHOTO PICKER & STORAGE ───
+  Future<String?> pickAndSavePhoto({
+    required ImageSource source,
+    required String subDir,
+  }) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (image == null) {
+        debugPrint('[Photo] User cancelled photo pick from $source');
+        return null;
+      }
+
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+
+      final targetDir = Directory('$_docsDirPath/$subDir');
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+      }
+
+      final cleanSourcePath = image.path.replaceFirst('file://', '');
+      final sourceFile = File(cleanSourcePath);
+      final filename = '${subDir}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final targetPath = '${targetDir.path}/$filename';
+
+      if (await sourceFile.exists()) {
+        try {
+          // Attempt direct OS file copy (Fast, 0 RAM overhead, ultra-reliable on iOS)
+          await sourceFile.copy(targetPath);
+          final copiedFile = File(targetPath);
+          if (await copiedFile.exists() && (await copiedFile.length()) > 0) {
+            debugPrint('[Photo Success] Copied file directly to $targetPath');
+            return '$subDir/$filename';
+          }
+        } catch (copyErr) {
+          debugPrint('[Photo Warning] Direct copy failed, falling back to byte stream: $copyErr');
+        }
+      }
+
+      // Fallback: Read bytes from XFile or File
+      Uint8List bytes;
+      try {
+        bytes = await image.readAsBytes();
+      } catch (_) {
+        bytes = await sourceFile.readAsBytes();
+      }
+
+      if (bytes.isNotEmpty) {
+        await File(targetPath).writeAsBytes(bytes, flush: true);
+        debugPrint('[Photo Success] Wrote ${bytes.length} bytes to $targetPath');
+        return '$subDir/$filename';
+      }
+
+      debugPrint('[Photo Error] Image file and bytes were empty for path $cleanSourcePath');
+      return null;
+    } catch (e, stack) {
+      debugPrint('[Photo Exception] Failed to pick/save photo: $e\n$stack');
+      return null;
+    }
+  }
+
   // Saves an XFile (from image_picker) directly to Documents using native byte stream
   Future<String> saveXFileToDocs(XFile xfile, String subDir) async {
     try {

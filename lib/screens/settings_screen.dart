@@ -605,6 +605,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _catController;
   late final TextEditingController _descController;
+  String? _relativeImagePath;
   String? _selectedImagePath;
   late String _selectedCategory;
 
@@ -616,6 +617,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     _nameController = TextEditingController(text: act?.name ?? '');
     _catController = TextEditingController(text: act?.category ?? '');
     _descController = TextEditingController(text: act?.description ?? '');
+    _relativeImagePath = act?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(act?.imagePath);
 
     // Resolve default category
@@ -637,47 +639,16 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     super.dispose();
   }
 
-  Future<void> _pickFromGallery() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (image != null && mounted) {
-        final relPath = await widget.provider.saveXFileToDocs(image, 'workshops');
-        if (mounted) {
-          setState(() {
-            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error picking gallery image: $e');
-    }
-  }
-
-  Future<void> _pickFromCamera() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
-      );
-      if (image != null && mounted) {
-        final relPath = await widget.provider.saveXFileToDocs(image, 'workshops');
-        if (mounted) {
-          setState(() {
-            _selectedImagePath = widget.provider.getAbsolutePath(relPath);
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error picking camera image: $e');
+  Future<void> _pickPhoto(ImageSource source) async {
+    final relPath = await widget.provider.pickAndSavePhoto(
+      source: source,
+      subDir: 'workshops',
+    );
+    if (relPath != null && mounted) {
+      setState(() {
+        _relativeImagePath = relPath;
+        _selectedImagePath = widget.provider.getAbsolutePath(relPath);
+      });
     }
   }
 
@@ -702,7 +673,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
               child: Column(
                 children: [
                   GestureDetector(
-                    onTap: _pickFromGallery,
+                    onTap: () => _pickPhoto(ImageSource.gallery),
                     child: Container(
                       width: 100,
                       height: 100,
@@ -726,7 +697,7 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
                   TextButton.icon(
                     icon: const Icon(Icons.photo_camera, size: 14),
                     label: const Text('Prendre une photo', style: TextStyle(fontSize: 12)),
-                    onPressed: _pickFromCamera,
+                    onPressed: () => _pickPhoto(ImageSource.camera),
                   ),
                 ],
               ),
@@ -771,23 +742,12 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
           onPressed: () async {
             if (_nameController.text.trim().isEmpty) return;
 
-            String? relativeImagePath = act?.imagePath;
-            if (_selectedImagePath != null &&
-                _selectedImagePath != provider.getAbsolutePath(act?.imagePath)) {
-              if (_selectedImagePath!.contains('workshops/')) {
-                final filename = _selectedImagePath!.split('workshops/').last;
-                relativeImagePath = 'workshops/$filename';
-              } else {
-                relativeImagePath = await provider.saveImageToDocs(_selectedImagePath!, 'workshops');
-              }
-            }
-
             final newAct = ActivityType(
               id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
               name: _nameController.text.trim(),
               category: _catController.text.trim(),
               description: _descController.text.trim(),
-              imagePath: relativeImagePath,
+              imagePath: _relativeImagePath,
               iconName: act?.iconName ?? 'palette',
               colorHex: act?.colorHex ?? '#FF7043',
             );
