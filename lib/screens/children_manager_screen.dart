@@ -440,9 +440,12 @@ class ChildrenManagerScreen extends StatelessWidget {
 
   // ─────────────────── ADD/EDIT CHILD DIALOG ───────────────────
   void _openChildDialog(BuildContext context, AppStateProvider provider, {Child? child}) {
-    showDialog(
-      context: context,
-      builder: (context) => _ChildFormDialog(provider: provider, child: child),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => _ChildFormDialog(provider: provider, child: child),
+      ),
     );
   }
 
@@ -737,9 +740,36 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
     final child = widget.child;
     final provider = widget.provider;
 
-    return AlertDialog(
-      title: Text(child == null ? 'Ajouter un Élève' : 'Modifier Élève'),
-      content: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(child == null ? 'Ajouter un Élève' : 'Modifier Élève'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (_firstnameController.text.trim().isEmpty) return;
+
+              final newChild = Child(
+                id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
+                firstname: _firstnameController.text.trim(),
+                lastname: _lastnameController.text.trim(),
+                group: _groupController.text.trim(),
+                notes: _notesController.text.trim(),
+                email: _emailController.text.trim(),
+                colorHex: child?.colorHex ?? '#4E9F3D',
+                avatarText: _firstnameController.text.trim()[0].toUpperCase(),
+                imagePath: _relativeImagePath,
+              );
+              provider.addOrUpdateChild(newChild);
+              if (mounted) {
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -805,31 +835,6 @@ class _ChildFormDialogState extends State<_ChildFormDialog> {
           ],
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-        ElevatedButton(
-          onPressed: () async {
-            if (_firstnameController.text.trim().isEmpty) return;
-
-            final newChild = Child(
-              id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
-              firstname: _firstnameController.text.trim(),
-              lastname: _lastnameController.text.trim(),
-              group: _groupController.text.trim(),
-              notes: _notesController.text.trim(),
-              email: _emailController.text.trim(),
-              colorHex: child?.colorHex ?? '#4E9F3D',
-              avatarText: _firstnameController.text.trim()[0].toUpperCase(),
-              imagePath: _relativeImagePath,
-            );
-            provider.addOrUpdateChild(newChild);
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('Enregistrer'),
-        ),
-      ],
     );
   }
 }

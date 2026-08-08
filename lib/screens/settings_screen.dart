@@ -581,9 +581,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? act}) {
-    showDialog(
-      context: context,
-      builder: (context) => _ActivityTypeFormDialog(provider: provider, act: act),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => _ActivityTypeFormDialog(provider: provider, act: act),
+      ),
     );
   }
 }
@@ -662,9 +665,33 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
     final act = widget.act;
     final provider = widget.provider;
 
-    return AlertDialog(
-      title: Text(act == null ? 'Nouvel Atelier' : 'Modifier l\'Atelier'),
-      content: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(act == null ? 'Ajouter un type d\'activité' : 'Modifier le type'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (_nameController.text.trim().isEmpty) return;
+              final newAct = ActivityType(
+                id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
+                name: _nameController.text.trim(),
+                category: _catController.text.trim(),
+                description: _descController.text.trim(),
+                iconName: act?.iconName ?? 'palette',
+                colorHex: _colorHex,
+                imagePath: _relativeImagePath,
+              );
+              provider.addOrUpdateActivityType(newAct);
+              if (mounted) {
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -733,32 +760,6 @@ class _ActivityTypeFormDialogState extends State<_ActivityTypeFormDialog> {
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            if (_nameController.text.trim().isEmpty) return;
-
-            final newAct = ActivityType(
-              id: act?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
-              name: _nameController.text.trim(),
-              category: _catController.text.trim(),
-              description: _descController.text.trim(),
-              imagePath: _relativeImagePath,
-              iconName: act?.iconName ?? 'palette',
-              colorHex: act?.colorHex ?? '#FF7043',
-            );
-            provider.addOrUpdateActivityType(newAct);
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          },
-          child: Text(act == null ? 'Créer' : 'Enregistrer'),
-        ),
-      ],
     );
   }
 }
