@@ -156,9 +156,10 @@ class AppStateProvider extends ChangeNotifier {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: source,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 85,
+        maxWidth: source == ImageSource.camera ? null : 1200,
+        maxHeight: source == ImageSource.camera ? null : 1200,
+        imageQuality: source == ImageSource.camera ? null : 85,
+        requestFullMetadata: false,
       );
 
       if (image == null) {

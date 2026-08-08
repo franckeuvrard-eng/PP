@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>PetitPas utilise la caméra pour scanner les QR Codes des élèves et des ateliers en classe, ainsi que pour prendre des photos des activités.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>PetitPas a besoin d'accéder au microphone pour la prise de vidéo avec la caméra.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PetitPas utilise la galerie photo pour sélectionner des illustrations d'ateliers et de travaux d'élèves.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
