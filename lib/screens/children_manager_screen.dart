@@ -14,6 +14,7 @@ import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
+import '../models/space.dart';
 import '../services/excel_export_service.dart';
 import 'child_profile_screen.dart';
 
