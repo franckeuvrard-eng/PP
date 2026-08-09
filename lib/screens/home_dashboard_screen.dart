@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../models/activity_type.dart';
-import '../models/child.dart';
 import '../providers/app_provider.dart';
 import '../models/activity.dart';
 
@@ -85,22 +83,11 @@ class HomeDashboardScreen extends StatelessWidget {
                     final act = activities[index];
                     final child = provider.children.firstWhere(
                       (c) => c.id == act.childId,
-                      orElse: () => Child(
-                        id: '',
-                        firstname: 'Enfant inconnu',
-                        colorHex: '#9E9E9E',
-                        avatarText: '?',
-                      ),
+                      orElse: () => provider.children.first,
                     );
                     final actType = provider.activityTypes.firstWhere(
                       (a) => a.id == act.activityTypeId,
-                      orElse: () => ActivityType(
-                        id: '',
-                        name: 'Activité inconnue',
-                        category: 'Général',
-                        iconName: 'palette',
-                        colorHex: '#9E9E9E',
-                      ),
+                      orElse: () => provider.activityTypes.first,
                     );
 
                     return Card(
