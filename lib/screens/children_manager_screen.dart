@@ -10,11 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
-import '../models/activity.dart';
 import '../models/space.dart';
-import '../services/excel_export_service.dart';
 import 'child_profile_screen.dart';
-import 'edit_activity_log_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
 
@@ -229,156 +226,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     );
   }
 
-  // ─────────────────── HISTORY POPUP ───────────────────
-  void _showChildHistoryDialog(BuildContext context, AppStateProvider provider, Child child) {
-    final childLogs = provider.activities.where((log) => log.childId == child.id).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF4E9F3D),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    _buildChildAvatarSmall(child, provider),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${child.firstname} ${child.lastname ?? ""}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          if (child.group != null)
-                            Text(child.group!, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Logs list
-              Flexible(
-                child: childLogs.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(40),
-                        child: Text('Aucune activité enregistrée.', textAlign: TextAlign.center),
-                      )
-                    : ListView.separated(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: childLogs.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final log = childLogs[index];
-                          final actType = provider.activityTypes.firstWhere(
-                            (a) => a.id == log.activityTypeId,
-                            orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
-                          );
-                          return ListTile(
-                            dense: true,
-                            onTap: () {
-                              Navigator.pop(context); // Close history dialog
-                              _openEditActivityLog(context, provider, log, actType, child);
-                            },
-                            leading: CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                              child: const Icon(Icons.palette, size: 14, color: Colors.white),
-                            ),
-                            title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp),
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFFA0AEC0))),
-                                if (log.evaluationStatus != null)
-                                  Text(log.evaluationStatus!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                                if (log.note != null && log.note!.isNotEmpty)
-                                  Text(log.note!, style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
-                              ],
-                            ),
-                            trailing: const Icon(Icons.edit, size: 16, color: Color(0xFF718096)),
-                            isThreeLine: true,
-                          );
-                        },
-                      ),
-              ),
-
-              // Export Excel button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Builder(
-                    builder: (btnContext) {
-                      return ElevatedButton.icon(
-                        onPressed: () {
-                          final box = btnContext.findRenderObject() as RenderBox?;
-                          final Rect? sharePositionOrigin = box != null && box.hasSize
-                              ? box.localToGlobal(Offset.zero) & box.size
-                              : null;
-                          Navigator.pop(context);
-                          ExcelExportService.exportSingleChild(
-                            context: context,
-                            provider: provider,
-                            child: child,
-                            logs: childLogs,
-                            sharePositionOrigin: sharePositionOrigin,
-                          );
-                        },
-                        icon: const Icon(Icons.table_chart, size: 18),
-                        label: const Text('Exporter en Excel'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF217346),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildChildAvatarSmall(Child child, AppStateProvider provider) {
-    final absolutePath = provider.getAbsolutePath(child.imagePath);
-    if (absolutePath != null && File(absolutePath).existsSync()) {
-      return CircleAvatar(radius: 22, backgroundImage: FileImage(File(absolutePath)));
-    }
-    return CircleAvatar(
-      radius: 22,
-      backgroundColor: Colors.white.withOpacity(0.3),
-      child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-    );
-  }
-
-
-
   // ─────────────────── PDF PERIOD PICKER ───────────────────
   void _choosePdfPeriod(BuildContext context, Child child, AppStateProvider provider) {
     DateTimeRange? customRange;
@@ -508,49 +355,13 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     );
   }
 
-  // ─────────────────── DELETE CHILD ───────────────────
-  void _confirmDeleteChild(BuildContext context, AppStateProvider provider, Child child) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.warning, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Confirmer la suppression'),
-            ],
-          ),
-          content: Text('Voulez-vous vraiment supprimer l\'élève ${child.firstname} ${child.lastname ?? ""}? Cette action supprimera également tout son historique d\'activités.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-              onPressed: () {
-                provider.deleteChild(child.id);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${child.firstname} a été supprimé(e).')),
-                );
-              },
-              child: const Text('Supprimer'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   // ─────────────────── ADD/EDIT CHILD DIALOG ───────────────────
   void _openChildDialog(BuildContext context, AppStateProvider provider, {Child? child}) {
     Navigator.push(
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (context) => _ChildFormDialog(provider: provider, child: child),
+        builder: (context) => ChildFormDialog(provider: provider, child: child),
       ),
     );
   }
@@ -796,33 +607,20 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
 
     return doc.save();
   }
-
-  void _openEditActivityLog(BuildContext context, AppStateProvider provider, ActivityLog log, ActivityType actType, Child child) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EditActivityLogScreen(
-          activityLog: log,
-          actType: actType,
-          child: child,
-        ),
-      ),
-    );
-  }
 }
 
 // ─── Proper StatefulWidget for Child form dialog ───
-class _ChildFormDialog extends StatefulWidget {
+class ChildFormDialog extends StatefulWidget {
   final AppStateProvider provider;
   final Child? child;
 
-  const _ChildFormDialog({required this.provider, this.child});
+  const ChildFormDialog({super.key, required this.provider, this.child});
 
   @override
-  State<_ChildFormDialog> createState() => _ChildFormDialogState();
+  State<ChildFormDialog> createState() => _ChildFormDialogState();
 }
 
-class _ChildFormDialogState extends State<_ChildFormDialog> {
+class _ChildFormDialogState extends State<ChildFormDialog> {
   late final TextEditingController _firstnameController;
   late final TextEditingController _lastnameController;
   late final TextEditingController _groupController;

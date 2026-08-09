@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/space.dart';
+import 'children_manager_screen.dart' show ChildFormDialog;
 import 'edit_activity_log_screen.dart';
 
 class ChildProfileScreen extends StatelessWidget {
@@ -41,6 +42,19 @@ class ChildProfileScreen extends StatelessWidget {
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Modifier cet élève',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => ChildFormDialog(provider: provider, child: currentChild),
+                  ),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.delete_forever, color: Colors.red),
               tooltip: 'Supprimer cet élève',
@@ -306,7 +320,7 @@ class ChildProfileScreen extends StatelessWidget {
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
                             ),
                           ),
-                          if (actType.isObligatory)
+                          if (actType.isObligatoryForGroup(child.group))
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(

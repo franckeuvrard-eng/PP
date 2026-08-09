@@ -59,3 +59,8 @@ Flutter/ephemeral
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
+
+# Cible Windows generee localement pour previsualiser l UI (flutter run -d windows).
+# Le projet ne cible que iOS : ce dossier est regenerable via
+# flutter create --project-name=petitpas --platforms=windows .
+/windows/

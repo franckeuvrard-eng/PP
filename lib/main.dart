@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
+import 'utils/platform_support.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
@@ -141,6 +142,12 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
+    if (!isMobilePlatform) {
+      // local_auth n'existe pas hors mobile : en previsualisation poste de
+      // travail on entre directement, sinon l'ecran reste verrouille a vie.
+      _isAuthenticated = true;
+      return;
+    }
     _authenticate();
   }
 
@@ -159,6 +166,8 @@ class _LockScreenState extends State<LockScreen> {
       );
     } on PlatformException catch (e) {
       debugPrint('Auth error: $e');
+    } on MissingPluginException catch (e) {
+      debugPrint('Authentification indisponible sur cette plateforme: $e');
     }
     if (!mounted) return;
     setState(() {

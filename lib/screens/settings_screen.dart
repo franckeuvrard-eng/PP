@@ -7,6 +7,8 @@ import '../models/class_settings.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../data/eduscol_data.dart';
+import '../services/atelier_pdf_service.dart';
+import '../utils/app_icons.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -266,7 +268,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               child: ExpansionTile(
                 leading: CircleAvatar(
                   backgroundColor: Color(int.parse(space.colorHex.replaceFirst('#', '0xff'))),
-                  child: const Icon(Icons.space_dashboard, color: Colors.white, size: 20),
+                  child: Icon(iconForName(space.iconName, fallback: Icons.space_dashboard),
+                      color: Colors.white, size: 20),
                 ),
                 title: Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(
@@ -312,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     leading: CircleAvatar(
                       radius: 16,
                       backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
-                      child: const Icon(Icons.palette, size: 14, color: Colors.white),
+                      child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
                     ),
                     title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     subtitle: Column(
@@ -322,13 +325,25 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 11)),
                         if (atelier.objectifs.isNotEmpty)
                           Text('🏁 ${atelier.objectifs.length} objectif(s) associé(s)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        if (atelier.photoPaths.isNotEmpty)
+                          Text('📷 ${atelier.photoPaths.length} photo(s)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                         if (atelier.isObligatory)
-                          const Text('⭐ Atelier Obligatoire', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          Text(
+                            atelier.obligatoryGroups.isEmpty
+                                ? '⭐ Obligatoire · toute la classe'
+                                : '⭐ Obligatoire · ${atelier.obligatoryGroups.join(', ')}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
                       ],
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        IconButton(
+                          icon: const Icon(Icons.picture_as_pdf, size: 18, color: Color(0xFF4E9F3D)),
+                          tooltip: 'Exporter la fiche PDF de cet atelier',
+                          onPressed: () => AtelierPdfService.openPreview(context, provider, atelier),
+                        ),
                         IconButton(
                           icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                           onPressed: () => _openActivityTypeDialog(context, provider, activityType: atelier),
@@ -370,6 +385,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     final nameCtrl = TextEditingController(text: space?.name ?? '');
     final descCtrl = TextEditingController(text: space?.description ?? '');
     String color = space?.colorHex ?? '#4E9F3D';
+    String? iconName = space?.iconName;
 
     final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
 
@@ -411,6 +427,38 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 12),
+                    const Align(alignment: Alignment.centerLeft, child: Text('Icône :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Color(int.parse(color.replaceFirst('#', '0xff'))).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            iconForName(iconName, fallback: Icons.space_dashboard),
+                            color: Color(int.parse(color.replaceFirst('#', '0xff'))),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showAppIconPicker(context, iconName);
+                              if (picked != null) {
+                                setSt(() => iconName = picked.isEmpty ? null : picked);
+                              }
+                            },
+                            icon: const Icon(Icons.emoji_symbols),
+                            label: Text(iconName == null ? 'Choisir' : iconName!),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -424,6 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         name: nameCtrl.text.trim(),
                         colorHex: color,
                         description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                        iconName: iconName,
                       );
                       provider.addOrUpdateSpace(newSpace);
                       Navigator.pop(context);
@@ -739,6 +788,11 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   late String _selectedLevelFilter;
   late bool _isObligatory;
   late List<String> _selectedObjectives;
+  late String? _iconName;
+  late List<String> _obligatoryGroups;
+  late List<String> _photoPaths;
+  late String? _imagePath;
+  final ScrollController _objectivesScrollCtrl = ScrollController();
 
   final List<String> _colors = [
     '#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5',
@@ -770,6 +824,79 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
 
     _selectedLevelFilter = 'Tous';
     _selectedObjectives = List<String>.from(act?.objectifs ?? []);
+    _iconName = act?.iconName;
+    _obligatoryGroups = List<String>.from(act?.obligatoryGroups ?? []);
+    _photoPaths = List<String>.from(act?.photoPaths ?? []);
+    _imagePath = act?.imagePath;
+  }
+
+  /// Sections existantes, deduites des eleves : le groupe est un champ libre
+  /// saisi sur la fiche eleve, il n'y a pas de referentiel separe.
+  List<String> _knownGroups(AppStateProvider provider) {
+    final groups = provider.children
+        .map((c) => c.group)
+        .whereType<String>()
+        .where((g) => g.trim().isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    // Un groupe deja cible mais dont plus aucun eleve ne fait partie doit
+    // rester visible, sinon on ne pourrait plus le decocher.
+    for (final g in _obligatoryGroups) {
+      if (!groups.contains(g)) groups.add(g);
+    }
+    return groups;
+  }
+
+  Future<void> _addAtelierPhotos() async {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    final picker = ImagePicker();
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Sélectionner de la galerie (multiples)'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  try {
+                    final images = await picker.pickMultiImage(
+                      maxWidth: 1600,
+                      maxHeight: 1600,
+                      imageQuality: 85,
+                    );
+                    for (final img in images) {
+                      final relPath = await provider.saveXFileToDocs(img, 'ateliers');
+                      if (mounted) setState(() => _photoPaths.add(relPath));
+                    }
+                  } catch (e) {
+                    debugPrint('Erreur selection photos atelier: $e');
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Prendre une photo'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final relPath = await provider.pickAndSavePhoto(
+                    source: ImageSource.camera,
+                    subDir: 'ateliers',
+                  );
+                  if (relPath != null && mounted) {
+                    setState(() => _photoPaths.add(relPath));
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -778,6 +905,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _descCtrl.dispose();
     _customDomaineCtrl.dispose();
     _customObjectiveCtrl.dispose();
+    _objectivesScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -856,13 +984,58 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         ],
                       ),
                       subtitle: const Text(
-                        'Cochez si cet atelier doit être réalisé par l\'ensemble des élèves de la classe.',
+                        'Cet atelier doit être réalisé par les élèves concernés.',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       value: _isObligatory,
                       activeColor: const Color(0xFF4E9F3D),
                       onChanged: (val) => setState(() => _isObligatory = val),
                     ),
+                    if (_isObligatory) ...[
+                      const SizedBox(height: 4),
+                      const Text('Sections concernées :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text(
+                        _obligatoryGroups.isEmpty
+                            ? 'Aucune section sélectionnée : obligatoire pour toute la classe.'
+                            : 'Obligatoire uniquement pour ${_obligatoryGroups.length} section(s).',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final groups = _knownGroups(provider);
+                          if (groups.isEmpty) {
+                            return const Text(
+                              'Aucune section définie sur les fiches élèves pour le moment.',
+                              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+                            );
+                          }
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: groups.map((g) {
+                              final isSelected = _obligatoryGroups.contains(g);
+                              return FilterChip(
+                                label: Text(g, style: const TextStyle(fontSize: 13)),
+                                selected: isSelected,
+                                selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                                checkmarkColor: const Color(0xFF4E9F3D),
+                                onSelected: (sel) {
+                                  setState(() {
+                                    if (sel) {
+                                      _obligatoryGroups.add(g);
+                                    } else {
+                                      _obligatoryGroups.remove(g);
+                                    }
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -951,7 +1124,10 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       const SizedBox(height: 8),
 
                       Container(
-                        constraints: const BoxConstraints(maxHeight: 220),
+                        // Liste plus haute et barre de defilement toujours
+                        // visible : a 220 px sans ascenseur, on ne voyait pas
+                        // ou l'on se situait dans le referentiel.
+                        constraints: const BoxConstraints(maxHeight: 380),
                         decoration: BoxDecoration(
                           border: Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(12),
@@ -961,8 +1137,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                 padding: EdgeInsets.all(16),
                                 child: Text('Aucun objectif officiel disponible pour ce filtre.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                               )
-                            : ListView.separated(
+                            : Scrollbar(
+                                controller: _objectivesScrollCtrl,
+                                thumbVisibility: true,
+                                child: ListView.separated(
+                                controller: _objectivesScrollCtrl,
                                 shrinkWrap: true,
+                                padding: const EdgeInsets.only(right: 8),
                                 itemCount: availableEduscolObjectives.length,
                                 separatorBuilder: (_, __) => const Divider(height: 1),
                                 itemBuilder: (context, idx) {
@@ -988,6 +1169,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                   );
                                 },
                               ),
+                            ),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -1093,6 +1275,111 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 16),
+
+                    const Text('Icône de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Color(int.parse(_color.replaceFirst('#', '0xff'))).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            iconForName(_iconName, fallback: Icons.category),
+                            color: Color(int.parse(_color.replaceFirst('#', '0xff'))),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final picked = await showAppIconPicker(context, _iconName);
+                              if (picked != null && mounted) {
+                                setState(() => _iconName = picked.isEmpty ? null : picked);
+                              }
+                            },
+                            icon: const Icon(Icons.emoji_symbols),
+                            label: Text(_iconName == null ? 'Choisir une icône' : 'Icône : $_iconName'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Photos de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        Text('${_photoPaths.length} photo(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Elles illustrent l\'atelier et sont reprises dans l\'export PDF.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 92,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          GestureDetector(
+                            onTap: _addAtelierPhotos,
+                            child: Container(
+                              width: 88,
+                              height: 88,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Theme.of(context).dividerColor),
+                              ),
+                              child: Icon(Icons.add_a_photo,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant, size: 26),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ..._photoPaths.asMap().entries.map((entry) {
+                            final absPath = provider.getAbsolutePath(entry.value);
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: absPath != null && File(absPath).existsSync()
+                                        ? Image.file(File(absPath), width: 88, height: 88, fit: BoxFit.cover)
+                                        : Container(
+                                            width: 88,
+                                            height: 88,
+                                            color: Theme.of(context).colorScheme.surfaceVariant,
+                                            child: const Icon(Icons.broken_image, size: 24),
+                                          ),
+                                  ),
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: GestureDetector(
+                                      onTap: () => setState(() => _photoPaths.removeAt(entry.key)),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                        child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1142,9 +1429,15 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       spaceId: _spaceId,
       colorHex: _color,
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+      // imagePath n'etait pas repris : modifier un atelier effacait jusqu'ici
+      // son illustration principale.
+      imagePath: _imagePath,
       domaine: finalDomaine,
       objectifs: _selectedObjectives,
       isObligatory: _isObligatory,
+      iconName: _iconName,
+      photoPaths: _photoPaths,
+      obligatoryGroups: _isObligatory ? _obligatoryGroups : const [],
     );
 
     provider.saveActivityType(newType);

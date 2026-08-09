@@ -9,6 +9,7 @@ import '../providers/app_provider.dart';
 import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../utils/platform_support.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -26,6 +27,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   bool _showManualSelection = false;
 
   Future<void> _startQrScanner(BuildContext context, AppStateProvider provider) async {
+    if (!isMobilePlatform) {
+      // mobile_scanner n'a pas d'implementation poste de travail : ouvrir la
+      // route camera y provoquerait une MissingPluginException.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Le scan QR n\'est disponible que sur iPhone et iPad.')),
+      );
+      return;
+    }
+
     final result = await Navigator.push<Map<String, String?>>(
       context,
       MaterialPageRoute(
@@ -723,7 +733,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                   icon: ValueListenableBuilder(
                     valueListenable: _controller.torchState,
                     builder: (context, state, child) {
-                      switch (state as TorchState) {
+                      switch (state) {
                         case TorchState.off:
                           return const Icon(Icons.flash_off, color: Colors.white, size: 24);
                         case TorchState.on:

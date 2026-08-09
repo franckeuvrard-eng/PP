@@ -206,7 +206,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
                                           ),
                                         ),
-                                      if (actType.isObligatory)
+                                      if (actType.isObligatoryForGroup(child.group))
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(

@@ -6,6 +6,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../services/excel_export_service.dart';
+import '../utils/app_icons.dart';
 
 enum StatsPeriod { all, today, week, month }
 
@@ -500,9 +501,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   .map((l) => l.childId)
                   .toSet();
 
-              final completedChildren = children.where((c) => completedChildIds.contains(c.id)).toList();
-              final missingChildren = children.where((c) => !completedChildIds.contains(c.id)).toList();
-              final ratio = children.isEmpty ? 0.0 : completedChildren.length / children.length;
+              // Un atelier peut n'etre obligatoire que pour certaines sections :
+              // le suivi ne porte que sur les eleves reellement concernes.
+              final concernedChildren =
+                  children.where((c) => actType.isObligatoryForGroup(c.group)).toList();
+              final completedChildren = concernedChildren.where((c) => completedChildIds.contains(c.id)).toList();
+              final missingChildren = concernedChildren.where((c) => !completedChildIds.contains(c.id)).toList();
+              // Sans eleve concerne il n'y a rien a realiser : on evite
+              // d'afficher une barre rouge trompeuse.
+              final ratio = concernedChildren.isEmpty
+                  ? 1.0
+                  : completedChildren.length / concernedChildren.length;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -510,13 +519,22 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 child: ExpansionTile(
                   leading: CircleAvatar(
                     backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                    child: const Icon(Icons.stars, color: Colors.white, size: 20),
+                    child: Icon(iconForName(actType.iconName, fallback: Icons.stars), color: Colors.white, size: 20),
                   ),
                   title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('📍 Espace : ${space.name}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        actType.obligatoryGroups.isEmpty
+                            ? '👥 Toute la classe'
+                            : '👥 ${actType.obligatoryGroups.join(', ')}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      if (concernedChildren.isEmpty)
+                        const Text('Aucun élève dans les sections ciblées.',
+                            style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -535,7 +553,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            '${completedChildren.length} / ${children.length}',
+                            '${completedChildren.length} / ${concernedChildren.length}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ],
