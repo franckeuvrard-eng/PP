@@ -47,8 +47,9 @@ jobs:
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
           # flutter create regenere le test/widget_test.dart du template, qui
           # reference MyApp() alors que la classe racine est PetitPasApp :
-          # il ferait echouer 'flutter analyze'.
-          rm -rf test
+          # il ferait echouer 'flutter analyze'. On ne supprime que ce
+          # fichier-la, les tests du depot doivent survivre.
+          rm -f test/widget_test.dart
 
       - name: Normalize iOS deployment target
         # flutter create reecrit project.pbxproj et AppFrameworkInfo.plist avec 12.0.
@@ -89,6 +90,11 @@ jobs:
         # Bloque uniquement sur les vraies erreurs de compilation Dart :
         # les infos et warnings de style ne doivent pas casser la release.
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        # Le build ne verifiait jusqu'ici que la compilation : des correctifs
+        # ont ete livres comme fonctionnels sans l'etre.
+        run: flutter test --reporter expanded
 
       - name: Generate App Launcher Icons
         run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true

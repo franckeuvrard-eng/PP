@@ -9,7 +9,16 @@ class ActivityType {
   final String colorHex;
   final String? description;
   final String? imagePath;
+  /// Libellé du domaine. Reste la source pour un domaine personnalisé.
   final String domaine;
+
+  /// Identifiant du domaine Éduscol (voir EduscolData.domains), ou null pour
+  /// un domaine saisi librement.
+  ///
+  /// Le libellé seul liait l'atelier au texte exact du référentiel : le jour où
+  /// une formulation officielle évolue, l'atelier se retrouverait rattaché à
+  /// un domaine qui n'existe plus.
+  final String? domaineId;
   final List<String> objectifs;
   final bool isObligatory;
 
@@ -37,6 +46,7 @@ class ActivityType {
     this.description,
     this.imagePath,
     this.domaine = '',
+    this.domaineId,
     this.objectifs = const [],
     this.isObligatory = false,
     this.iconName,
@@ -78,6 +88,7 @@ class ActivityType {
     Object? description = kUndefined,
     Object? imagePath = kUndefined,
     String? domaine,
+    Object? domaineId = kUndefined,
     List<String>? objectifs,
     bool? isObligatory,
     Object? iconName = kUndefined,
@@ -93,6 +104,7 @@ class ActivityType {
       description: description == kUndefined ? this.description : description as String?,
       imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
       domaine: domaine ?? this.domaine,
+      domaineId: domaineId == kUndefined ? this.domaineId : domaineId as String?,
       objectifs: objectifs ?? this.objectifs,
       isObligatory: isObligatory ?? this.isObligatory,
       iconName: iconName == kUndefined ? this.iconName : iconName as String?,
@@ -113,6 +125,7 @@ class ActivityType {
       'description': description,
       'imagePath': imagePath,
       'domaine': domaine,
+      'domaineId': domaineId,
       'objectifs': objectifs,
       'isObligatory': isObligatory,
       'iconName': iconName,
@@ -131,6 +144,7 @@ class ActivityType {
       description: map['description'],
       imagePath: map['imagePath'],
       domaine: map['domaine'] ?? '',
+      domaineId: map['domaineId'],
       objectifs: List<String>.from(map['objectifs'] ?? map['pedagogicalDomains'] ?? []),
       isObligatory: map['isObligatory'] ?? false,
       iconName: map['iconName'],

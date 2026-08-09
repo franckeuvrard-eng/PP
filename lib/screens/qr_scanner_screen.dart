@@ -871,15 +871,13 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    Child? scannedChild;
-    if (_scannedChildId != null) {
-      scannedChild = widget.children.firstWhere((c) => c.id == _scannedChildId);
-    }
-
-    ActivityType? scannedActivity;
-    if (_scannedActivityTypeId != null) {
-      scannedActivity = widget.activityTypes.firstWhere((a) => a.id == _scannedActivityTypeId);
-    }
+    // Un identifiant pre-selectionne peut designer un eleve ou un atelier
+    // supprime entre-temps : firstWhere sans repli levait alors une exception
+    // en pleine construction de l'ecran.
+    final scannedChild =
+        widget.children.where((c) => c.id == _scannedChildId).firstOrNull;
+    final scannedActivity =
+        widget.activityTypes.where((a) => a.id == _scannedActivityTypeId).firstOrNull;
 
     final double cutOutSize = MediaQuery.of(context).size.width * 0.7;
 

@@ -61,6 +61,12 @@ String pdfSafe(String input) {
   return buffer
       .toString()
       .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
-      .replaceAll(RegExp(r' +([,.;:!?])'), r'$1')
+      // Uniquement la virgule et le point : en typographie française, « ! »,
+      // « ? », « : » et « ; » sont précédés d'une espace, qu'il ne faut pas
+      // retirer.
+      //
+      // replaceAllMapped et non replaceAll : ce dernier ne comprend pas les
+      // références de groupe et insérait « $1 » littéralement dans le texte.
+      .replaceAllMapped(RegExp(r' +([,.])'), (m) => m.group(1)!)
       .trim();
 }

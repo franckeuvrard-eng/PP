@@ -15,6 +15,7 @@ import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
 import '../models/evaluation_status.dart';
+import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import '../services/app_database.dart';
 
@@ -335,6 +336,7 @@ class AppStateProvider extends ChangeNotifier {
 
       _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       await _migrateStatusLabels();
+      await _migrateDomainIds();
 
       // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
       // l'affichage de l'application.
@@ -973,40 +975,30 @@ class AppStateProvider extends ChangeNotifier {
       if (item is Map) {
         result.add(EvaluationStatus.fromMap(Map<String, dynamic>.from(item)));
       } else if (item is String) {
-        result.add(_statusFromLegacyLabel(item, result.length));
+        result.add(EvaluationStatus.fromLegacyLabel(item, result.length));
       }
     }
     return result.isEmpty ? List<EvaluationStatus>.from(EvaluationStatus.defaults) : result;
   }
 
-  /// Fabrique un niveau a partir d'un libelle historique.
-  static EvaluationStatus _statusFromLegacyLabel(String label, int index) {
-    final normalized = _normalizeLabel(label);
-    for (final d in EvaluationStatus.defaults) {
-      if (_normalizeLabel(d.label) == normalized) {
-        // Meme intitule qu'un niveau par defaut : on conserve le libelle de
-        // l'enseignant, mais avec l'identifiant et la couleur connus.
-        return d.copyWith(label: label.trim());
-      }
-    }
-    return EvaluationStatus(
-      id: 'statut_${index}_${normalized.replaceAll(RegExp(r'[^a-z0-9]+'), '_')}',
-      label: label.trim(),
-      colorHex: '#1976D2',
-    );
-  }
 
-  /// Compare des libelles sans tenir compte des emojis, de la casse ni des
-  /// accents : « Acquis 🟢 » et « acquis » designent le meme niveau.
-  static String _normalizeLabel(String label) {
-    const accents = {
-      'à': 'a', 'â': 'a', 'ä': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
-      'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u',
-      'ç': 'c',
-    };
-    var out = label.toLowerCase();
-    accents.forEach((k, v) => out = out.replaceAll(k, v));
-    return out.replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  /// Rattache les ateliers a l'identifiant de leur domaine Eduscol.
+  ///
+  /// Le libelle est conserve : il reste la source pour un domaine
+  /// personnalise, qui n'a pas d'identifiant.
+  Future<void> _migrateDomainIds() async {
+    var migrated = 0;
+    for (var i = 0; i < _activityTypes.length; i++) {
+      final a = _activityTypes[i];
+      if (a.domaineId != null || a.domaine.isEmpty) continue;
+      final match = EduscolData.domains.where((d) => d.title == a.domaine).firstOrNull;
+      if (match == null) continue;
+      final updated = a.copyWith(domaineId: match.id);
+      _activityTypes[i] = updated;
+      await _db.saveActivityType(updated);
+      migrated++;
+    }
+    if (migrated > 0) debugPrint('Migration des domaines : $migrated atelier(s).');
   }
 
   /// Convertit les observations qui portent encore un libelle en identifiant.
@@ -1025,13 +1017,13 @@ class AppStateProvider extends ChangeNotifier {
       final label = log.legacyStatusLabel;
       if (log.evaluationStatusId != null || label == null || label.isEmpty) continue;
 
-      final normalized = _normalizeLabel(label);
+      final normalized = EvaluationStatus.normalizeLabel(label);
       var match = _evaluationStatuses
-          .where((s) => _normalizeLabel(s.label) == normalized)
+          .where((s) => EvaluationStatus.normalizeLabel(s.label) == normalized)
           .firstOrNull;
 
       if (match == null) {
-        match = _statusFromLegacyLabel(label, _evaluationStatuses.length);
+        match = EvaluationStatus.fromLegacyLabel(label, _evaluationStatuses.length);
         _evaluationStatuses.add(match);
         statusesChanged = true;
       }

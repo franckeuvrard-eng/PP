@@ -31,6 +31,40 @@ class EvaluationStatus {
     EvaluationStatus(id: 'acquis', label: 'Acquis', colorHex: '#388E3C'),
   ];
 
+  /// Compare deux intitulés sans tenir compte des emojis, de la casse ni des
+  /// accents : « Acquis 🟢 » et « acquis » désignent le même niveau.
+  ///
+  /// Sert à rattacher les données antérieures aux identifiants stables.
+  static String normalizeLabel(String label) {
+    const accents = {
+      'à': 'a', 'â': 'a', 'ä': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+      'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c',
+    };
+    var out = label.toLowerCase();
+    accents.forEach((k, v) => out = out.replaceAll(k, v));
+    return out.replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  /// Fabrique un niveau à partir d'un intitulé historique.
+  ///
+  /// Reprend l'identifiant et la couleur d'un niveau par défaut quand
+  /// l'intitulé correspond, tout en conservant le texte de l'enseignant.
+  /// Sinon, crée un niveau dédié : aucune évaluation ne doit être perdue.
+  static EvaluationStatus fromLegacyLabel(String label, int index) {
+    final normalized = normalizeLabel(label);
+    for (final d in defaults) {
+      if (normalizeLabel(d.label) == normalized) {
+        return d.copyWith(label: label.trim());
+      }
+    }
+    return EvaluationStatus(
+      id: 'statut_${index}_${normalized.replaceAll(RegExp(r'[^a-z0-9]+'), '_')}',
+      label: label.trim(),
+      colorHex: '#1976D2',
+    );
+  }
+
   EvaluationStatus copyWith({
     String? id,
     String? label,

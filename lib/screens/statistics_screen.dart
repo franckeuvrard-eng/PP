@@ -420,11 +420,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     var sansDomaine = 0;
 
     for (final log in logs) {
-      final domaine = typeById[log.activityTypeId]?.domaine ?? '';
-      if (domaine.isEmpty) {
+      final type = typeById[log.activityTypeId];
+      // Le rattachement se fait par identifiant quand l'atelier en porte un ;
+      // le libelle ne sert que pour les domaines personnalises.
+      final domain = type?.domaineId == null
+          ? null
+          : EduscolData.domains.where((d) => d.id == type!.domaineId).firstOrNull;
+      final key = domain?.title ?? type?.domaine ?? '';
+      if (key.isEmpty) {
         sansDomaine++;
       } else {
-        counts[domaine] = (counts[domaine] ?? 0) + 1;
+        counts[key] = (counts[key] ?? 0) + 1;
       }
     }
 

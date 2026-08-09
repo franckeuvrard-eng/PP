@@ -1272,9 +1272,12 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _color = act?.colorHex ?? '#4E9F3D';
     _isObligatory = act?.isObligatory ?? false;
 
-    _selectedDomainId = EduscolData.domains.any((d) => d.title == act?.domaine)
-        ? EduscolData.domains.firstWhere((d) => d.title == act?.domaine).id
-        : (act?.domaine.isNotEmpty == true ? 'custom' : 'none');
+    // L'identifiant enregistre fait foi ; la recherche par titre ne sert plus
+    // que pour un atelier anterieur a la migration.
+    _selectedDomainId = act?.domaineId ??
+        (EduscolData.domains.any((d) => d.title == act?.domaine)
+            ? EduscolData.domains.firstWhere((d) => d.title == act?.domaine).id
+            : (act?.domaine.isNotEmpty == true ? 'custom' : 'none'));
 
     if (_selectedDomainId == 'custom') {
       _customDomaineCtrl.text = act?.domaine ?? '';
@@ -1939,11 +1942,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     }
 
     String finalDomaine = '';
+    String? finalDomaineId;
     if (_selectedDomainId == 'custom') {
       finalDomaine = _customDomaineCtrl.text.trim();
     } else if (_selectedDomainId != null && _selectedDomainId != 'none') {
       final dom = EduscolData.domains.firstWhere((d) => d.id == _selectedDomainId, orElse: () => EduscolData.domains.first);
       finalDomaine = dom.title;
+      finalDomaineId = dom.id;
     }
 
     final provider = Provider.of<AppStateProvider>(context, listen: false);
@@ -1957,6 +1962,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       // son illustration principale.
       imagePath: _imagePath,
       domaine: finalDomaine,
+      domaineId: finalDomaineId,
       objectifs: _selectedObjectives,
       isObligatory: _isObligatory,
       iconName: _iconName,
