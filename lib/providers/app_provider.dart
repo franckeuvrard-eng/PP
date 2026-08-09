@@ -13,6 +13,7 @@ import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
+import '../data/sons_data.dart';
 
 class AppStateProvider extends ChangeNotifier {
   ClassSettings _classSettings = ClassSettings(
@@ -76,10 +77,25 @@ class AppStateProvider extends ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
 
+  /// Suivi « Analyse des sons » : idEleve -> son -> statut.
+  ///
+  /// Les sons absents valent [SonStatut.nonAcquis], on ne stocke donc que ce
+  /// qui a ete effectivement pointe par l'enseignant.
+  Map<String, Map<String, SonStatut>> _sonsProgress = {};
+
   String? _docsDirPath;
 
   AppStateProvider() {
     _loadFromPrefs();
+  }
+
+  Map<String, Map<String, int>> _sonsProgressAsMap() {
+    return _sonsProgress.map(
+      (childId, sons) => MapEntry(
+        childId,
+        sons.map((son, statut) => MapEntry(son, statut.code)),
+      ),
+    );
   }
 
   ClassSettings get classSettings => _classSettings;
@@ -89,6 +105,36 @@ class AppStateProvider extends ChangeNotifier {
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
   ThemeMode get themeMode => _themeMode;
+
+  /// Statut d'un son pour un eleve. Non renseigne = non acquis.
+  SonStatut sonStatut(String childId, String son) =>
+      _sonsProgress[childId]?[son] ?? SonStatut.nonAcquis;
+
+  /// Tous les sons pointes d'un eleve (les autres sont non acquis).
+  Map<String, SonStatut> sonsOf(String childId) =>
+      Map.unmodifiable(_sonsProgress[childId] ?? const {});
+
+  /// Fait passer un son a l'etat suivant : non acquis -> en cours -> acquis,
+  /// puis retour a non acquis.
+  void cycleSonStatut(String childId, String son) {
+    final next = sonStatut(childId, son).suivant;
+    final sons = _sonsProgress.putIfAbsent(childId, () => {});
+    if (next == SonStatut.nonAcquis) {
+      sons.remove(son);
+      if (sons.isEmpty) _sonsProgress.remove(childId);
+    } else {
+      sons[son] = next;
+    }
+    _saveToPrefs();
+    notifyListeners();
+  }
+
+  /// Remet tous les sons d'un eleve a non acquis.
+  void resetSons(String childId) {
+    if (_sonsProgress.remove(childId) == null) return;
+    _saveToPrefs();
+    notifyListeners();
+  }
 
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
@@ -137,6 +183,19 @@ class AppStateProvider extends ChangeNotifier {
         _evaluationStatuses = List<String>.from(decoded);
       }
 
+      final sonsJson = prefs.getString('sons_progress');
+      if (sonsJson != null) {
+        final Map<String, dynamic> decoded = json.decode(sonsJson);
+        _sonsProgress = decoded.map(
+          (childId, sons) => MapEntry(
+            childId,
+            (sons as Map<String, dynamic>).map(
+              (son, code) => MapEntry(son, SonStatut.fromCode(code)),
+            ),
+          ),
+        );
+      }
+
       final themeStr = prefs.getString('theme_mode');
       if (themeStr != null) {
         if (themeStr == 'light') {
@@ -163,7 +222,9 @@ class AppStateProvider extends ChangeNotifier {
       await prefs.setString('activity_types', json.encode(_activityTypes.map((a) => a.toMap()).toList()));
       await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
       await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
-      
+      await prefs.setString('sons_progress', json.encode(_sonsProgressAsMap()));
+
+
       String themeStr = 'system';
       if (_themeMode == ThemeMode.light) themeStr = 'light';
       if (_themeMode == ThemeMode.dark) themeStr = 'dark';
@@ -338,6 +399,7 @@ class AppStateProvider extends ChangeNotifier {
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses,
+        'sons_progress': _sonsProgressAsMap(),
       };
       final jsonBytes = utf8.encode(json.encode(backupData));
       archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
@@ -421,6 +483,17 @@ class AppStateProvider extends ChangeNotifier {
       _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
       _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
       _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      final sonsData = data['sons_progress'];
+      _sonsProgress = sonsData is Map
+          ? sonsData.map(
+              (childId, sons) => MapEntry(
+                childId as String,
+                (sons as Map).map(
+                  (son, code) => MapEntry(son as String, SonStatut.fromCode(code)),
+                ),
+              ),
+            )
+          : {};
 
       // Restore photo files
       for (final file in archive) {
@@ -461,6 +534,8 @@ class AppStateProvider extends ChangeNotifier {
 
   void deleteChild(String id) {
     _children.removeWhere((c) => c.id == id);
+    // Sans cela le suivi des sons resterait indefiniment dans les preferences.
+    _sonsProgress.remove(id);
     _saveToPrefs();
     notifyListeners();
   }
@@ -544,6 +619,7 @@ class AppStateProvider extends ChangeNotifier {
   }) {
     if (clearChildren) {
       _children = [];
+      _sonsProgress = {};
     }
     if (clearActivityTypes) {
       _activityTypes = [];

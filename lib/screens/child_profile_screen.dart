@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/space.dart';
+import '../data/sons_data.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
 import 'edit_activity_log_screen.dart';
 
@@ -31,7 +32,7 @@ class ChildProfileScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text('${currentChild.firstname} ${currentChild.lastname ?? ""}'),
@@ -39,6 +40,7 @@ class ChildProfileScreen extends StatelessWidget {
             tabs: [
               Tab(icon: Icon(Icons.person), text: 'Profil'),
               Tab(icon: Icon(Icons.history), text: 'Activités'),
+              Tab(icon: Icon(Icons.checklist), text: 'Acquis'),
             ],
           ),
           actions: [
@@ -66,6 +68,7 @@ class ChildProfileScreen extends StatelessWidget {
           children: [
             _buildProfileTab(context, provider, currentChild, isDark),
             _buildActivitiesTab(context, provider, currentChild, childLogs, isDark),
+            _buildAcquisTab(context, provider, currentChild),
           ],
         ),
       ),
@@ -195,6 +198,137 @@ class ChildProfileScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.8))),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────── ACQUIS : ANALYSE DES SONS ───────────────────
+
+  static Color _sonColor(SonStatut statut) => switch (statut) {
+        SonStatut.nonAcquis => const Color(0xFFD32F2F),
+        SonStatut.enCours => const Color(0xFFF9A825),
+        SonStatut.acquis => const Color(0xFF388E3C),
+      };
+
+  Widget _buildAcquisTab(BuildContext context, AppStateProvider provider, Child child) {
+    final tous = SonsData.tous;
+    final acquis = tous.where((s) => provider.sonStatut(child.id, s) == SonStatut.acquis).length;
+    final enCours = tous.where((s) => provider.sonStatut(child.id, s) == SonStatut.enCours).length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        const Text('Analyse des sons',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text('Langage · conscience phonémique & signes graphiques',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 12),
+
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _sonLegende(SonStatut.acquis, '$acquis acquis'),
+            _sonLegende(SonStatut.enCours, '$enCours en cours'),
+            _sonLegende(SonStatut.nonAcquis, '${tous.length - acquis - enCours} non acquis'),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Appuyez sur un son pour le faire évoluer : non acquis → en cours → acquis.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+
+        ...SonsData.groupes.map((groupe) => Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(groupe.titre,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: groupe.sons.map((son) {
+                      final statut = provider.sonStatut(child.id, son);
+                      final couleur = _sonColor(statut);
+                      return InkWell(
+                        onTap: () => provider.cycleSonStatut(child.id, son),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Tooltip(
+                          message: '$son — ${statut.libelle}',
+                          child: Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              color: couleur.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: couleur, width: 2),
+                            ),
+                            child: Center(
+                              child: Text(
+                                son,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: couleur,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            )),
+
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final confirme = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Réinitialiser l\'analyse des sons ?'),
+                content: Text(
+                    'Tous les sons de ${child.firstname} repasseront à « non acquis ».'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                    child: const Text('Réinitialiser'),
+                  ),
+                ],
+              ),
+            );
+            if (confirme == true) provider.resetSons(child.id);
+          },
+          icon: const Icon(Icons.restart_alt),
+          label: const Text('Tout remettre à non acquis'),
+        ),
+      ],
+    );
+  }
+
+  Widget _sonLegende(SonStatut statut, String label) {
+    final couleur = _sonColor(statut);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: couleur.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: couleur, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: couleur)),
         ],
       ),
     );

@@ -5,16 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-
-import '../models/activity.dart';
 import '../models/activity_type.dart';
-import '../models/child.dart';
 import '../models/space.dart';
 import '../providers/app_provider.dart';
+import '../utils/pdf_viewer.dart';
 
 /// Genere la fiche PDF detaillee d'un atelier : description, objectifs
-/// Eduscol, photos de l'atelier, et le detail par eleve avec ses photos.
+/// Eduscol, sections ciblees et photos legendees de l'atelier.
 ///
 /// Sert de support a remettre a l'enfant ou aux familles.
 class AtelierPdfService {
@@ -52,25 +49,36 @@ class AtelierPdfService {
     );
   }
 
-  static pw.Widget _photoGrid(List<pw.MemoryImage> images) {
-    return pw.Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: images
-          .map((img) => pw.Container(
-                width: 150,
-                height: 112,
-                decoration: pw.BoxDecoration(
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                  border: pw.Border.all(color: PdfColors.grey400),
-                ),
-                child: pw.ClipRRect(
-                  horizontalRadius: 6,
-                  verticalRadius: 6,
-                  child: pw.Image(img, fit: pw.BoxFit.cover),
-                ),
-              ))
-          .toList(),
+  /// Vignette d'une photo, surmontant sa legende quand elle en a une.
+  static pw.Widget _photoTile(pw.MemoryImage image, String? caption) {
+    return pw.Container(
+      width: 165,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          pw.Container(
+            width: 165,
+            height: 124,
+            decoration: pw.BoxDecoration(
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              border: pw.Border.all(color: PdfColors.grey400),
+            ),
+            child: pw.ClipRRect(
+              horizontalRadius: 6,
+              verticalRadius: 6,
+              child: pw.Image(image, fit: pw.BoxFit.cover),
+            ),
+          ),
+          if (caption != null) ...[
+            pw.SizedBox(height: 3),
+            pw.Text(
+              _clean(caption),
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -85,13 +93,14 @@ class AtelierPdfService {
       orElse: () => Space(id: '', name: 'Non défini', colorHex: '#718096'),
     );
 
-    final logs = provider.activities.where((l) => l.activityTypeId == atelier.id).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    final atelierImages = atelier.allPhotoPaths
-        .map((p) => _imageAt(provider, p))
-        .whereType<pw.MemoryImage>()
-        .toList();
+    // La fiche decrit l'atelier seul : les realisations des eleves relevent
+    // du rapport individuel, pas de ce support.
+    final photoTiles = <pw.Widget>[];
+    for (final relPath in atelier.allPhotoPaths) {
+      final image = _imageAt(provider, relPath);
+      if (image == null) continue;
+      photoTiles.add(_photoTile(image, atelier.captionFor(relPath)));
+    }
 
     final doc = pw.Document();
 
@@ -145,75 +154,16 @@ class AtelierPdfService {
               ),
             ],
 
-            if (atelierImages.isNotEmpty) ...[
-              _sectionTitle('Photos de l\'atelier (${atelierImages.length})'),
-              _photoGrid(atelierImages),
+            if (photoTiles.isNotEmpty) ...[
+              _sectionTitle('Photos de l\'atelier (${photoTiles.length})'),
+              pw.Wrap(spacing: 10, runSpacing: 10, children: photoTiles),
             ],
-
-            _sectionTitle('Réalisations des élèves (${logs.length})'),
-            if (logs.isEmpty)
-              pw.Text('Aucune activité enregistrée pour cet atelier.',
-                  style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700))
-            else
-              ...logs.map((log) => _buildLogBlock(provider, log)),
           ];
         },
       ),
     );
 
     return doc.save();
-  }
-
-  static pw.Widget _buildLogBlock(AppStateProvider provider, ActivityLog log) {
-    final child = provider.children.firstWhere(
-      (c) => c.id == log.childId,
-      orElse: () => Child(id: '', firstname: 'Élève supprimé', colorHex: '#718096', avatarText: '?'),
-    );
-
-    final logImages = log.photoPaths
-        .map((p) => _imageAt(provider, p))
-        .whereType<pw.MemoryImage>()
-        .toList();
-
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 10),
-      padding: const pw.EdgeInsets.all(8),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey300),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(
-                '${_clean(child.firstname)} ${_clean(child.lastname ?? '')}'.trim(),
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-              ),
-              pw.Text(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp),
-                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-            ],
-          ),
-          if (child.group != null && child.group!.trim().isNotEmpty)
-            pw.Text('Section : ${_clean(child.group!)}',
-                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-          if (log.evaluationStatus != null && log.evaluationStatus!.trim().isNotEmpty)
-            pw.Text('Évaluation : ${_clean(log.evaluationStatus!)}',
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-          if (log.note != null && log.note!.trim().isNotEmpty) ...[
-            pw.SizedBox(height: 2),
-            pw.Text(_clean(log.note!),
-                style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic)),
-          ],
-          if (logImages.isNotEmpty) ...[
-            pw.SizedBox(height: 6),
-            _photoGrid(logImages),
-          ],
-        ],
-      ),
-    );
   }
 
   /// Ouvre l'apercu imprimable / partageable de la fiche atelier.
@@ -224,28 +174,13 @@ class AtelierPdfService {
   ) {
     final safeName = atelier.name.replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '').trim().replaceAll(' ', '_');
 
-    Navigator.push(
+    openPdfViewer(
       context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(
-            title: Text('Fiche - ${atelier.name}'),
-            backgroundColor: const Color(0xFF4E9F3D),
-            foregroundColor: Colors.white,
-          ),
-          body: PdfPreview(
-            build: (format) => buildBytes(provider: provider, atelier: atelier, format: format),
-            allowPrinting: true,
-            allowSharing: true,
-            canChangePageFormat: false,
-            canChangeOrientation: false,
-            initialPageFormat: PdfPageFormat.a4,
-            pdfFileName: 'Atelier_${safeName.isEmpty ? 'sans_nom' : safeName}.pdf',
-            shareActionExtraSubject: 'Fiche atelier - ${atelier.name}',
-            shareActionExtraBody: 'Veuillez trouver ci-joint la fiche détaillée de l\'atelier ${atelier.name}.',
-          ),
-        ),
-      ),
+      title: 'Fiche - ${atelier.name}',
+      fileName: 'Atelier_${safeName.isEmpty ? 'sans_nom' : safeName}.pdf',
+      build: (format) => buildBytes(provider: provider, atelier: atelier, format: format),
+      shareSubject: 'Fiche atelier - ${atelier.name}',
+      shareBody: 'Veuillez trouver ci-joint la fiche détaillée de l\'atelier ${atelier.name}.',
     );
   }
 }

@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../data/sons_data.dart';
+import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
@@ -152,7 +153,9 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                     child: Text('Aucun élève ne correspond à la recherche.'),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    // Marge basse degagee pour le bouton flottant, qui
+                    // recouvrait sinon la derniere fiche de la liste.
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                     itemCount: filteredChildren.length,
                     itemBuilder: (context, index) {
                       final child = filteredChildren[index];
@@ -209,10 +212,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                 icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
                                 onPressed: () => _choosePdfPeriod(context, child, provider),
                                 tooltip: 'Générer le rapport PDF',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Color(0xFF718096)),
-                                onPressed: () => _openChildDialog(context, provider, child: child),
                               ),
                             ],
                           ),
@@ -386,30 +385,112 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
       periodLabel = '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}';
     }
 
-    Navigator.push(
+    openPdfViewer(
       context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text('Rapport - ${child.firstname} ($periodLabel)'),
-            backgroundColor: const Color(0xFF4E9F3D),
-            foregroundColor: Colors.white,
-          ),
-          body: PdfPreview(
-            build: (format) => _generateReportBytes(child, provider, format, from, to),
-            allowPrinting: true,
-            allowSharing: true,
-            canChangePageFormat: false,
-            canChangeOrientation: false,
-            initialPageFormat: PdfPageFormat.a4,
-            pdfFileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
-            shareActionExtraBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
-            shareActionExtraSubject: 'Rapport d\'activités - ${child.firstname}',
-            shareActionExtraEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
-          ),
+      title: 'Rapport - ${child.firstname} ($periodLabel)',
+      fileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
+      build: (format) => _generateReportBytes(child, provider, format, from, to),
+      shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
+      shareSubject: 'Rapport d\'activités - ${child.firstname}',
+      shareEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
+    );
+  }
+
+  static PdfColor _sonPdfColor(SonStatut statut) => switch (statut) {
+        SonStatut.nonAcquis => const PdfColor.fromInt(0xFFD32F2F),
+        SonStatut.enCours => const PdfColor.fromInt(0xFFF9A825),
+        SonStatut.acquis => const PdfColor.fromInt(0xFF388E3C),
+      };
+
+  /// Pastille coloree portant le son, lisible meme imprimee en niveaux de gris
+  /// grace au libelle de la legende qui l'accompagne.
+  static pw.Widget _sonChip(String son, SonStatut statut) {
+    final color = _sonPdfColor(statut);
+    return pw.Container(
+      width: 26,
+      height: 26,
+      decoration: pw.BoxDecoration(
+        color: color,
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(13)),
+      ),
+      alignment: pw.Alignment.center,
+      child: pw.Text(
+        son,
+        style: pw.TextStyle(
+          fontSize: 10,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.white,
         ),
       ),
     );
+  }
+
+  static pw.Widget _sonLegendeItem(SonStatut statut) {
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Container(
+          width: 9,
+          height: 9,
+          decoration: pw.BoxDecoration(
+            color: _sonPdfColor(statut),
+            shape: pw.BoxShape.circle,
+          ),
+        ),
+        pw.SizedBox(width: 4),
+        pw.Text(statut.libelle, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800)),
+      ],
+    );
+  }
+
+  List<pw.Widget> _buildSonsSection(Child child, AppStateProvider provider) {
+    final tous = SonsData.tous;
+    final acquis = tous.where((s) => provider.sonStatut(child.id, s) == SonStatut.acquis).length;
+    final enCours = tous.where((s) => provider.sonStatut(child.id, s) == SonStatut.enCours).length;
+
+    return [
+      pw.Text('Analyse des sons — état actuel',
+          style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+      pw.Text(
+        'Langage · conscience phonémique & signes graphiques — $acquis acquis, $enCours en cours sur ${tous.length} sons.',
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+      ),
+      pw.SizedBox(height: 6),
+      pw.Row(
+        children: [
+          _sonLegendeItem(SonStatut.acquis),
+          pw.SizedBox(width: 12),
+          _sonLegendeItem(SonStatut.enCours),
+          pw.SizedBox(width: 12),
+          _sonLegendeItem(SonStatut.nonAcquis),
+        ],
+      ),
+      pw.SizedBox(height: 8),
+      ...SonsData.groupes.map((groupe) => pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 8),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.SizedBox(
+                  width: 84,
+                  child: pw.Text(groupe.titre,
+                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.Expanded(
+                  child: pw.Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: groupe.sons
+                        .map((son) => _sonChip(son, provider.sonStatut(child.id, son)))
+                        .toList(),
+                  ),
+                ),
+              ],
+            ),
+          )),
+      pw.Divider(),
+      pw.SizedBox(height: 8),
+    ];
   }
 
   Future<Uint8List> _generateReportBytes(
@@ -500,6 +581,10 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
               ],
             ),
             pw.SizedBox(height: 16),
+
+            // L'analyse des sons est un etat courant, pas un historique :
+            // elle figure en tete quelle que soit la periode demandee.
+            ..._buildSonsSection(child, provider),
 
             pw.Text('Historique des activités (${childLogs.length}) :',
                 style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),

@@ -791,6 +791,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   late String? _iconName;
   late List<String> _obligatoryGroups;
   late List<String> _photoPaths;
+  late Map<String, String> _photoCaptions;
   late String? _imagePath;
   final ScrollController _objectivesScrollCtrl = ScrollController();
 
@@ -827,7 +828,45 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _iconName = act?.iconName;
     _obligatoryGroups = List<String>.from(act?.obligatoryGroups ?? []);
     _photoPaths = List<String>.from(act?.photoPaths ?? []);
+    _photoCaptions = Map<String, String>.from(act?.photoCaptions ?? {});
     _imagePath = act?.imagePath;
+  }
+
+  Future<void> _editPhotoCaption(String relPath) async {
+    final ctrl = TextEditingController(text: _photoCaptions[relPath] ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Commentaire de la photo'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Ce que montre la photo, la consigne, le matériel...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, ctrl.text.trim()),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      if (result.isEmpty) {
+        _photoCaptions.remove(relPath);
+      } else {
+        _photoCaptions[relPath] = result;
+      }
+    });
   }
 
   /// Sections existantes, deduites des eleves : le groupe est un champ libre
@@ -1325,7 +1364,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ),
                     const SizedBox(height: 8),
                     SizedBox(
-                      height: 92,
+                      height: 132,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: [
@@ -1345,31 +1384,60 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                           ),
                           const SizedBox(width: 8),
                           ..._photoPaths.asMap().entries.map((entry) {
-                            final absPath = provider.getAbsolutePath(entry.value);
+                            final relPath = entry.value;
+                            final absPath = provider.getAbsolutePath(relPath);
+                            final caption = _photoCaptions[relPath];
+                            final hasCaption = caption != null && caption.trim().isNotEmpty;
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
-                              child: Stack(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: absPath != null && File(absPath).existsSync()
-                                        ? Image.file(File(absPath), width: 88, height: 88, fit: BoxFit.cover)
-                                        : Container(
-                                            width: 88,
-                                            height: 88,
-                                            color: Theme.of(context).colorScheme.surfaceVariant,
-                                            child: const Icon(Icons.broken_image, size: 24),
+                                  Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: absPath != null && File(absPath).existsSync()
+                                            ? Image.file(File(absPath), width: 88, height: 88, fit: BoxFit.cover)
+                                            : Container(
+                                                width: 88,
+                                                height: 88,
+                                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                                child: const Icon(Icons.broken_image, size: 24),
+                                              ),
+                                      ),
+                                      Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: GestureDetector(
+                                          onTap: () => setState(() {
+                                            _photoPaths.removeAt(entry.key);
+                                            _photoCaptions.remove(relPath);
+                                          }),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                            child: const Icon(Icons.close, size: 12, color: Colors.white),
                                           ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Positioned(
-                                    top: 2,
-                                    right: 2,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _photoPaths.removeAt(entry.key)),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                        child: const Icon(Icons.close, size: 12, color: Colors.white),
+                                  SizedBox(
+                                    width: 88,
+                                    child: TextButton.icon(
+                                      onPressed: () => _editPhotoCaption(relPath),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: const Size(0, 32),
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      icon: Icon(hasCaption ? Icons.edit_note : Icons.add_comment, size: 14),
+                                      label: Text(
+                                        hasCaption ? caption.trim() : 'Commenter',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 11),
                                       ),
                                     ),
                                   ),
@@ -1384,22 +1452,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                 ),
               ),
             ),
+            // Le bouton d'enregistrement est celui de la barre du haut :
+            // il reste atteignable sans parcourir tout le formulaire.
             const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _saveAtelier,
-                icon: const Icon(Icons.save),
-                label: const Text('Enregistrer l\'Atelier', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4E9F3D),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -1437,6 +1492,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       isObligatory: _isObligatory,
       iconName: _iconName,
       photoPaths: _photoPaths,
+      photoCaptions: _photoCaptions,
       obligatoryGroups: _isObligatory ? _obligatoryGroups : const [],
     );
 

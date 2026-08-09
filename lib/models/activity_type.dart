@@ -17,6 +17,12 @@ class ActivityType {
   /// Photos d'illustration de l'atelier (chemins relatifs au dossier Documents).
   final List<String> photoPaths;
 
+  /// Legende de chaque photo, indexee par chemin relatif.
+  ///
+  /// Une Map plutot qu'une liste parallele : supprimer une photo ne decale
+  /// alors pas les commentaires des suivantes.
+  final Map<String, String> photoCaptions;
+
   /// Groupes / sections pour lesquels l'atelier est obligatoire.
   /// Vide alors que [isObligatory] est vrai : obligatoire pour toute la classe.
   final List<String> obligatoryGroups;
@@ -33,8 +39,16 @@ class ActivityType {
     this.isObligatory = false,
     this.iconName,
     this.photoPaths = const [],
+    this.photoCaptions = const {},
     this.obligatoryGroups = const [],
   });
+
+  /// Legende associee a une photo, ou null si aucune.
+  String? captionFor(String relPath) {
+    final caption = photoCaptions[relPath];
+    if (caption == null || caption.trim().isEmpty) return null;
+    return caption.trim();
+  }
 
   /// Vrai si l'atelier est obligatoire pour un eleve de ce groupe.
   ///
@@ -67,6 +81,7 @@ class ActivityType {
       'isObligatory': isObligatory,
       'iconName': iconName,
       'photoPaths': photoPaths,
+      'photoCaptions': photoCaptions,
       'obligatoryGroups': obligatoryGroups,
     };
   }
@@ -84,6 +99,7 @@ class ActivityType {
       isObligatory: map['isObligatory'] ?? false,
       iconName: map['iconName'],
       photoPaths: List<String>.from(map['photoPaths'] ?? []),
+      photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
       obligatoryGroups: List<String>.from(map['obligatoryGroups'] ?? []),
     );
   }
