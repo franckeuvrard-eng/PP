@@ -61,7 +61,7 @@ class EduscolData {
   ];
 
   static const List<EduscolObjective> objectives = [
-    // 🗣️ DOMAINE 1 : MOBILISER LE LANGAGE
+    // DOMAINE 1 : MOBILISER LE LANGAGE
     // PS (2-4 ans)
     EduscolObjective(id: 'l_ps_1', domainId: 'd1_langage', level: 'PS', text: 'S\'exprimer par des mots-phrases ou des phrases simples'),
     EduscolObjective(id: 'l_ps_2', domainId: 'd1_langage', level: 'PS', text: 'Comprendre des consignes simples de la vie de classe'),
@@ -89,7 +89,7 @@ class EduscolData {
     EduscolObjective(id: 'l_gs_6', domainId: 'd1_langage', level: 'GS', text: 'Écrire son prénom en écriture cursive sans modèle'),
     EduscolObjective(id: 'l_gs_7', domainId: 'd1_langage', level: 'GS', text: 'Encoder des mots simples en s\'appuyant sur les sons (Phonologie)'),
 
-    // 🔢 DOMAINE 2 : OUTILS MATHÉMATIQUES
+    // DOMAINE 2 : OUTILS MATHEMATIQUES
     // PS (2-4 ans)
     EduscolObjective(id: 'm_ps_1', domainId: 'd2_maths', level: 'PS', text: 'Dénombrer une quantité de 1 à 3 objets'),
     EduscolObjective(id: 'm_ps_2', domainId: 'd2_maths', level: 'PS', text: 'Constituer une collection ayant autant d\'objets qu\'une autre (jusqu\'à 3)'),
@@ -113,7 +113,7 @@ class EduscolData {
     EduscolObjective(id: 'm_gs_5', domainId: 'd2_maths', level: 'GS', text: 'Se repérer et se déplacer sur un quadrillage'),
     EduscolObjective(id: 'm_gs_6', domainId: 'd2_maths', level: 'GS', text: 'Reconnaître des solides simples (cube, pyramide, boule)'),
 
-    // 🏃 DOMAINE 3 : ACTIVITÉ PHYSIQUE
+    // DOMAINE 3 : ACTIVITE PHYSIQUE
     // PS (2-4 ans)
     EduscolObjective(id: 'p_ps_1', domainId: 'd3_physique', level: 'PS', text: 'Courir, sauter, lancer dans un espace aménagé'),
     EduscolObjective(id: 'p_ps_2', domainId: 'd3_physique', level: 'PS', text: 'Garder l\'équilibre sur des poutres ou modules de motricité'),
@@ -129,7 +129,7 @@ class EduscolData {
     EduscolObjective(id: 'p_gs_2', domainId: 'd3_physique', level: 'GS', text: 'Enchaîner plusieurs actions motrices (courir puis sauter)'),
     EduscolObjective(id: 'p_gs_3', domainId: 'd3_physique', level: 'GS', text: 'Exprimer des intentions par le corps dans une danse'),
 
-    // 🎨 DOMAINE 4 : ACTIVITÉS ARTISTIQUES
+    // DOMAINE 4 : ACTIVITES ARTISTIQUES
     // PS (2-4 ans)
     EduscolObjective(id: 'a_ps_1', domainId: 'd4_art', level: 'PS', text: 'Manipuler la peinture avec les doigts, pinceaux, tampons'),
     EduscolObjective(id: 'a_ps_2', domainId: 'd4_art', level: 'PS', text: 'Explorer la matière (pâte à modeler, pâte à sel, sable)'),
@@ -145,7 +145,7 @@ class EduscolData {
     EduscolObjective(id: 'a_gs_2', domainId: 'd4_art', level: 'GS', text: 'Créer une œuvre collective en s\'inspirant d\'un artiste'),
     EduscolObjective(id: 'a_gs_3', domainId: 'd4_art', level: 'GS', text: 'Reconnaître et distinguer les sons d\'instruments de musique simples'),
 
-    // 🔍 DOMAINE 5 : EXPLORER LE MONDE
+    // DOMAINE 5 : EXPLORER LE MONDE
     // PS (2-4 ans)
     EduscolObjective(id: 'e_ps_1', domainId: 'd5_monde', level: 'PS', text: 'Se repérer dans les moments de la journée de classe (matin, cantine, sieste, après-midi)'),
     EduscolObjective(id: 'e_ps_2', domainId: 'd5_monde', level: 'PS', text: 'Nommer les principales parties du corps humain'),
