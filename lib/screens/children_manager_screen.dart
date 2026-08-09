@@ -11,6 +11,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../data/sons_data.dart';
+import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
 
@@ -366,12 +367,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
   }
 
   // ─────────────────── PDF PREVIEW ───────────────────
-  String _sanitizeEmoji(String text) {
-    return text
-        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{1F900}-\u{1F9FF}|\u{1F1E0}-\u{1F1FF}]',
-            unicode: true), '')
-        .trim();
-  }
 
   Future<void> _openPdfPreview(
     BuildContext context,
@@ -541,7 +536,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
               ),
             ),
             pw.SizedBox(height: 6),
-            pw.Text('Période : $periodLabel',
+            pw.Text('Période : ${pdfSafe(periodLabel)}',
                 style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic)),
             pw.SizedBox(height: 14),
 
@@ -553,17 +548,17 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                        '${_sanitizeEmoji(child.firstname)} ${_sanitizeEmoji(child.lastname ?? "")}',
+                        '${pdfSafe(child.firstname)} ${pdfSafe(child.lastname ?? "")}',
                         style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
                     if (child.group != null && child.group!.isNotEmpty)
-                      pw.Text('Groupe/Section : ${_sanitizeEmoji(child.group!)}',
+                      pw.Text('Groupe/Section : ${pdfSafe(child.group!)}',
                           style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.email != null && child.email!.isNotEmpty)
-                      pw.Text('Email de contact : ${child.email}',
+                      pw.Text('Email de contact : ${pdfSafe(child.email ?? "")}',
                           style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.notes != null && child.notes!.isNotEmpty) ...[
                       pw.SizedBox(height: 6),
-                      pw.Text('Notes : ${_sanitizeEmoji(child.notes!)}',
+                      pw.Text('Notes : ${pdfSafe(child.notes!)}',
                           style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700)),
                     ],
                   ],
@@ -627,9 +622,9 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('Atelier : ${_sanitizeEmoji(actType.name)}',
+                          pw.Text('Atelier : ${pdfSafe(actType.name)}',
                               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                          pw.Text('Espace : ${_sanitizeEmoji(space.name.isEmpty ? "Non défini" : space.name)}',
+                          pw.Text('Espace : ${pdfSafe(space.name.isEmpty ? "Non défini" : space.name)}',
                               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
                         ],
                       ),
@@ -640,7 +635,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       ),
                       if (actType.domaine.isNotEmpty) ...[
                         pw.SizedBox(height: 3),
-                        pw.Text('Domaine : ${_sanitizeEmoji(actType.domaine)}',
+                        pw.Text('Domaine : ${pdfSafe(actType.domaine)}',
                             style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
                       ],
                       if (actType.objectifs.isNotEmpty) ...[
@@ -649,18 +644,18 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
                         ...actType.objectifs.map((obj) => pw.Padding(
                           padding: const pw.EdgeInsets.only(left: 8, top: 1),
-                          child: pw.Text('- ${_sanitizeEmoji(obj)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
+                          child: pw.Text('- ${pdfSafe(obj)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
                         )),
                       ],
                       if (log.evaluationStatus != null) ...[
                         pw.SizedBox(height: 4),
-                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}',
+                        pw.Text('Statut : ${pdfSafe(log.evaluationStatus!)}',
                             style: pw.TextStyle(
                                 fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text('Observation : ${_sanitizeEmoji(log.note!)}',
+                        pw.Text('Observation : ${pdfSafe(log.note!)}',
                             style: pw.TextStyle(fontSize: 9.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey900)),
                       ],
                       if (activityImages.isNotEmpty) ...[

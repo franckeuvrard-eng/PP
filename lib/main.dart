@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'utils/platform_support.dart';
+import 'screens/help_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
@@ -138,17 +139,22 @@ class _LockScreenState extends State<LockScreen> {
   final LocalAuthentication auth = LocalAuthentication();
   bool _isAuthenticated = false;
   bool _isAuthenticating = false;
+  bool _authRequested = false;
 
-  @override
-  void initState() {
-    super.initState();
-    if (!isMobilePlatform) {
-      // local_auth n'existe pas hors mobile : en previsualisation poste de
-      // travail on entre directement, sinon l'ecran reste verrouille a vie.
+  /// Declenche la demande d'authentification une fois, et seulement une fois
+  /// les preferences chargees : le reglage Face ID n'est connu qu'a ce
+  /// moment-la.
+  void _maybeStartAuth(AppStateProvider provider) {
+    if (_authRequested || !provider.isLoaded) return;
+    _authRequested = true;
+
+    // local_auth n'existe pas hors mobile : en previsualisation poste de
+    // travail on entre directement, sinon l'ecran resterait verrouille a vie.
+    if (!provider.biometricLockEnabled || !isMobilePlatform) {
       _isAuthenticated = true;
       return;
     }
-    _authenticate();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
   }
 
   Future<void> _authenticate() async {
@@ -178,9 +184,20 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<AppStateProvider>(context);
+    _maybeStartAuth(provider);
+
     if (_isAuthenticated) {
       return const MainNavigationFrame();
     }
+
+    if (!provider.isLoaded) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF4E9F3D),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF4E9F3D),
       body: Center(
@@ -269,6 +286,13 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> {
               setState(() => _currentIndex = 1);
             },
             tooltip: 'Scan Express',
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+            },
+            tooltip: 'Aide',
           ),
         ],
       ),

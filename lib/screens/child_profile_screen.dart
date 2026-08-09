@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/space.dart';
+import '../utils/app_icons.dart';
 import '../data/sons_data.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
 import 'edit_activity_log_screen.dart';
@@ -407,7 +408,8 @@ class ChildProfileScreen extends StatelessWidget {
                                 CircleAvatar(
                                   radius: 18,
                                   backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                                  child: const Icon(Icons.palette, size: 16, color: Colors.white),
+                                  child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
+                                      size: 16, color: Colors.white),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(

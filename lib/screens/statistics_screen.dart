@@ -381,7 +381,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                      child: const Icon(Icons.palette, color: Colors.white, size: 18),
+                      child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
+                          color: Colors.white, size: 18),
                     ),
                     title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(

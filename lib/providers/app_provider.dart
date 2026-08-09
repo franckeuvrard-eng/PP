@@ -77,6 +77,11 @@ class AppStateProvider extends ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
 
+  /// Verrouillage de l'application par FaceID / code a l'ouverture.
+  bool _biometricLockEnabled = true;
+
+  bool _isLoaded = false;
+
   /// Suivi « Analyse des sons » : idEleve -> son -> statut.
   ///
   /// Les sons absents valent [SonStatut.nonAcquis], on ne stocke donc que ce
@@ -105,6 +110,20 @@ class AppStateProvider extends ChangeNotifier {
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
   ThemeMode get themeMode => _themeMode;
+  bool get biometricLockEnabled => _biometricLockEnabled;
+
+  /// Vrai une fois les preferences relues du disque.
+  ///
+  /// L'ecran de verrouillage doit attendre ce signal : autrement il lirait
+  /// les valeurs par defaut et demanderait Face ID a quelqu'un qui l'a
+  /// justement desactive.
+  bool get isLoaded => _isLoaded;
+
+  void setBiometricLockEnabled(bool enabled) {
+    _biometricLockEnabled = enabled;
+    _saveToPrefs();
+    notifyListeners();
+  }
 
   /// Statut d'un son pour un eleve. Non renseigne = non acquis.
   SonStatut sonStatut(String childId, String son) =>
@@ -196,6 +215,8 @@ class AppStateProvider extends ChangeNotifier {
         );
       }
 
+      _biometricLockEnabled = prefs.getBool('biometric_lock_enabled') ?? true;
+
       final themeStr = prefs.getString('theme_mode');
       if (themeStr != null) {
         if (themeStr == 'light') {
@@ -207,9 +228,14 @@ class AppStateProvider extends ChangeNotifier {
         }
       }
 
+      _isLoaded = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading preferences: $e');
+      // Meme en cas d'echec l'application doit demarrer, sur les valeurs
+      // par defaut, plutot que rester bloquee sur l'ecran d'attente.
+      _isLoaded = true;
+      notifyListeners();
     }
   }
 
@@ -223,6 +249,7 @@ class AppStateProvider extends ChangeNotifier {
       await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
       await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
       await prefs.setString('sons_progress', json.encode(_sonsProgressAsMap()));
+      await prefs.setBool('biometric_lock_enabled', _biometricLockEnabled);
 
 
       String themeStr = 'system';

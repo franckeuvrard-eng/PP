@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../providers/app_provider.dart';
+import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
 
 /// Genere la fiche PDF detaillee d'un atelier : description, objectifs
@@ -15,18 +16,6 @@ import '../utils/pdf_viewer.dart';
 ///
 /// Sert de support a remettre a l'enfant ou aux familles.
 class AtelierPdfService {
-  /// Les polices PDF integrees (Helvetica) ne savent pas rendre les emojis :
-  /// sans nettoyage ils apparaissent en caracteres parasites.
-  static String _clean(String text) {
-    return text
-        .replaceAll(
-            RegExp(
-                r'[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}|\u{1F900}-\u{1F9FF}|\u{1F1E0}-\u{1F1FF}]',
-                unicode: true),
-            '')
-        .trim();
-  }
-
   static pw.MemoryImage? _imageAt(AppStateProvider provider, String? relPath) {
     final abs = provider.getAbsolutePath(relPath);
     if (abs == null) return null;
@@ -73,7 +62,7 @@ class AtelierPdfService {
           if (caption != null) ...[
             pw.SizedBox(height: 3),
             pw.Text(
-              _clean(caption),
+              pdfSafe(caption),
               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
             ),
           ],
@@ -122,35 +111,35 @@ class AtelierPdfService {
               ),
             ),
             pw.Text(
-              '${_clean(settings.name)} - ${_clean(settings.teacher)} - ${_clean(settings.schoolYear)}',
+              '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
               style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
             ),
             pw.SizedBox(height: 14),
 
-            pw.Text(_clean(atelier.name),
+            pw.Text(pdfSafe(atelier.name),
                 style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 4),
-            pw.Text('Espace : ${_clean(space.name)}', style: const pw.TextStyle(fontSize: 11)),
+            pw.Text('Espace : ${pdfSafe(space.name)}', style: const pw.TextStyle(fontSize: 11)),
             if (atelier.domaine.isNotEmpty)
-              pw.Text('Domaine : ${_clean(atelier.domaine)}', style: const pw.TextStyle(fontSize: 11)),
+              pw.Text('Domaine : ${pdfSafe(atelier.domaine)}', style: const pw.TextStyle(fontSize: 11)),
             if (atelier.isObligatory)
               pw.Text(
                 atelier.obligatoryGroups.isEmpty
                     ? 'Atelier obligatoire pour toute la classe'
-                    : 'Atelier obligatoire pour : ${atelier.obligatoryGroups.map(_clean).join(', ')}',
+                    : 'Atelier obligatoire pour : ${atelier.obligatoryGroups.map(pdfSafe).join(', ')}',
                 style: pw.TextStyle(
                     fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800),
               ),
             if (atelier.description != null && atelier.description!.trim().isNotEmpty) ...[
               pw.SizedBox(height: 8),
-              pw.Text(_clean(atelier.description!),
+              pw.Text(pdfSafe(atelier.description!),
                   style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
             ],
 
             if (atelier.objectifs.isNotEmpty) ...[
               _sectionTitle('Objectifs travaillés (${atelier.objectifs.length})'),
               ...atelier.objectifs.map(
-                (o) => pw.Bullet(text: _clean(o), style: const pw.TextStyle(fontSize: 10)),
+                (o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 10)),
               ),
             ],
 

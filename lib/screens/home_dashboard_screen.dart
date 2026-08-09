@@ -6,6 +6,7 @@ import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../utils/app_icons.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
 
@@ -144,7 +145,8 @@ class HomeDashboardScreen extends StatelessWidget {
                                   )
                                 : CircleAvatar(
                                     backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                                    child: const Icon(Icons.palette, color: Colors.white),
+                                    child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
+                                        color: Colors.white),
                                   ),
                             const SizedBox(width: 14),
                             Expanded(

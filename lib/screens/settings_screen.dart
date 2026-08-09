@@ -566,6 +566,51 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           const Text('Gérez les sauvegardes globales et les accès.', style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 16),
 
+          // Verrouillage a l'ouverture
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.fingerprint, color: Color(0xFF4E9F3D)),
+                      SizedBox(width: 8),
+                      Text('Verrouillage de l\'application', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Demander Face ID / code à l\'ouverture',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: Text(
+                      provider.biometricLockEnabled
+                          ? 'L\'espace enseignant est protégé au démarrage.'
+                          : 'L\'application s\'ouvre directement, sans authentification.',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    value: provider.biometricLockEnabled,
+                    activeColor: const Color(0xFF4E9F3D),
+                    onChanged: (val) => provider.setBiometricLockEnabled(val),
+                  ),
+                  if (!provider.biometricLockEnabled)
+                    const Text(
+                      'Attention : les données des élèves deviennent accessibles à toute personne ayant l\'appareil en main.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
+                    ),
+                  const Text(
+                    'La modification prend effet au prochain démarrage de l\'application.',
+                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Backup Card
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
