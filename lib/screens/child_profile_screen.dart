@@ -206,7 +206,7 @@ class ChildProfileScreen extends StatelessWidget {
     // Group activities by date
     final Map<String, List<ActivityLog>> groupedLogs = {};
     for (final log in childLogs) {
-      final dateKey = DateFormat('dd MMMM yyyy', 'fr_FR').format(log.timestamp);
+      final dateKey = DateFormat('dd/MM/yyyy').format(log.timestamp);
       groupedLogs.putIfAbsent(dateKey, () => []);
       groupedLogs[dateKey]!.add(log);
     }
