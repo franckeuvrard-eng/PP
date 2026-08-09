@@ -1134,7 +1134,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     String finalDomaine = '';
     if (_selectedDomainId == 'custom') {
       finalDomaine = _customDomaineCtrl.text.trim();
-    } else if (_selectedDomainId != null) {
+    } else if (_selectedDomainId != null && _selectedDomainId != 'none') {
       final dom = EduscolData.domains.firstWhere((d) => d.id == _selectedDomainId, orElse: () => EduscolData.domains.first);
       finalDomaine = dom.title;
     }
