@@ -1,5 +1,7 @@
-# Uncomment this line to define a global platform for your project
-platform :ios, '12.0'
+# Cible de deploiement unique du projet : doit rester alignee avec
+# IPHONEOS_DEPLOYMENT_TARGET (project.pbxproj) et MinimumOSVersion
+# (Flutter/AppFrameworkInfo.plist), sinon Xcode echoue au link des pods.
+platform :ios, '14.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -38,9 +40,9 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 12.0
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      end
+      # Affectation inconditionnelle : un test "< x" laissait passer des pods
+      # compiles pour une cible superieure a celle de l'app.
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
     end
   end
 end

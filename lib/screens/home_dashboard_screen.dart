@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
-import '../models/activity.dart';
 import '../models/space.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';

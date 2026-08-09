@@ -5,26 +5,37 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  IOS_DEPLOYMENT_TARGET: '14.0'
+
 jobs:
   build-ios:
-    runs-on: macos-latest
-    permissions:
-      contents: write
+    # Runner epingle : macos-14 embarque Xcode 15.x, compatible Flutter 3.19.
+    # macos-latest bascule sur Xcode 16.x, incompatible avec Flutter 3.19.
+    runs-on: macos-14
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+      - name: Select Xcode 15.4
+        run: |
+          ls /Applications | grep -i '^Xcode' || true
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
           channel: 'stable'
+
+      - name: Toolchain diagnostics
+        run: |
+          sw_vers
+          xcode-select -p
+          xcodebuild -version
+          pod --version
+          flutter --version
+          dart --version
 
       - name: Recreate iOS platform files
         run: |
@@ -34,16 +45,30 @@ jobs:
           echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
-          echo "DEVELOPMENT_TEAM=0000000000" >> ios/Flutter/Release.xcconfig
-          rm -rf test
+
+      - name: Normalize iOS deployment target
+        # flutter create reecrit project.pbxproj et AppFrameworkInfo.plist avec 12.0.
+        # On realigne tout sur la meme valeur que le Podfile pour eviter
+        # "module has a minimum deployment target of iOS X".
+        run: |
+          T="${IOS_DEPLOYMENT_TARGET}"
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = ${T};/g" ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s|<string>12.0</string>|<string>${T}</string>|g" ios/Flutter/AppFrameworkInfo.plist
+          echo "IPHONEOS_DEPLOYMENT_TARGET=${T}" >> ios/Flutter/Release.xcconfig
+          echo "--- pbxproj ---"
+          grep -n 'IPHONEOS_DEPLOYMENT_TARGET' ios/Runner.xcodeproj/project.pbxproj
+          echo "--- AppFrameworkInfo.plist ---"
+          grep -n -A1 'MinimumOSVersion' ios/Flutter/AppFrameworkInfo.plist
+          echo "--- Podfile ---"
+          grep -n 'platform :ios' ios/Podfile
 
       - name: Install dependencies
-        run: |
-          flutter pub get
-          if [ -f ios/Podfile ]; then
-            sed -i '' 's/# platform :ios/platform :ios/g' ios/Podfile
-            sed -i '' "s/platform :ios, .*/platform :ios, '14.0'/g" ios/Podfile
-          fi
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        # Bloque uniquement sur les vraies erreurs de compilation Dart :
+        # les infos et warnings de style ne doivent pas casser la release.
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Generate App Launcher Icons
         run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true
@@ -55,16 +80,39 @@ jobs:
           CODE_SIGN_IDENTITY: ''
         run: |
           set -o pipefail
-          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || (echo "=== LAST 100 LINES OF BUILD OUTPUT ===" && tail -n 100 build_output.txt && exit 1)
+          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || {
+            echo "=== FIRST ERROR LINES ==="
+            grep -n -i -E 'error:|fatal|\*\* BUILD FAILED|Encountered error' build_output.txt | head -n 50
+            echo "=== LAST 200 LINES ==="
+            tail -n 200 build_output.txt
+            exit 1
+          }
+
+      - name: Read app version
+        id: version
+        run: |
+          V=$(grep -m1 '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d'+' -f1)
+          echo "app_version=${V}" >> "$GITHUB_OUTPUT"
 
       - name: Package Payload to IPA
         run: |
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -r PetitPas_v1.3.0.ipa Payload
+          zip -r "PetitPas_v${{ steps.version.outputs.app_version }}.ipa" Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PetitPas-v1.3.0-iOS-IPA
-          path: PetitPas_v1.3.0.ipa
+          name: PetitPas-v${{ steps.version.outputs.app_version }}-iOS-IPA
+          path: PetitPas_v${{ steps.version.outputs.app_version }}.ipa
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          if-no-files-found: warn
+          path: |
+            build_output.txt
+            pubspec.lock
+            ios/Podfile.lock

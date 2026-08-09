@@ -305,7 +305,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   final child = sortedChildren[index];
                   final totalCount = childActivityCounts[child.id] ?? 0;
                   final sMap = childStatusCounts[child.id] ?? {};
-                  final acquisCount = sMap['Acquis'] ?? 0;
+                  // Les libelles de statut sont parametrables et contiennent des
+                  // emojis, donc on compare sur le libelle normalise.
+                  final acquisCount = sMap.entries
+                      .where((e) => _normalizeStatus(e.key).startsWith('acquis'))
+                      .fold<int>(0, (sum, e) => sum + e.value);
 
                   return ExpansionTile(
                     leading: CircleAvatar(
@@ -413,20 +417,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
+  /// Retire les emojis et la ponctuation d'un libelle de statut pour permettre
+  /// une comparaison stable, quels que soient les statuts saisis dans les
+  /// parametres (ex. 'Acquis 🟢' -> 'acquis').
+  String _normalizeStatus(String status) {
+    return status
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-zà-ÿ' ]"), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'acquis':
-        return const Color(0xFF388E3C);
-      case 'en cours d\'acquisition':
-      case 'en cours':
-        return const Color(0xFFF57C00);
-      case 'non acquis':
-        return const Color(0xFFD32F2F);
-      case 'à revoir':
-        return const Color(0xFF7B1FA2);
-      default:
-        return const Color(0xFF1976D2);
+    final s = _normalizeStatus(status);
+    if (s.startsWith('non acquis')) return const Color(0xFFD32F2F);
+    if (s.startsWith('acquis')) return const Color(0xFF388E3C);
+    if (s.startsWith('en cours')) return const Color(0xFFF57C00);
+    if (s.startsWith('à revoir') || s.startsWith('a revoir')) {
+      return const Color(0xFF7B1FA2);
     }
+    return const Color(0xFF1976D2);
   }
 
   Widget _buildMandatoryWorkshopsSection(
