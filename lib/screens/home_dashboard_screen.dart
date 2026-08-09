@@ -1,42 +1,16 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
-import '../models/child.dart';
-import '../models/activity_type.dart';
-import '../models/space.dart';
-import 'statistics_screen.dart';
-import 'edit_activity_log_screen.dart';
+import '../models/activity.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
-
-  Widget _buildChildAvatar(Child child, AppStateProvider provider) {
-    final absolutePath = provider.getAbsolutePath(child.imagePath);
-    if (absolutePath != null && File(absolutePath).existsSync()) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundImage: FileImage(File(absolutePath)),
-      );
-    }
-    return CircleAvatar(
-      radius: 20,
-      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
-      child: Text(
-        child.avatarText,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final activities = provider.activities;
-    final now = DateTime.now();
-    final todayActivities = activities.where((a) => a.timestamp.year == now.year && a.timestamp.month == now.month && a.timestamp.day == now.day).toList();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -48,26 +22,21 @@ class HomeDashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  title: 'Aujourd\'hui',
-                  value: '${todayActivities.length}',
-                  icon: Icons.bolt,
-                  color: isDark ? const Color(0xFF3B2E15) : const Color(0xFFFFF3E0),
-                  textColor: isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
+                  title: 'Présents',
+                  value: '${provider.children.length} / ${provider.children.length}',
+                  icon: Icons.check_circle_outline,
+                  color: const Color(0xFFE8F5E9),
+                  textColor: const Color(0xFF2E7D32),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const StatisticsScreen()));
-                  },
-                  child: _buildStatCard(
-                    title: 'Statistiques',
-                    value: 'Analyses',
-                    icon: Icons.bar_chart,
-                    color: isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD),
-                    textColor: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
-                  ),
+                child: _buildStatCard(
+                  title: 'Activités',
+                  value: '${activities.length}',
+                  icon: Icons.bolt,
+                  color: const Color(0xFFFFF3E0),
+                  textColor: const Color(0xFFE65100),
                 ),
               ),
             ],
@@ -78,10 +47,20 @@ class HomeDashboardScreen extends StatelessWidget {
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 'Fil d\'actualité du jour',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Saisie'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4E9F3D),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ],
           ),
@@ -89,33 +68,26 @@ class HomeDashboardScreen extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Timeline List
-          todayActivities.isEmpty
-              ? Center(
+          activities.isEmpty
+              ? const Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Text(
-                      'Aucune activité enregistrée aujourd\'hui.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-                    ),
+                    padding: EdgeInsets.all(40),
+                    child: Text('Aucune activité enregistrée pour le moment.'),
                   ),
                 )
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: todayActivities.length,
+                  itemCount: activities.length,
                   itemBuilder: (context, index) {
-                    final act = todayActivities[index];
+                    final act = activities[index];
                     final child = provider.children.firstWhere(
                       (c) => c.id == act.childId,
-                      orElse: () => Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?'),
+                      orElse: () => provider.children.first,
                     );
                     final actType = provider.activityTypes.firstWhere(
                       (a) => a.id == act.activityTypeId,
-                      orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
-                    );
-                    final space = provider.spaces.firstWhere(
-                      (s) => s.id == actType.spaceId,
-                      orElse: () => Space(id: '', name: '', colorHex: '#718096'),
+                      orElse: () => provider.activityTypes.first,
                     );
 
                     return Card(
@@ -127,194 +99,44 @@ class HomeDashboardScreen extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Workshop/Activity icon or cover image if exists
-                            (actType.imagePath != null &&
-                                    provider.getAbsolutePath(actType.imagePath) != null &&
-                                    File(provider.getAbsolutePath(actType.imagePath)!).existsSync())
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.file(
-                                      File(provider.getAbsolutePath(actType.imagePath)!),
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : CircleAvatar(
-                                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                                    child: const Icon(Icons.palette, color: Colors.white),
-                                  ),
+                            CircleAvatar(
+                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                              child: const Icon(Icons.palette, color: Colors.white),
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Child info & Edit button
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          _buildChildAvatar(child, provider),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${child.firstname} ${child.lastname ?? ""}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                          ),
-                                        ],
+                                      Text(
+                                        '${child.firstname} ${child.lastname ?? ""}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_outlined, size: 18),
-                                        tooltip: 'Éditer l\'observation',
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => EditActivityLogScreen(
-                                                activityLog: act,
-                                                actType: actType,
-                                                child: child,
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                      Text(
+                                        act.emotion,
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFFFF7043), fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
-                                  // Activity Type, Space, Obligatory & Time
-                                  Wrap(
-                                    crossAxisAlignment: WrapCrossAlignment.center,
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      Text(
-                                        '🎯 ${actType.name}',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                      if (space.name.isNotEmpty)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF4E9F3D).withOpacity(0.12),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '📍 ${space.name}',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
-                                          ),
-                                        ),
-                                      if (actType.isObligatory)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: const Text(
-                                            '⭐ Obligatoire',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
-                                          ),
-                                        ),
-                                      Text(
-                                        '• ${DateFormat('HH:mm').format(act.timestamp)}',
-                                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
-                                      ),
-                                    ],
+                                  Text(
+                                    actType.name,
+                                    style: const TextStyle(fontSize: 14, color: Color(0xFF718096)),
                                   ),
-                                  
-                                  // Evaluation Status pill
-                                  if (act.evaluationStatus != null) ...[
+                                  if (act.note != null && act.note!.isNotEmpty) ...[
                                     const SizedBox(height: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceVariant,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        act.evaluationStatus!,
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                                      ),
-                                    ),
-                                  ],
-
-                                  // Observation Note
-                                  if (act.note != null && act.note!.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surface,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Theme.of(context).dividerColor),
+                                        color: const Color(0xFFF8FAF7),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                                      ),
-                                    ),
-                                  ],
-
-                                  // Attached Photo Gallery Carousel
-                                  if (act.photoPaths.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                      height: 90,
-                                      child: ListView.builder(
-                                        scrollDirection: Axis.horizontal,
-                                        itemCount: act.photoPaths.length,
-                                        itemBuilder: (context, photoIndex) {
-                                          final path = act.photoPaths[photoIndex];
-                                          final resolvedPath = provider.getAbsolutePath(path);
-                                          if (resolvedPath == null || !File(resolvedPath).existsSync()) return const SizedBox();
-                                          return GestureDetector(
-                                            onTap: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => Dialog(
-                                                  backgroundColor: Colors.transparent,
-                                                  insetPadding: const EdgeInsets.all(10),
-                                                  child: Stack(
-                                                    alignment: Alignment.center,
-                                                    children: [
-                                                      InteractiveViewer(
-                                                        child: ClipRRect(
-                                                          borderRadius: BorderRadius.circular(16),
-                                                          child: Image.file(File(resolvedPath), fit: BoxFit.contain),
-                                                        ),
-                                                      ),
-                                                      Positioned(
-                                                        top: 10,
-                                                        right: 10,
-                                                        child: CircleAvatar(
-                                                          backgroundColor: Colors.black54,
-                                                          child: IconButton(
-                                                            icon: const Icon(Icons.close, color: Colors.white),
-                                                            onPressed: () => Navigator.pop(context),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            child: Container(
-                                              margin: const EdgeInsets.only(right: 8),
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(12),
-                                                child: Image.file(
-                                                  File(resolvedPath),
-                                                  width: 90,
-                                                  height: 90,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                        style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
                                       ),
                                     ),
                                   ],
