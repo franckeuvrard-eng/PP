@@ -178,6 +178,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ),
             const SizedBox(height: 24),
 
+            // ─── Mandatory Workshops Tracking ───
+            _buildMandatoryWorkshopsSection(context, provider, filteredActivities, children, types),
+            const SizedBox(height: 24),
+
             // ─── Evaluation Status Breakdown ───
             const Text('Répartition des Évaluations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
@@ -423,6 +427,184 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       default:
         return const Color(0xFF1976D2);
     }
+  }
+
+  Widget _buildMandatoryWorkshopsSection(
+    BuildContext context,
+    AppStateProvider provider,
+    List<ActivityLog> logs,
+    List<Child> children,
+    List<ActivityType> types,
+  ) {
+    final mandatoryTypes = types.where((t) => t.isObligatory).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.stars, color: Colors.orange, size: 22),
+            SizedBox(width: 8),
+            Text('Ateliers Obligatoires & Suivi des Retards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (mandatoryTypes.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Aucun atelier n\'est configuré comme obligatoire.\nPour rendre un atelier obligatoire, allez dans Paramètres > Espaces & Ateliers et cochez "Atelier Obligatoire".',
+                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: mandatoryTypes.length,
+            itemBuilder: (context, index) {
+              final actType = mandatoryTypes[index];
+              final space = provider.spaces.firstWhere(
+                (s) => s.id == actType.spaceId,
+                orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
+              );
+
+              final completedChildIds = logs
+                  .where((l) => l.activityTypeId == actType.id)
+                  .map((l) => l.childId)
+                  .toSet();
+
+              final completedChildren = children.where((c) => completedChildIds.contains(c.id)).toList();
+              final missingChildren = children.where((c) => !completedChildIds.contains(c.id)).toList();
+              final ratio = children.isEmpty ? 0.0 : completedChildren.length / children.length;
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ExpansionTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                    child: const Icon(Icons.stars, color: Colors.white, size: 20),
+                  ),
+                  title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('📍 Espace : ${space.name}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 8,
+                                backgroundColor: Colors.red.shade100,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  ratio == 1.0 ? const Color(0xFF4E9F3D) : Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${completedChildren.length} / ${children.length}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Élèves n\'ayant pas réalisé cet atelier (${missingChildren.length}) :',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.red),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (missingChildren.isEmpty)
+                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier obligatoire.', style: TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.bold))
+                          else
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: missingChildren.map((c) {
+                                return Chip(
+                                  avatar: CircleAvatar(
+                                    backgroundColor: c.avatarColor,
+                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                  ),
+                                  label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
+                                  backgroundColor: Colors.red.shade50,
+                                  side: BorderSide(color: Colors.red.shade200),
+                                );
+                              }).toList(),
+                            ),
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline, color: Color(0xFF4E9F3D), size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Élèves ayant validé (${completedChildren.length}) :',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4E9F3D)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (completedChildren.isEmpty)
+                            const Text('Aucun élève n\'a encore réalisé cet atelier.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey))
+                          else
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: completedChildren.map((c) {
+                                return Chip(
+                                  avatar: CircleAvatar(
+                                    backgroundColor: c.avatarColor,
+                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                  ),
+                                  label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
+                                  backgroundColor: Colors.green.shade50,
+                                  side: BorderSide(color: Colors.green.shade200),
+                                );
+                              }).toList(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
   }
 }
 

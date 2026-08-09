@@ -9,6 +9,7 @@ class ActivityType {
   final String? imagePath;
   final String domaine;
   final List<String> objectifs;
+  final bool isObligatory;
 
   ActivityType({
     required this.id,
@@ -19,6 +20,7 @@ class ActivityType {
     this.imagePath,
     this.domaine = '',
     this.objectifs = const [],
+    this.isObligatory = false,
   });
 
   // Backwards compatibility: map old 'category' field to 'spaceId'
@@ -33,6 +35,7 @@ class ActivityType {
       'imagePath': imagePath,
       'domaine': domaine,
       'objectifs': objectifs,
+      'isObligatory': isObligatory,
     };
   }
 
@@ -46,6 +49,7 @@ class ActivityType {
       imagePath: map['imagePath'],
       domaine: map['domaine'] ?? '',
       objectifs: List<String>.from(map['objectifs'] ?? map['pedagogicalDomains'] ?? []),
+      isObligatory: map['isObligatory'] ?? false,
     );
   }
 

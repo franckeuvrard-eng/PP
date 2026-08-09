@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import 'statistics_screen.dart';
+import 'edit_activity_log_screen.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
@@ -148,7 +149,7 @@ class HomeDashboardScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Child info
+                                  // Child info & Edit button
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -162,22 +163,61 @@ class HomeDashboardScreen extends StatelessWidget {
                                           ),
                                         ],
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, size: 18),
+                                        tooltip: 'Éditer l\'observation',
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => EditActivityLogScreen(
+                                                activityLog: act,
+                                                actType: actType,
+                                                child: child,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  // Activity Type and Space
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  const SizedBox(height: 4),
+                                  // Activity Type, Space, Obligatory & Time
+                                  Wrap(
+                                    cross: WrapCrossAlignment.center,
+                                    spacing: 6,
+                                    runSpacing: 4,
                                     children: [
-                                      Flexible(
-                                        child: Text(
-                                          space.name.isNotEmpty ? '${actType.name} • 📍${space.name}' : actType.name,
-                                          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
                                       Text(
-                                        DateFormat('HH:mm').format(act.timestamp),
+                                        '🎯 ${actType.name}',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                      if (space.name.isNotEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '📍 ${space.name}',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
+                                          ),
+                                        ),
+                                      if (actType.isObligatory)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            '⭐ Obligatoire',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                                          ),
+                                        ),
+                                      Text(
+                                        '• ${DateFormat('HH:mm').format(act.timestamp)}',
                                         style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                                       ),
                                     ],

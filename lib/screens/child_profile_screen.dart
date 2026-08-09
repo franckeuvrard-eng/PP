@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/space.dart';
+import 'edit_activity_log_screen.dart';
 
 class ChildProfileScreen extends StatelessWidget {
   final Child child;
@@ -243,35 +244,123 @@ class ChildProfileScreen extends StatelessWidget {
               );
 
               return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                    child: const Icon(Icons.palette, size: 18, color: Colors.white),
-                  ),
-                  title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Column(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('📍 ${space.name} • ${DateFormat('HH:mm').format(log.timestamp)}',
-                          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0))),
-                      if (actType.domaine.isNotEmpty)
-                        Text('📚 ${actType.domaine}',
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : const Color(0xFFB0BEC5))),
-                      if (log.evaluationStatus != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(log.evaluationStatus!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                                  child: const Icon(Icons.palette, size: 16, color: Colors.white),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    actType.name,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            tooltip: 'Éditer l\'observation',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EditActivityLogScreen(
+                                    activityLog: log,
+                                    actType: actType,
+                                    child: child,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '📍 ${space.name}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                            ),
+                          ),
+                          if (actType.isObligatory)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                '⭐ Obligatoire',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                              ),
+                            ),
+                          Text(
+                            '• ${DateFormat('HH:mm').format(log.timestamp)}',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0)),
+                          ),
+                        ],
+                      ),
+                      if (actType.domaine.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '📚 Domaine : ${actType.domaine}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.indigo.shade800),
                         ),
-                      if (log.note != null && log.note!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(log.note!, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                      ],
+                      if (actType.objectifs.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '🏁 Objectifs : ${actType.objectifs.join(' • ')}',
+                          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade700),
                         ),
+                      ],
+                      if (log.evaluationStatus != null) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            log.evaluationStatus!,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                      if (log.note != null && log.note!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '📝 ${log.note!}',
+                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                        ),
+                      ],
                     ],
                   ),
-                  isThreeLine: true,
                 ),
               );
             }),

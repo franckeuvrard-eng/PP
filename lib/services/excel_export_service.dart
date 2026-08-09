@@ -30,8 +30,10 @@ class ExcelExportService {
       sheet.appendRow(<xl.CellValue?>[
         xl.TextCellValue('Date'),
         xl.TextCellValue('Élève'),
+        xl.TextCellValue('Espace'),
         xl.TextCellValue('Atelier'),
         xl.TextCellValue('Domaine'),
+        xl.TextCellValue('Objectifs'),
         xl.TextCellValue('Évaluation'),
         xl.TextCellValue('Observations'),
       ]);
@@ -44,13 +46,15 @@ class ExcelExportService {
         );
         final space = provider.spaces.firstWhere(
           (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: '', colorHex: ''),
+          orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
         );
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue('${child.firstname} ${child.lastname ?? ""}'),
-          xl.TextCellValue(actType.name),
           xl.TextCellValue(space.name),
+          xl.TextCellValue(actType.name),
+          xl.TextCellValue(actType.domaine),
+          xl.TextCellValue(actType.objectifs.join(' ; ')),
           xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);
@@ -103,8 +107,10 @@ class ExcelExportService {
         xl.TextCellValue('Prénom Élève'),
         xl.TextCellValue('Nom Élève'),
         xl.TextCellValue('Groupe'),
+        xl.TextCellValue('Espace'),
         xl.TextCellValue('Atelier'),
         xl.TextCellValue('Domaine'),
+        xl.TextCellValue('Objectifs'),
         xl.TextCellValue('Évaluation'),
         xl.TextCellValue('Observations'),
       ]);
@@ -119,15 +125,17 @@ class ExcelExportService {
         );
         final space = provider.spaces.firstWhere(
           (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: '', colorHex: ''),
+          orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
         );
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue(child?.firstname ?? 'Élève inconnu'),
           xl.TextCellValue(child?.lastname ?? ''),
           xl.TextCellValue(child?.group ?? ''),
-          xl.TextCellValue(actType.name),
           xl.TextCellValue(space.name),
+          xl.TextCellValue(actType.name),
+          xl.TextCellValue(actType.domaine),
+          xl.TextCellValue(actType.objectifs.join(' ; ')),
           xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);
