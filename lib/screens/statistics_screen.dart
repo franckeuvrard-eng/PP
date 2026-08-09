@@ -556,7 +556,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               children: missingChildren.map((c) {
                                 return Chip(
                                   avatar: CircleAvatar(
-                                    backgroundColor: c.avatarColor,
+                                    backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
                                     child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
@@ -586,7 +586,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               children: completedChildren.map((c) {
                                 return Chip(
                                   avatar: CircleAvatar(
-                                    backgroundColor: c.avatarColor,
+                                    backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
                                     child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),

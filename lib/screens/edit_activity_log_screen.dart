@@ -96,9 +96,9 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                     Row(
                       children: [
                         CircleAvatar(
-                          backgroundColor: widget.child.avatarColor,
+                          backgroundColor: Color(int.parse(widget.child.colorHex.replaceFirst('#', '0xff'))),
                           child: Text(
-                            widget.child.firstName.isNotEmpty ? widget.child.firstName[0].toUpperCase() : '?',
+                            widget.child.firstname.isNotEmpty ? widget.child.firstname[0].toUpperCase() : '?',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -107,10 +107,11 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${widget.child.firstName} ${widget.child.lastName}',
+                              '${widget.child.firstname} ${widget.child.lastname ?? ""}',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                            Text('Groupe : ${widget.child.groupName}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            if (widget.child.group != null && widget.child.group!.isNotEmpty)
+                              Text('Groupe : ${widget.child.group}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                           ],
                         ),
                       ],
