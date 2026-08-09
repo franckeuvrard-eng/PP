@@ -66,6 +66,22 @@ jobs:
           echo "--- Podfile ---"
           grep -n 'platform :ios' ios/Podfile
 
+      - name: Validate storyboards
+        # xcodebuild remonte "Command CompileStoryboard failed with a nonzero
+        # exit code" sans le message d'ibtool (il part dans le xcresult). On
+        # appelle ibtool directement pour obtenir le diagnostic lisible.
+        run: |
+          IBTOOL="$(xcode-select -p)/usr/bin/ibtool"
+          for sb in ios/Runner/Base.lproj/*.storyboard; do
+            echo "=== $sb ==="
+            "$IBTOOL" --errors --warnings --notices \
+              --minimum-deployment-target "${IOS_DEPLOYMENT_TARGET}" \
+              --target-device iphone --target-device ipad \
+              --output-format human-readable-text \
+              --compile "$(mktemp -d)/$(basename "$sb")c" "$sb" \
+              || echo ">>> ibtool a echoue sur $sb"
+          done
+
       - name: Install dependencies
         run: flutter pub get
 
