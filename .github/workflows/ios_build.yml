@@ -84,9 +84,14 @@ jobs:
           CODE_SIGN_IDENTITY: ''
         run: |
           set -o pipefail
-          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || {
+          # --verbose : sans lui, l'outil Flutter resume l'echec xcodebuild en une
+          # ligne ("Command X failed with a nonzero exit code") et masque le
+          # message reel du compilateur / d'ibtool.
+          flutter build ios --release --no-codesign --verbose 2>&1 | tee build_output.txt || {
             echo "=== FIRST ERROR LINES ==="
-            grep -n -i -E 'error:|fatal|\*\* BUILD FAILED|Encountered error' build_output.txt | head -n 50
+            grep -n -i -E 'error:|\*\* BUILD FAILED|Encountered error' build_output.txt | head -n 50
+            echo "=== IBTOOL / STORYBOARD ==="
+            grep -n -i -E 'ibtool|storyboard|CompileStoryboard' build_output.txt | head -n 40
             echo "=== LAST 200 LINES ==="
             tail -n 200 build_output.txt
             exit 1
