@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../providers/app_provider.dart';
+import '../models/space.dart';
 
 class QrGeneratorScreen extends StatelessWidget {
   const QrGeneratorScreen({super.key});
@@ -147,7 +148,7 @@ class QrGeneratorScreen extends StatelessWidget {
                         textAlign: pw.TextAlign.center,
                       ),
                       pw.Text(
-                        act.category,
+                        provider.spaces.firstWhere((s) => s.id == act.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
                         style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
                         textAlign: pw.TextAlign.center,
                       ),
@@ -275,7 +276,7 @@ class QrGeneratorScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         Text(
-                          act.category,
+                          provider.spaces.firstWhere((s) => s.id == act.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
                           style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
                         ),
                         const SizedBox(height: 10),

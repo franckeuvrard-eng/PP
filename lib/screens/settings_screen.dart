@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/activity_type.dart';
+import '../models/space.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,7 +23,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   late TextEditingController _schoolNameController;
   late TextEditingController _schoolYearController;
 
-  final TextEditingController _newCategoryController = TextEditingController();
   String _selectedLevel = 'PS';
   String? _classLogoPath;
 
@@ -50,7 +50,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     _atsemController.dispose();
     _schoolNameController.dispose();
     _schoolYearController.dispose();
-    _newCategoryController.dispose();
     super.dispose();
   }
 
@@ -69,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           indicatorColor: const Color(0xFF4E9F3D),
           tabs: const [
             Tab(icon: Icon(Icons.school), text: 'Profil Classe'),
-            Tab(icon: Icon(Icons.palette), text: 'Ateliers & Packs'),
+            Tab(icon: Icon(Icons.space_dashboard), text: 'Espaces & Ateliers'),
             Tab(icon: Icon(Icons.brightness_6), text: 'Apparence'),
             Tab(icon: Icon(Icons.security), text: 'Sauvegarde & Sécurité'),
           ],
@@ -79,7 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         controller: _tabController,
         children: [
           _buildClassProfileTab(provider),
-          _buildWorkshopsTab(provider),
+          _buildSpacesAndWorkshopsTab(provider),
           _buildAppearanceTab(provider),
           _buildSecurityBackupTab(provider),
         ],
@@ -231,181 +230,313 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  // ─────────────────── TAB 2 : ATELIERS & PACKS ───────────────────
-  Widget _buildWorkshopsTab(AppStateProvider provider) {
-    final types = provider.activityTypes;
+  // ─────────────────── TAB 2 : ESPACES & ATELIERS ───────────────────
+  Widget _buildSpacesAndWorkshopsTab(AppStateProvider provider) {
+    final spaces = provider.spaces;
+    final allAteliers = provider.activityTypes;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── SECTION ESPACES ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('🎨 Catalogue des Ateliers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('📍 Espaces de la Classe', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ElevatedButton.icon(
-                onPressed: () => _openActivityTypeDialog(context, provider),
+                onPressed: () => _openSpaceDialog(context, provider),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Ajouter'),
+                label: const Text('Espace'),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E9F3D), foregroundColor: Colors.white),
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          const Text('Définissez les zones / coins de votre classe.', style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 12),
 
-          // ── PACKS CLE EN MAIN ──
-          Card(
-            color: const Color(0xFFE8F5E9),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.auto_awesome, color: Color(0xFF2E7D32)),
-                      SizedBox(width: 8),
-                      Text('Packs d\'Ateliers Clé en Main', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32), fontSize: 15)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text('Importez un pack d\'ateliers prédéfinis conformes aux programmes :', style: TextStyle(fontSize: 12)),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ActionChip(
-                        avatar: const Icon(Icons.backpack, size: 16),
-                        label: const Text('Pack Rentrée & Autonomie'),
-                        onPressed: () => _importPack(context, provider, 'rentree'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.draw, size: 16),
-                        label: const Text('Pack Motricité Fine & Graphisme'),
-                        onPressed: () => _importPack(context, provider, 'graphisme'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.calculate, size: 16),
-                        label: const Text('Pack Mathématiques & Logic'),
-                        onPressed: () => _importPack(context, provider, 'maths'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.music_note, size: 16),
-                        label: const Text('Pack Éveil Musical & Sonore'),
-                        onPressed: () => _importPack(context, provider, 'musique'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.science, size: 16),
-                        label: const Text('Pack Découverte du Monde'),
-                        onPressed: () => _importPack(context, provider, 'decouverte'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.record_voice_over, size: 16),
-                        label: const Text('Pack Langage & Communication'),
-                        onPressed: () => _importPack(context, provider, 'langage'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.self_improvement, size: 16),
-                        label: const Text('Pack Vivre Ensemble & Émotions'),
-                        onPressed: () => _importPack(context, provider, 'vivre_ensemble'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── WORKSHOPS LIST ──
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: types.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final type = types[index];
-              return ListTile(
+          // Spaces list
+          ...spaces.map((space) {
+            final ateliersInSpace = allAteliers.where((a) => a.spaceId == space.id).toList();
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ExpansionTile(
                 leading: CircleAvatar(
-                  backgroundColor: Color(int.parse(type.colorHex.replaceFirst('#', '0xff'))),
-                  child: const Icon(Icons.palette, color: Colors.white, size: 18),
+                  backgroundColor: Color(int.parse(space.colorHex.replaceFirst('#', '0xff'))),
+                  child: const Icon(Icons.space_dashboard, color: Colors.white, size: 20),
                 ),
-                title: Text(type.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${type.category} • ${type.description ?? ""}'),
+                title: Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                  '${ateliersInSpace.length} atelier(s)${space.description != null ? ' • ${space.description}' : ''}',
+                  style: const TextStyle(fontSize: 12),
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.grey),
-                      onPressed: () => _openActivityTypeDialog(context, provider, activityType: type),
+                      icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
+                      onPressed: () => _openSpaceDialog(context, provider, space: space),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () => provider.deleteActivityType(type.id),
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Supprimer cet espace ?'),
+                            content: Text('Cela supprimera aussi les ${ateliersInSpace.length} atelier(s) rattachés.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                onPressed: () {
+                                  provider.deleteSpace(space.id);
+                                  Navigator.pop(ctx);
+                                },
+                                child: const Text('Supprimer'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+                children: [
+                  // Ateliers in this space
+                  ...ateliersInSpace.map((atelier) => ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
+                      child: const Icon(Icons.palette, size: 14, color: Colors.white),
+                    ),
+                    title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (atelier.domaine.isNotEmpty)
+                          Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 11)),
+                        if (atelier.objectifs.isNotEmpty)
+                          Text('🎯 ${atelier.objectifs.join(", ")}', style: const TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                          onPressed: () => _openActivityTypeDialog(context, provider, activityType: atelier),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                          onPressed: () => provider.deleteActivityType(atelier.id),
+                        ),
+                      ],
+                    ),
+                    isThreeLine: atelier.domaine.isNotEmpty || atelier.objectifs.isNotEmpty,
+                  )),
+                  // Add atelier button inside expansion
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openActivityTypeDialog(context, provider, preselectedSpaceId: space.id),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Ajouter un atelier dans cet espace'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          if (spaces.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: Text('Aucun espace défini. Ajoutez votre premier espace !')),
+            ),
         ],
       ),
     );
   }
 
-  void _importPack(BuildContext context, AppStateProvider provider, String packKey) {
-    List<ActivityType> pack = [];
+  // ─────────────────── SPACE DIALOG ───────────────────
+  void _openSpaceDialog(BuildContext context, AppStateProvider provider, {Space? space}) {
+    final nameCtrl = TextEditingController(text: space?.name ?? '');
+    final descCtrl = TextEditingController(text: space?.description ?? '');
+    String color = space?.colorHex ?? '#4E9F3D';
 
-    if (packKey == 'rentree') {
-      pack = [
-        ActivityType(id: 'p_r1', name: 'Rangement des Jeux', category: 'Vie Pratique', iconName: 'inventory', colorHex: '#4E9F3D', description: 'Apprendre à trier et ranger les jeux après le temps libre.'),
-        ActivityType(id: 'p_r2', name: 'Lavage des Mains', category: 'Autonomie', iconName: 'clean_hands', colorHex: '#42A5F5', description: 'Autonomie au lavabo avant le repas et après la récréation.'),
-        ActivityType(id: 'p_r3', name: 'Habillage & Manteau', category: 'Autonomie', iconName: 'checkroom', colorHex: '#FFA726', description: 'Mettre son manteau et fermer les fermetures éclair.'),
-      ];
-    } else if (packKey == 'graphisme') {
-      pack = [
-        ActivityType(id: 'p_g1', name: 'Pâte à Modeler & Colombins', category: 'Motricité Fine', iconName: 'gesture', colorHex: '#E91E63', description: 'Former de petites boules et colombins pour muscler les doigts.'),
-        ActivityType(id: 'p_g2', name: 'Découpage aux Ciseaux', category: 'Motricité Fine', iconName: 'content_cut', colorHex: '#9C27B0', description: 'Tenir les ciseaux et découper le long de lignes droites.'),
-        ActivityType(id: 'p_g3', name: 'Lignes Verticales & Horizontales', category: 'Graphisme', iconName: 'border_color', colorHex: '#FF9800', description: 'Tracés guidés de haut en bas et de gauche à droite.'),
-      ];
-    } else if (packKey == 'maths') {
-      pack = [
-        ActivityType(id: 'p_m1', name: 'Tri par Couleur & Forme', category: 'Mathématiques', iconName: 'category', colorHex: '#3F51B5', description: 'Classer des objets selon la couleur ou la forme géométrique.'),
-        ActivityType(id: 'p_m2', name: 'Dénombrement (1 à 3)', category: 'Mathématiques', iconName: 'pin', colorHex: '#009688', description: 'Dénombrer de petites collections d\'objets jusqu\'à 3.'),
-        ActivityType(id: 'p_m3', name: 'Algorithme Simple AB-AB', category: 'Logic', iconName: 'alt_route', colorHex: '#673AB7', description: 'Poursuivre une suite logique alternant deux couleurs.'),
-      ];
-    } else if (packKey == 'musique') {
-      pack = [
-        ActivityType(id: 'p_mu1', name: 'Comptines & Chansons', category: 'Éveil Musical', iconName: 'music_note', colorHex: '#E91E63', description: 'Apprentissage de comptines et chansons à gestes.'),
-        ActivityType(id: 'p_mu2', name: 'Instruments de Percussion', category: 'Éveil Musical', iconName: 'piano', colorHex: '#F44336', description: 'Découverte des instruments à percussion (maracas, claves, tambourin).'),
-        ActivityType(id: 'p_mu3', name: 'Écoute & Reconnaissance Sonore', category: 'Éveil Musical', iconName: 'hearing', colorHex: '#9C27B0', description: 'Identifier des sons familiers, bruits d\'animaux, instruments.'),
-      ];
-    } else if (packKey == 'decouverte') {
-      pack = [
-        ActivityType(id: 'p_d1', name: 'Jardinage & Nature', category: 'Découverte du Monde', iconName: 'yard', colorHex: '#4CAF50', description: 'Planter des graines, observer la croissance, les saisons.'),
-        ActivityType(id: 'p_d2', name: 'Expériences Sensorielles', category: 'Découverte du Monde', iconName: 'science', colorHex: '#00BCD4', description: 'Bacs sensoriels (eau, sable, terre), transvasements.'),
-        ActivityType(id: 'p_d3', name: 'Animaux & Environnement', category: 'Découverte du Monde', iconName: 'pets', colorHex: '#8BC34A', description: 'Observer et classer des animaux familiers, élevage de chenilles.'),
-      ];
-    } else if (packKey == 'langage') {
-      pack = [
-        ActivityType(id: 'p_l1', name: 'Imagier & Vocabulaire', category: 'Langage', iconName: 'image', colorHex: '#FF5722', description: 'Nommer des objets, enrichir le vocabulaire avec des imagiers.'),
-        ActivityType(id: 'p_l2', name: 'Jeux de Rôle & Marionnettes', category: 'Langage', iconName: 'theater_comedy', colorHex: '#795548', description: 'Dialoguer en situation de jeu, coin dînette, marionnettes.'),
-        ActivityType(id: 'p_l3', name: 'Albums & Langage Oral', category: 'Langage', iconName: 'auto_stories', colorHex: '#607D8B', description: 'Raconter une histoire à partir d\'images séquentielles.'),
-      ];
-    } else if (packKey == 'vivre_ensemble') {
-      pack = [
-        ActivityType(id: 'p_ve1', name: 'Règles de Vie & Conseil', category: 'Vivre Ensemble', iconName: 'groups', colorHex: '#3F51B5', description: 'Établir les règles de la classe, conseil d\'élèves.'),
-        ActivityType(id: 'p_ve2', name: 'Émotions & Bien-être', category: 'Vivre Ensemble', iconName: 'emoji_emotions', colorHex: '#FFEB3B', description: 'Identifier et exprimer ses émotions (roue des émotions, album Le monstre des couleurs).'),
-        ActivityType(id: 'p_ve3', name: 'Jeux Coopératifs', category: 'Vivre Ensemble', iconName: 'handshake', colorHex: '#00BCD4', description: 'Jeux collectifs favorisant l\'entraide et le partage.'),
-      ];
-    }
+    final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
 
-    provider.importActivityTypePack(pack);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Pack "${packKey.toUpperCase()}" importé avec succès ! 🎉'), backgroundColor: const Color(0xFF4E9F3D)),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSt) {
+            return AlertDialog(
+              title: Text(space == null ? 'Ajouter un Espace' : 'Modifier l\'Espace'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom de l\'espace')),
+                    const SizedBox(height: 8),
+                    TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description (optionnel)')),
+                    const SizedBox(height: 12),
+                    const Align(alignment: Alignment.centerLeft, child: Text('Couleur :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: colors.map((c) {
+                        final isSelected = c == color;
+                        return GestureDetector(
+                          onTap: () => setSt(() => color = c),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Color(int.parse(c.replaceFirst('#', '0xff'))),
+                              shape: BoxShape.circle,
+                              border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                              boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(c.replaceFirst('#', '0xff'))), blurRadius: 8)] : null,
+                            ),
+                            child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameCtrl.text.trim().isNotEmpty) {
+                      final newSpace = Space(
+                        id: space?.id ?? 'space_${DateTime.now().millisecondsSinceEpoch}',
+                        name: nameCtrl.text.trim(),
+                        colorHex: color,
+                        description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                      );
+                      provider.addOrUpdateSpace(newSpace);
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Enregistrer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ─────────────────── ATELIER DIALOG ───────────────────
+  void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? activityType, String? preselectedSpaceId}) {
+    final nameCtrl = TextEditingController(text: activityType?.name ?? '');
+    final descCtrl = TextEditingController(text: activityType?.description ?? '');
+    final domaineCtrl = TextEditingController(text: activityType?.domaine ?? '');
+    final objectifsCtrl = TextEditingController(text: activityType?.objectifs.join('\n') ?? '');
+    String spaceId = preselectedSpaceId ?? activityType?.spaceId ?? (provider.spaces.isNotEmpty ? provider.spaces.first.id : '');
+    String color = activityType?.colorHex ?? '#4E9F3D';
+
+    final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSt) {
+            return AlertDialog(
+              title: Text(activityType == null ? 'Ajouter un Atelier' : 'Modifier l\'Atelier'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom de l\'atelier')),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: provider.spaces.any((s) => s.id == spaceId) ? spaceId : null,
+                      decoration: const InputDecoration(labelText: 'Espace'),
+                      items: provider.spaces.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setSt(() => spaceId = val);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(controller: domaineCtrl, decoration: const InputDecoration(labelText: 'Domaine pédagogique', hintText: 'Ex: Mobiliser le langage')),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: objectifsCtrl,
+                      decoration: const InputDecoration(labelText: 'Objectifs (un par ligne)', hintText: 'Écouter une histoire\nReformuler avec ses mots'),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+                    const SizedBox(height: 12),
+                    const Text('Couleur :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: colors.map((c) {
+                        final isSelected = c == color;
+                        return GestureDetector(
+                          onTap: () => setSt(() => color = c),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Color(int.parse(c.replaceFirst('#', '0xff'))),
+                              shape: BoxShape.circle,
+                              border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                              boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(c.replaceFirst('#', '0xff'))), blurRadius: 8)] : null,
+                            ),
+                            child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameCtrl.text.trim().isNotEmpty) {
+                      final objectifs = objectifsCtrl.text
+                          .split('\n')
+                          .map((o) => o.trim())
+                          .where((o) => o.isNotEmpty)
+                          .toList();
+                      final newType = ActivityType(
+                        id: activityType?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
+                        name: nameCtrl.text.trim(),
+                        spaceId: spaceId,
+                        colorHex: color,
+                        description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                        domaine: domaineCtrl.text.trim(),
+                        objectifs: objectifs,
+                      );
+                      provider.saveActivityType(newType);
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Enregistrer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -462,7 +593,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  // ─────────────────── TAB 4 : SECURIATION & BACKUP ───────────────────
+  // ─────────────────── TAB 4 : SECURITE & BACKUP ───────────────────
   Widget _buildSecurityBackupTab(AppStateProvider provider) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -557,72 +688,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? activityType}) {
-    final nameCtrl = TextEditingController(text: activityType?.name ?? '');
-    final descCtrl = TextEditingController(text: activityType?.description ?? '');
-    String cat = (activityType != null && provider.categories.contains(activityType.category))
-        ? activityType.category
-        : (provider.categories.isNotEmpty ? provider.categories.first : 'Général');
-    String color = activityType?.colorHex ?? '#4E9F3D';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        final categoriesList = provider.categories.contains(cat) 
-            ? provider.categories 
-            : [...provider.categories, cat];
-
-        return AlertDialog(
-          title: Text(activityType == null ? 'Ajouter un Atelier' : 'Modifier l\'Atelier'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom de l\'atelier')),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: cat,
-                decoration: const InputDecoration(labelText: 'Domaine / Catégorie'),
-                items: categoriesList.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) {
-                  if (val != null) cat = val;
-                },
-              ),
-              const SizedBox(height: 8),
-              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-            ElevatedButton(
-              onPressed: () {
-                if (nameCtrl.text.trim().isNotEmpty) {
-                  final newType = ActivityType(
-                    id: activityType?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
-                    name: nameCtrl.text.trim(),
-                    category: cat,
-                    iconName: activityType?.iconName ?? 'palette',
-                    colorHex: color,
-                    description: descCtrl.text.trim(),
-                  );
-                  provider.saveActivityType(newType);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Enregistrer'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _openResetDialog(BuildContext context, AppStateProvider provider) {
     bool clearActivities = false;
     bool clearChildren = false;
     bool clearActivityTypes = false;
     bool resetSettings = false;
     bool clearEvaluationStatuses = false;
-    bool clearCategories = false;
+    bool clearSpaces = false;
     bool clearPhotos = false;
 
     showDialog(
@@ -667,17 +739,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       activeColor: Colors.red,
                     ),
                     CheckboxListTile(
+                      title: const Text('📍 Espaces de classe'),
+                      subtitle: const Text('Remettre les espaces par défaut'),
+                      value: clearSpaces,
+                      onChanged: (v) => setSt(() => clearSpaces = v ?? false),
+                      activeColor: Colors.red,
+                    ),
+                    CheckboxListTile(
                       title: const Text('📊 Niveaux d\'évaluation'),
                       subtitle: const Text('Remettre les statuts par défaut'),
                       value: clearEvaluationStatuses,
                       onChanged: (v) => setSt(() => clearEvaluationStatuses = v ?? false),
-                      activeColor: Colors.red,
-                    ),
-                    CheckboxListTile(
-                      title: const Text('📁 Catégories / Domaines'),
-                      subtitle: const Text('Remettre les catégories par défaut'),
-                      value: clearCategories,
-                      onChanged: (v) => setSt(() => clearCategories = v ?? false),
                       activeColor: Colors.red,
                     ),
                     CheckboxListTile(
@@ -709,7 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       clearActivities: clearActivities,
                       resetSettings: resetSettings,
                       clearEvaluationStatuses: clearEvaluationStatuses,
-                      clearCategories: clearCategories,
+                      clearSpaces: clearSpaces,
                       clearPhotos: clearPhotos,
                     );
                     Navigator.pop(context);

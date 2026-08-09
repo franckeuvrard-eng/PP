@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
+import '../models/space.dart';
 import '../providers/app_provider.dart';
 
 class ExcelExportService {
@@ -39,13 +40,17 @@ class ExcelExportService {
       for (final log in logs) {
         final actType = provider.activityTypes.firstWhere(
           (a) => a.id == log.activityTypeId,
-          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: 'Général', iconName: '', colorHex: ''),
+          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: ''),
+        );
+        final space = provider.spaces.firstWhere(
+          (s) => s.id == actType.spaceId,
+          orElse: () => Space(id: '', name: '', colorHex: ''),
         );
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue('${child.firstname} ${child.lastname ?? ""}'),
           xl.TextCellValue(actType.name),
-          xl.TextCellValue(actType.category),
+          xl.TextCellValue(space.name),
           xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);
@@ -110,7 +115,11 @@ class ExcelExportService {
         final child = childMap[log.childId];
         final actType = provider.activityTypes.firstWhere(
           (a) => a.id == log.activityTypeId,
-          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: 'Général', iconName: '', colorHex: ''),
+          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: ''),
+        );
+        final space = provider.spaces.firstWhere(
+          (s) => s.id == actType.spaceId,
+          orElse: () => Space(id: '', name: '', colorHex: ''),
         );
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
@@ -118,7 +127,7 @@ class ExcelExportService {
           xl.TextCellValue(child?.lastname ?? ''),
           xl.TextCellValue(child?.group ?? ''),
           xl.TextCellValue(actType.name),
-          xl.TextCellValue(actType.category),
+          xl.TextCellValue(space.name),
           xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);

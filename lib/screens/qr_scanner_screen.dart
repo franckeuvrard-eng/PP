@@ -357,7 +357,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             const SizedBox(width: 6),
                             Text(
                               provider.activityTypes.firstWhere((a) => a.id == _selectedActivityTypeId,
-                                  orElse: () => ActivityType(id: '', name: '?', category: '', iconName: '', colorHex: '')).name,
+                                  orElse: () => ActivityType(id: '', name: '?', spaceId: '', colorHex: '')).name,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                           ]),

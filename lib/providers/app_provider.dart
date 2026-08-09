@@ -13,6 +13,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/class_settings.dart';
+import '../models/space.dart';
 
 class AppStateProvider extends ChangeNotifier {
   ClassSettings _classSettings = ClassSettings(
@@ -29,13 +30,22 @@ class AppStateProvider extends ChangeNotifier {
     Child(id: "child_4", firstname: "Chloé", lastname: "Dubois", birthdate: "2023-09-05", group: "Groupe Jaune", notes: "Lunettes de vue", colorHex: "#FFA726", avatarText: "CD", email: "parents.chloe@example.com"),
   ];
 
+  List<Space> _spaces = [
+    Space(id: 'space_1', name: 'Coin Arts Visuels', colorHex: '#FF7043', iconName: 'palette', description: 'Peinture, dessin, collages'),
+    Space(id: 'space_2', name: 'Espace Motricité', colorHex: '#4E9F3D', iconName: 'fitness_center', description: 'Parcours, jeux d\'opposition, danse'),
+    Space(id: 'space_3', name: 'Coin Lecture', colorHex: '#7E57C2', iconName: 'menu_book', description: 'Albums, contes, langage oral'),
+    Space(id: 'space_4', name: 'Coin Mathématiques', colorHex: '#FFA726', iconName: 'calculate', description: 'Tri, dénombrement, logique'),
+    Space(id: 'space_5', name: 'Coin Écoute & Musique', colorHex: '#42A5F5', iconName: 'music_note', description: 'Instruments, comptines, écoute'),
+    Space(id: 'space_6', name: 'Coin Jeux & Construction', colorHex: '#8D6E63', iconName: 'extension', description: 'Puzzles, kapla, jeux de société'),
+  ];
+
   List<ActivityType> _activityTypes = [
-    ActivityType(id: "act_1", name: "Peinture & Arts", category: "Créatif", iconName: "palette", colorHex: "#FF7043", description: "Atelier peinture, dessin libre ou dirigé, collages."),
-    ActivityType(id: "act_2", name: "Motricité & Parcours", category: "Motricité", iconName: "fitness_center", colorHex: "#4E9F3D", description: "Parcours gymnique, lancer, jeux d'opposition, danse."),
-    ActivityType(id: "act_3", name: "Lecture & Contes", category: "Apprentissage", iconName: "menu_book", colorHex: "#7E57C2", description: "Écoute de contes, manipulation d'albums, langage oral."),
-    ActivityType(id: "act_4", name: "Graphisme & Tracés", category: "Apprentissage", iconName: "edit", colorHex: "#FFA726", description: "Exercices de motricité fine, tracés de lignes, ronds."),
-    ActivityType(id: "act_5", name: "Temps Calme", category: "Bien-être", iconName: "bed", colorHex: "#42A5F5", description: "Sieste pour les PS, relaxation, écoute musicale douce."),
-    ActivityType(id: "act_6", name: "Repas & Goûter", category: "Vie pratique", iconName: "restaurant", colorHex: "#8D6E63", description: "Autonomie à la cantine, propreté, rangement."),
+    ActivityType(id: 'act_1', name: 'Peinture Libre', spaceId: 'space_1', colorHex: '#FF7043', description: 'Peinture, dessin libre ou dirigé, collages.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: ['Choisir différents outils', 'Mélanger les couleurs']),
+    ActivityType(id: 'act_2', name: 'Parcours Gymnique', spaceId: 'space_2', colorHex: '#4E9F3D', description: 'Parcours gymnique, lancer, jeux d\'opposition, danse.', domaine: 'Agir, s\'exprimer à travers l\'activité physique', objectifs: ['Courir, sauter', 'Se repérer dans l\'espace']),
+    ActivityType(id: 'act_3', name: 'Lecture & Contes', spaceId: 'space_3', colorHex: '#7E57C2', description: 'Écoute de contes, manipulation d\'albums, langage oral.', domaine: 'Mobiliser le langage', objectifs: ['Écouter une histoire', 'Reformuler avec ses mots']),
+    ActivityType(id: 'act_4', name: 'Graphisme & Tracés', spaceId: 'space_1', colorHex: '#FFA726', description: 'Exercices de motricité fine, tracés de lignes, ronds.', domaine: 'Mobiliser le langage dans sa dimension écrite', objectifs: ['Tracer des lignes', 'Reproduire des formes']),
+    ActivityType(id: 'act_5', name: 'Tri & Dénombrement', spaceId: 'space_4', colorHex: '#00BCD4', description: 'Classer, trier, dénombrer de petites collections.', domaine: 'Acquérir les premiers outils mathématiques', objectifs: ['Trier par couleur', 'Dénombrer jusqu\'à 3']),
+    ActivityType(id: 'act_6', name: 'Comptines & Chansons', spaceId: 'space_5', colorHex: '#E91E63', description: 'Apprentissage de comptines, instruments de percussion.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: ['Mémoriser une comptine', 'Marquer un rythme']),
   ];
 
   List<ActivityLog> _activities = [
@@ -63,14 +73,7 @@ class AppStateProvider extends ChangeNotifier {
     'Acquis 🟢',
   ];
 
-  List<String> _categories = [
-    'Apprentissage',
-    'Créatif',
-    'Motricité',
-    'Bien-être',
-    'Vie pratique',
-    'Général',
-  ];
+
 
   ThemeMode _themeMode = ThemeMode.system;
 
@@ -82,10 +85,10 @@ class AppStateProvider extends ChangeNotifier {
 
   ClassSettings get classSettings => _classSettings;
   List<Child> get children => List.unmodifiable(_children);
+  List<Space> get spaces => List.unmodifiable(_spaces);
   List<ActivityType> get activityTypes => List.unmodifiable(_activityTypes);
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
-  List<String> get categories => List.unmodifiable(_categories);
   ThemeMode get themeMode => _themeMode;
 
   void setThemeMode(ThemeMode mode) {
@@ -111,6 +114,12 @@ class AppStateProvider extends ChangeNotifier {
         _children = decoded.map((item) => Child.fromMap(item)).toList();
       }
 
+      final spacesJson = prefs.getString('spaces');
+      if (spacesJson != null) {
+        final List<dynamic> decoded = json.decode(spacesJson);
+        _spaces = decoded.map((item) => Space.fromMap(item)).toList();
+      }
+
       final typesJson = prefs.getString('activity_types');
       if (typesJson != null) {
         final List<dynamic> decoded = json.decode(typesJson);
@@ -127,12 +136,6 @@ class AppStateProvider extends ChangeNotifier {
       if (evaluationStatusesJson != null) {
         final List<dynamic> decoded = json.decode(evaluationStatusesJson);
         _evaluationStatuses = List<String>.from(decoded);
-      }
-
-      final categoriesJson = prefs.getString('categories');
-      if (categoriesJson != null) {
-        final List<dynamic> decoded = json.decode(categoriesJson);
-        _categories = List<String>.from(decoded);
       }
 
       final themeStr = prefs.getString('theme_mode');
@@ -157,10 +160,10 @@ class AppStateProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('class_settings', _classSettings.toJson());
       await prefs.setString('children', json.encode(_children.map((c) => c.toMap()).toList()));
+      await prefs.setString('spaces', json.encode(_spaces.map((s) => s.toMap()).toList()));
       await prefs.setString('activity_types', json.encode(_activityTypes.map((a) => a.toMap()).toList()));
       await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
       await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
-      await prefs.setString('categories', json.encode(_categories));
       
       String themeStr = 'system';
       if (_themeMode == ThemeMode.light) themeStr = 'light';
@@ -332,10 +335,10 @@ class AppStateProvider extends ChangeNotifier {
         'exportedAt': DateTime.now().toIso8601String(),
         'class_settings': _classSettings.toMap(),
         'children': _children.map((c) => c.toMap()).toList(),
+        'spaces': _spaces.map((s) => s.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses,
-        'categories': _categories,
       };
       final jsonBytes = utf8.encode(json.encode(backupData));
       archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
@@ -413,10 +416,12 @@ class AppStateProvider extends ChangeNotifier {
       // Restore JSON data
       _classSettings = ClassSettings.fromMap(data['class_settings']);
       _children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+      if (data['spaces'] != null) {
+        _spaces = (data['spaces'] as List).map((s) => Space.fromMap(s)).toList();
+      }
       _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
       _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
       _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
-      _categories = List<String>.from(data['categories'] ?? []);
 
       // Restore photo files
       for (final file in archive) {
@@ -461,13 +466,22 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void importActivityTypePack(List<ActivityType> newTypes) {
-    for (var act in newTypes) {
-      final existingIndex = _activityTypes.indexWhere((a) => a.name.toLowerCase().trim() == act.name.toLowerCase().trim());
-      if (existingIndex == -1) {
-        _activityTypes.add(act);
-      }
+  // ─── SPACES CRUD ───
+  void addOrUpdateSpace(Space space) {
+    final index = _spaces.indexWhere((s) => s.id == space.id);
+    if (index >= 0) {
+      _spaces[index] = space;
+    } else {
+      _spaces.add(space);
     }
+    _saveToPrefs();
+    notifyListeners();
+  }
+
+  void deleteSpace(String id) {
+    _spaces.removeWhere((s) => s.id == id);
+    // Also remove ateliers in this space
+    _activityTypes.removeWhere((a) => a.spaceId == id);
     _saveToPrefs();
     notifyListeners();
   }
@@ -518,11 +532,7 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCategories(List<String> categories) {
-    _categories = categories;
-    _saveToPrefs();
-    notifyListeners();
-  }
+
 
   void resetSelectiveData({
     required bool clearChildren,
@@ -530,7 +540,7 @@ class AppStateProvider extends ChangeNotifier {
     required bool clearActivities,
     required bool resetSettings,
     bool clearEvaluationStatuses = false,
-    bool clearCategories = false,
+    bool clearSpaces = false,
     bool clearPhotos = false,
   }) {
     if (clearChildren) {
@@ -549,14 +559,14 @@ class AppStateProvider extends ChangeNotifier {
         'Acquis 🟢',
       ];
     }
-    if (clearCategories) {
-      _categories = [
-        'Apprentissage',
-        'Créatif',
-        'Motricité',
-        'Bien-être',
-        'Vie pratique',
-        'Général',
+    if (clearSpaces) {
+      _spaces = [
+        Space(id: 'space_1', name: 'Coin Arts Visuels', colorHex: '#FF7043', iconName: 'palette'),
+        Space(id: 'space_2', name: 'Espace Motricité', colorHex: '#4E9F3D', iconName: 'fitness_center'),
+        Space(id: 'space_3', name: 'Coin Lecture', colorHex: '#7E57C2', iconName: 'menu_book'),
+        Space(id: 'space_4', name: 'Coin Mathématiques', colorHex: '#FFA726', iconName: 'calculate'),
+        Space(id: 'space_5', name: 'Coin Écoute & Musique', colorHex: '#42A5F5', iconName: 'music_note'),
+        Space(id: 'space_6', name: 'Coin Jeux & Construction', colorHex: '#8D6E63', iconName: 'extension'),
       ];
     }
     if (resetSettings) {

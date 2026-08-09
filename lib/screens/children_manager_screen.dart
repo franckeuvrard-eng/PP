@@ -15,6 +15,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../services/excel_export_service.dart';
+import 'child_profile_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
 
@@ -165,7 +166,14 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         child: ListTile(
-                          onTap: () => _showChildHistoryDialog(context, provider, child),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChildProfileScreen(child: child),
+                              ),
+                            );
+                          },
                           leading: _buildChildAvatar(child, provider),
                           title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Column(
@@ -209,10 +217,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                               IconButton(
                                 icon: const Icon(Icons.edit, color: Color(0xFF718096)),
                                 onPressed: () => _openChildDialog(context, provider, child: child),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                onPressed: () => _confirmDeleteChild(context, provider, child),
                               ),
                             ],
                           ),
@@ -289,7 +293,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                           final log = childLogs[index];
                           final actType = provider.activityTypes.firstWhere(
                             (a) => a.id == log.activityTypeId,
-                            orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: '#718096'),
+                            orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
                           );
                           return ListTile(
                             dense: true,
@@ -699,7 +703,12 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                 final actType = provider.activityTypes.firstWhere(
                   (a) => a.id == log.activityTypeId,
                   orElse: () =>
-                      ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: ''),
+                      ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
+                );
+
+                final space = provider.spaces.firstWhere(
+                  (s) => s.id == actType.spaceId,
+                  orElse: () => Space(id: '', name: '', colorHex: ''),
                 );
 
                 final List<pw.MemoryImage> activityImages = [];
@@ -725,7 +734,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                         children: [
                           pw.Text(_sanitizeEmoji(actType.name),
                               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                          pw.Text(_sanitizeEmoji(actType.category),
+                          pw.Text(_sanitizeEmoji(space.name),
                               style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                         ],
                       ),

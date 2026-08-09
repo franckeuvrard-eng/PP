@@ -4,6 +4,7 @@ import '../providers/app_provider.dart';
 import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../models/space.dart';
 import '../services/excel_export_service.dart';
 
 enum StatsPeriod { all, today, week, month }
@@ -74,9 +75,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       }
       final actType = types.firstWhere(
         (t) => t.id == act.activityTypeId,
-        orElse: () => ActivityType(id: '', name: '', category: 'Autre', iconName: '', colorHex: '#718096'),
+        orElse: () => ActivityType(id: '', name: '', spaceId: '', colorHex: '#718096'),
       );
-      final cat = actType.category.isNotEmpty ? actType.category : 'Autre';
+      final space = provider.spaces.firstWhere(
+        (s) => s.id == actType.spaceId,
+        orElse: () => Space(id: '', name: 'Autre', colorHex: '#718096'),
+      );
+      final cat = space.name.isNotEmpty ? space.name : 'Autre';
       domainCounts[cat] = (domainCounts[cat] ?? 0) + 1;
 
       // Evaluation stats
@@ -369,7 +374,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: const Icon(Icons.palette, color: Colors.white, size: 18),
                     ),
                     title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(actType.category, style: const TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      provider.spaces.firstWhere((s) => s.id == actType.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     trailing: Text('$count fois', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   );
                 },

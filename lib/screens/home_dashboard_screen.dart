@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../models/space.dart';
 import 'statistics_screen.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -109,7 +110,11 @@ class HomeDashboardScreen extends StatelessWidget {
                     );
                     final actType = provider.activityTypes.firstWhere(
                       (a) => a.id == act.activityTypeId,
-                      orElse: () => ActivityType(id: '', name: 'Atelier inconnu', category: '', iconName: '', colorHex: '#718096'),
+                      orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
+                    );
+                    final space = provider.spaces.firstWhere(
+                      (s) => s.id == actType.spaceId,
+                      orElse: () => Space(id: '', name: '', colorHex: '#718096'),
                     );
 
                     return Card(
@@ -160,13 +165,16 @@ class HomeDashboardScreen extends StatelessWidget {
                                     ],
                                   ),
                                   const SizedBox(height: 6),
-                                  // Activity Type and Category
+                                  // Activity Type and Space
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        actType.name,
-                                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600),
+                                      Flexible(
+                                        child: Text(
+                                          space.name.isNotEmpty ? '${actType.name} • 📍${space.name}' : actType.name,
+                                          style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                       Text(
                                         DateFormat('HH:mm').format(act.timestamp),
