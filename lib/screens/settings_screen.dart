@@ -881,7 +881,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     const Text('📚 Domaine & Objectifs Éduscol (Cycle 1)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedDomainId,
+                      value: (_selectedDomainId == 'custom' || _selectedDomainId == 'none' || EduscolData.domains.any((d) => d.id == _selectedDomainId)) ? _selectedDomainId : 'none',
                       decoration: const InputDecoration(
                         labelText: 'Domaine d\'apprentissage Éduscol (Optionnel)',
                         border: OutlineInputBorder(),
