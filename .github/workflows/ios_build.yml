@@ -102,8 +102,10 @@ jobs:
           set -o pipefail
           # --verbose : sans lui, l'outil Flutter resume l'echec xcodebuild en une
           # ligne ("Command X failed with a nonzero exit code") et masque le
-          # message reel du compilateur / d'ibtool.
-          flutter build ios --release --no-codesign --verbose 2>&1 | tee build_output.txt || {
+          # message reel du compilateur / d'ibtool. La sortie va dans le fichier
+          # (recuperable via l'artefact build-diagnostics) et non dans la console,
+          # qui resterait illisible avec ~12000 lignes.
+          flutter build ios --release --no-codesign --verbose > build_output.txt 2>&1 || {
             echo "=== FIRST ERROR LINES ==="
             grep -n -i -E 'error:|\*\* BUILD FAILED|Encountered error' build_output.txt | head -n 50
             echo "=== IBTOOL / STORYBOARD ==="
