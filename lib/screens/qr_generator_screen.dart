@@ -277,7 +277,7 @@ class QrGeneratorScreen extends StatelessWidget {
                         ),
                         Text(
                           provider.spaces.firstWhere((s) => s.id == act.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
                         ),
                         const SizedBox(height: 10),
                         QrImageView(

@@ -636,7 +636,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       ),
                       if (concernedChildren.isEmpty)
                         const Text('Aucun élève dans les sections ciblées.',
-                            style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey)),
+                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -689,7 +689,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                 return Chip(
                                   avatar: CircleAvatar(
                                     backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
-                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 12, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
                                   backgroundColor: Colors.red.shade50,
@@ -719,7 +719,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                 return Chip(
                                   avatar: CircleAvatar(
                                     backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
-                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                    child: Text(c.avatarText, style: const TextStyle(fontSize: 12, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
                                   backgroundColor: Colors.green.shade50,

@@ -329,17 +329,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (atelier.domaine.isNotEmpty)
-                          Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 11)),
+                          Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 12)),
                         if (atelier.objectifs.isNotEmpty)
-                          Text('🏁 ${atelier.objectifs.length} objectif(s) associé(s)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('🏁 ${atelier.objectifs.length} objectif(s) associé(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         if (atelier.photoPaths.isNotEmpty)
-                          Text('📷 ${atelier.photoPaths.length} photo(s)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('📷 ${atelier.photoPaths.length} photo(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         if (atelier.isObligatory)
                           Text(
                             atelier.obligatoryGroups.isEmpty
                                 ? '⭐ Obligatoire · toute la classe'
                                 : '⭐ Obligatoire · ${atelier.obligatoryGroups.join(', ')}',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                       ],
                     ),
@@ -886,7 +886,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       leading: const Icon(Icons.description_outlined),
                       title: Text(stamp.replaceAll('T', ' à ').replaceAll('-', '/'),
                           style: const TextStyle(fontSize: 13)),
-                      subtitle: Text('$sizeKo Ko', style: const TextStyle(fontSize: 11)),
+                      subtitle: Text('$sizeKo Ko', style: const TextStyle(fontSize: 12)),
                       trailing: TextButton(
                         onPressed: () async {
                           final confirme = await showDialog<bool>(
@@ -980,7 +980,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     ),
                   const Text(
                     'La modification prend effet au prochain démarrage de l\'application.',
-                    style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
                   ),
                 ],
               ),
@@ -1663,7 +1663,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                   return CheckboxListTile(
                                     dense: true,
                                     title: Text(obj.text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                                    subtitle: Text('Niveau Éduscol : ${obj.level}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    subtitle: Text('Niveau Éduscol : ${obj.level}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                     value: isChecked,
                                     activeColor: const Color(0xFF4E9F3D),
                                     onChanged: (val) {
@@ -1909,7 +1909,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                         hasCaption ? caption.trim() : 'Commenter',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 11),
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
                                   ),

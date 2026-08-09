@@ -22,13 +22,8 @@ class ChildProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     // Refresh child data from provider in case it was updated
-    final currentChild = provider.children.firstWhere(
-      (c) => c.id == child.id,
-      orElse: () => child,
-    );
-    final childLogs = provider.activities
-        .where((log) => log.childId == currentChild.id)
-        .toList()
+    final currentChild = provider.childById(child.id) ?? child;
+    final childLogs = provider.activitiesForChild(currentChild.id).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -135,7 +130,7 @@ class ChildProfileScreen extends StatelessWidget {
                 child: _buildStatBox(
                   context,
                   icon: Icons.assignment,
-                  value: '${provider.activities.where((a) => a.childId == child.id).length}',
+                  value: '${provider.activityCountForChild(child.id)}',
                   label: 'Observations totales',
                   color: const Color(0xFF4E9F3D),
                 ),
@@ -145,7 +140,7 @@ class ChildProfileScreen extends StatelessWidget {
                 child: _buildStatBox(
                   context,
                   icon: Icons.today,
-                  value: '${provider.activities.where((a) => a.childId == child.id && _isSameDay(a.timestamp, DateTime.now())).length}',
+                  value: '${provider.activityCountForChildOn(child.id, DateTime.now())}',
                   label: "Aujourd'hui",
                   color: const Color(0xFFFF7043),
                 ),
@@ -199,7 +194,7 @@ class ChildProfileScreen extends StatelessWidget {
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
           Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.8))),
+          Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
         ],
       ),
     );
@@ -274,14 +269,18 @@ class ChildProfileScreen extends StatelessWidget {
                           triggerMode: TooltipTriggerMode.manual,
                           message: '$son — ${statut.libelle}',
                           child: Container(
-                            width: 54,
-                            height: 54,
+                            // Taille minimale plutot que fixe : a 54x54 stricts,
+                            // le libelle debordait des que l'utilisateur
+                            // agrandissait la police dans les reglages iOS.
+                            constraints: const BoxConstraints(minWidth: 54, minHeight: 54),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
                               color: couleur.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: couleur, width: 2),
                             ),
                             child: Center(
+                              widthFactor: 1,
                               child: Text(
                                 son,
                                 style: TextStyle(
@@ -465,7 +464,7 @@ class ChildProfileScreen extends StatelessWidget {
                             ),
                             child: Text(
                               '📍 ${space.name}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
                             ),
                           ),
                           if (actType.isObligatoryForGroup(child.group))
@@ -477,12 +476,12 @@ class ChildProfileScreen extends StatelessWidget {
                               ),
                               child: const Text(
                                 '⭐ Obligatoire',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                               ),
                             ),
                           Text(
                             '• ${DateFormat('HH:mm').format(log.timestamp)}',
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0)),
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0)),
                           ),
                         ],
                       ),
@@ -497,7 +496,7 @@ class ChildProfileScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '🏁 Objectifs : ${actType.objectifs.join(' • ')}',
-                          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade700),
+                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade700),
                         ),
                       ],
                       if (provider.statusLabel(log) != null) ...[
@@ -587,9 +586,5 @@ class ChildProfileScreen extends StatelessWidget {
         );
       },
     );
-  }
-
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }

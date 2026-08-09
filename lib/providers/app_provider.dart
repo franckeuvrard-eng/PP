@@ -20,6 +20,15 @@ import '../data/sons_data.dart';
 import '../services/app_database.dart';
 
 class AppStateProvider extends ChangeNotifier {
+  /// Recalcule les index avant de prevenir les ecrans.
+  ///
+  /// Toutes les mutations passent par ici : c'est la seule garantie que les
+  /// index ne divergent pas des listes.
+  void _notify() {
+    _reindex();
+    notifyListeners();
+  }
+
   ClassSettings _classSettings = ClassSettings(
     name: "Classe Petite Section (PS)",
     teacher: "Mme Dupont",
@@ -100,6 +109,67 @@ class AppStateProvider extends ChangeNotifier {
 
   String? _docsDirPath;
 
+  // ─── Index de consultation ───
+  //
+  // Les ecrans resolvaient un eleve, un atelier ou un espace par firstWhere a
+  // chaque reconstruction, et recomptaient les observations par eleve de la
+  // meme facon : sur une annee scolaire cela represente des dizaines de
+  // milliers d'iterations par image affichee. Ces tables sont recalculees a
+  // chaque modification, soit bien plus rarement qu'on ne les consulte.
+  Map<String, Child> _childById = {};
+  Map<String, ActivityType> _typeById = {};
+  Map<String, Space> _spaceById = {};
+  Map<String, List<ActivityLog>> _logsByChild = {};
+  Map<String, List<ActivityLog>> _logsByType = {};
+
+  void _reindex() {
+    _childById = {for (final c in _children) c.id: c};
+    _typeById = {for (final t in _activityTypes) t.id: t};
+    _spaceById = {for (final s in _spaces) s.id: s};
+
+    _logsByChild = {};
+    _logsByType = {};
+    for (final log in _activities) {
+      (_logsByChild[log.childId] ??= []).add(log);
+      (_logsByType[log.activityTypeId] ??= []).add(log);
+    }
+  }
+
+  /// Eleve correspondant a un identifiant, ou null.
+  Child? childById(String? id) => id == null ? null : _childById[id];
+
+  /// Atelier correspondant a un identifiant, ou null.
+  ActivityType? activityTypeById(String? id) => id == null ? null : _typeById[id];
+
+  /// Espace correspondant a un identifiant, ou null.
+  Space? spaceById(String? id) => id == null ? null : _spaceById[id];
+
+  /// Observations d'un eleve, de la plus recente a la plus ancienne.
+  List<ActivityLog> activitiesForChild(String childId) =>
+      List.unmodifiable(_logsByChild[childId] ?? const []);
+
+  /// Observations rattachees a un atelier.
+  List<ActivityLog> activitiesForType(String typeId) =>
+      List.unmodifiable(_logsByType[typeId] ?? const []);
+
+  /// Nombre d'observations d'un eleve sur une journee donnee.
+  int activityCountForChildOn(String childId, DateTime day) {
+    final logs = _logsByChild[childId];
+    if (logs == null) return 0;
+    var count = 0;
+    for (final l in logs) {
+      if (l.timestamp.year == day.year &&
+          l.timestamp.month == day.month &&
+          l.timestamp.day == day.day) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// Nombre total d'observations d'un eleve.
+  int activityCountForChild(String childId) => _logsByChild[childId]?.length ?? 0;
+
   AppStateProvider() {
     _load();
   }
@@ -141,7 +211,7 @@ class AppStateProvider extends ChangeNotifier {
     }
     _sections = cleaned;
     _write(_db.setSetting('sections', json.encode(_sections)));
-    notifyListeners();
+    _notify();
   }
 
   /// Renomme une section et reporte le changement sur les eleves et les
@@ -173,7 +243,7 @@ class AppStateProvider extends ChangeNotifier {
     }
 
     _write(_db.setSetting('sections', json.encode(_sections)));
-    notifyListeners();
+    _notify();
   }
 
   /// Nombre d'eleves rattaches a une section, pour avertir avant suppression.
@@ -192,7 +262,7 @@ class AppStateProvider extends ChangeNotifier {
   void setBiometricLockEnabled(bool enabled) {
     _biometricLockEnabled = enabled;
     _write(_db.setSetting('biometric_lock_enabled', enabled.toString()));
-    notifyListeners();
+    _notify();
   }
 
   /// Statut d'un son pour un eleve. Non renseigne = non acquis.
@@ -219,20 +289,20 @@ class AppStateProvider extends ChangeNotifier {
       sons[son] = next;
     }
     _write(_db.setSon(childId, son, next));
-    notifyListeners();
+    _notify();
   }
 
   /// Remet tous les sons d'un eleve a non acquis.
   void resetSons(String childId) {
     if (_sonsProgress.remove(childId) == null) return;
     _write(_db.clearSons(childId));
-    notifyListeners();
+    _notify();
   }
 
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
     _write(_db.setSetting('theme_mode', _themeModeToString(mode)));
-    notifyListeners();
+    _notify();
   }
 
   /// Les mutations restent synchrones pour l'interface : l'ecriture en base
@@ -348,7 +418,7 @@ class AppStateProvider extends ChangeNotifier {
       // par defaut, plutot que rester bloquee sur l'ecran d'attente.
     }
     _isLoaded = true;
-    notifyListeners();
+    _notify();
   }
 
   /// Ecrit en base le jeu de donnees d'exemple present en memoire.
@@ -468,7 +538,7 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
       );
-      notifyListeners();
+      _notify();
       return true;
     } catch (e) {
       debugPrint('Echec de la restauration automatique : $e');
@@ -819,7 +889,7 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
       );
-      notifyListeners();
+      _notify();
       return 'success';
     } catch (e) {
       debugPrint('Import error: $e');
@@ -830,7 +900,7 @@ class AppStateProvider extends ChangeNotifier {
   void updateClassSettings(ClassSettings settings) {
     _classSettings = settings;
     _write(_db.setSetting('class_settings', settings.toJson()));
-    notifyListeners();
+    _notify();
   }
 
   void addOrUpdateChild(Child child) {
@@ -841,7 +911,7 @@ class AppStateProvider extends ChangeNotifier {
       _children.add(child);
     }
     _write(_db.saveChild(child));
-    notifyListeners();
+    _notify();
   }
 
   /// Supprime un eleve et renvoie de quoi revenir en arriere.
@@ -856,7 +926,7 @@ class AppStateProvider extends ChangeNotifier {
     _children.removeWhere((c) => c.id == id);
     _sonsProgress.remove(id);
     _write(_db.deleteChildCascade(id));
-    notifyListeners();
+    _notify();
     return DeletedChild(child: child, sons: sons);
   }
 
@@ -870,7 +940,7 @@ class AppStateProvider extends ChangeNotifier {
     deleted.sons.forEach((son, statut) {
       _write(_db.setSon(deleted.child.id, son, statut));
     });
-    notifyListeners();
+    _notify();
   }
 
   // ─── SPACES CRUD ───
@@ -882,7 +952,7 @@ class AppStateProvider extends ChangeNotifier {
       _spaces.add(space);
     }
     _write(_db.saveSpace(space));
-    notifyListeners();
+    _notify();
   }
 
   void deleteSpace(String id) {
@@ -894,7 +964,7 @@ class AppStateProvider extends ChangeNotifier {
     for (final atelierId in orphanIds) {
       _write(_db.deleteActivityType(atelierId));
     }
-    notifyListeners();
+    _notify();
   }
 
   void saveActivityType(ActivityType actType) {
@@ -905,7 +975,7 @@ class AppStateProvider extends ChangeNotifier {
       _activityTypes.add(actType);
     }
     _write(_db.saveActivityType(actType));
-    notifyListeners();
+    _notify();
   }
 
   void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
@@ -913,13 +983,13 @@ class AppStateProvider extends ChangeNotifier {
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
     _write(_db.deleteActivityType(id));
-    notifyListeners();
+    _notify();
   }
 
   void logActivity(ActivityLog activity) {
     _activities.insert(0, activity);
     _write(_db.saveActivity(activity));
-    notifyListeners();
+    _notify();
   }
 
   void updateActivityLog(ActivityLog updatedActivity) {
@@ -927,7 +997,7 @@ class AppStateProvider extends ChangeNotifier {
     if (index >= 0) {
       _activities[index] = updatedActivity;
       _write(_db.saveActivity(updatedActivity));
-      notifyListeners();
+      _notify();
     }
   }
 
@@ -938,7 +1008,7 @@ class AppStateProvider extends ChangeNotifier {
     if (index < 0) return null;
     final removed = _activities.removeAt(index);
     _write(_db.deleteActivity(id));
-    notifyListeners();
+    _notify();
     return removed;
   }
 
@@ -947,13 +1017,13 @@ class AppStateProvider extends ChangeNotifier {
     _activities.add(log);
     _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     _write(_db.saveActivity(log));
-    notifyListeners();
+    _notify();
   }
 
   void setEvaluationStatuses(List<EvaluationStatus> statuses) {
     _evaluationStatuses = statuses;
     _persistEvaluationStatuses();
-    notifyListeners();
+    _notify();
   }
 
   void _persistEvaluationStatuses() {
@@ -1092,7 +1162,7 @@ class AppStateProvider extends ChangeNotifier {
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
     ));
-    notifyListeners();
+    _notify();
   }
 
   Future<void> _deleteAllPhotos() async {

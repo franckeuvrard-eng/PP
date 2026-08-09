@@ -123,6 +123,14 @@ class PetitPasApp extends StatelessWidget {
       supportedLocales: const [
         Locale('fr', 'FR'),
       ],
+      // Le reglage de taille de texte d'iOS est respecte, mais borne a 1,8x :
+      // au-dela, les grilles de pastilles et les bandes de photos ne tiennent
+      // plus a l'ecran. Cela couvre l'integralite des tailles courantes et une
+      // bonne partie des tailles d'accessibilite.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.8,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const LockScreen(),
     );
   }
@@ -273,7 +281,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> {
                 const Text('PetitPas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 Text(
                   appProvider.classSettings.name,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
                 ),
               ],
             ),

@@ -108,18 +108,14 @@ class HomeDashboardScreen extends StatelessWidget {
                   itemCount: todayActivities.length,
                   itemBuilder: (context, index) {
                     final act = todayActivities[index];
-                    final child = provider.children.firstWhere(
-                      (c) => c.id == act.childId,
-                      orElse: () => Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?'),
-                    );
-                    final actType = provider.activityTypes.firstWhere(
-                      (a) => a.id == act.activityTypeId,
-                      orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
-                    );
-                    final space = provider.spaces.firstWhere(
-                      (s) => s.id == actType.spaceId,
-                      orElse: () => Space(id: '', name: '', colorHex: '#718096'),
-                    );
+                    // Resolution par index : trois balayages lineaires par
+                    // ligne du fil, a chaque reconstruction, sinon.
+                    final child = provider.childById(act.childId) ??
+                        Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?');
+                    final actType = provider.activityTypeById(act.activityTypeId) ??
+                        ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096');
+                    final space = provider.spaceById(actType.spaceId) ??
+                        Space(id: '', name: '', colorHex: '#718096');
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -205,7 +201,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                           ),
                                           child: Text(
                                             '📍 ${space.name}',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
                                           ),
                                         ),
                                       if (actType.isObligatoryForGroup(child.group))
@@ -217,12 +213,12 @@ class HomeDashboardScreen extends StatelessWidget {
                                           ),
                                           child: const Text(
                                             '⭐ Obligatoire',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                                           ),
                                         ),
                                       Text(
                                         '• ${DateFormat('HH:mm').format(act.timestamp)}',
-                                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                                       ),
                                     ],
                                   ),
@@ -238,7 +234,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                       ),
                                       child: Text(
                                         provider.statusLabel(act)!,
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                                       ),
                                     ),
                                   ],

@@ -87,7 +87,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           title: Text('${c.firstname} ${c.lastname ?? ''}'.trim()),
                           subtitle: c.group == null || c.group!.isEmpty
                               ? null
-                              : Text(c.group!, style: const TextStyle(fontSize: 11)),
+                              : Text(c.group!, style: const TextStyle(fontSize: 12)),
                           onChanged: (checked) => setSt(() {
                             if (checked == true) {
                               selection.add(c.id);
@@ -307,7 +307,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             hasCaption ? caption.trim() : 'Commenter',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10),
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ),
                       ),
@@ -390,7 +390,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           children: [
                             Text(
                               'SÉLECTION MANUELLE',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 4),
                             Icon(

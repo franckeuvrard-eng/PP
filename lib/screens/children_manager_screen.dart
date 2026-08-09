@@ -43,10 +43,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
@@ -54,12 +50,12 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
 
     final allChildren = provider.children;
 
-    // Calculate today activity counts per child
-    final Map<String, int> todayActivityCounts = {};
-    for (var child in allChildren) {
-      final count = provider.activities.where((act) => act.childId == child.id && _isSameDay(act.timestamp, now)).length;
-      todayActivityCounts[child.id] = count;
-    }
+    // Comptage via l'index du provider : la version precedente rebalayait
+    // toutes les observations pour chaque eleve, a chaque reconstruction.
+    final Map<String, int> todayActivityCounts = {
+      for (final child in allChildren)
+        child.id: provider.activityCountForChildOn(child.id, now),
+    };
 
     final pendingTodayCount = allChildren.where((c) => (todayActivityCounts[c.id] ?? 0) == 0).length;
     final evaluatedTodayCount = allChildren.where((c) => (todayActivityCounts[c.id] ?? 0) > 0).length;
@@ -204,7 +200,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                       ),
                                       child: Text(
                                         '✅ $todayCount activité(s) aujourd\'hui',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D)),
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D)),
                                       ),
                                     )
                                   : Container(
@@ -215,7 +211,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                       ),
                                       child: Text(
                                         '⏳ En attente d\'activité',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
                                       ),
                                     ),
                             ],
@@ -426,7 +422,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
       child: pw.Text(
         son,
         style: pw.TextStyle(
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.white,
         ),
@@ -529,7 +525,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     DateTime? to,
   ) {
     // Filter logs by period
-    var childLogs = provider.activities.where((log) => log.childId == child.id).toList();
+    var childLogs = provider.activitiesForChild(child.id).toList();
     if (from != null) {
       childLogs = childLogs.where((l) => l.timestamp.isAfter(from.subtract(const Duration(seconds: 1)))).toList();
     }
@@ -623,10 +619,8 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
                 );
 
-                final space = provider.spaces.firstWhere(
-                  (s) => s.id == actType.spaceId,
-                  orElse: () => Space(id: '', name: '', colorHex: ''),
-                );
+                final space = provider.spaceById(actType.spaceId) ??
+                    Space(id: '', name: '', colorHex: '');
 
                 // Chaque photo est accompagnee de sa legende quand elle en a une.
                 final List<({pw.MemoryImage image, String? caption})> activityImages = [];
