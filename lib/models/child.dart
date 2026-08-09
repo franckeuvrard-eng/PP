@@ -9,6 +9,8 @@ class Child {
   final String? notes;
   final String colorHex;
   final String avatarText;
+  final String? email;
+  final String? imagePath;
 
   Child({
     required this.id,
@@ -19,6 +21,8 @@ class Child {
     this.notes,
     required this.colorHex,
     required this.avatarText,
+    this.email,
+    this.imagePath,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +35,8 @@ class Child {
       'notes': notes,
       'colorHex': colorHex,
       'avatarText': avatarText,
+      'email': email,
+      'imagePath': imagePath,
     };
   }
 
@@ -44,6 +50,8 @@ class Child {
       notes: map['notes'],
       colorHex: map['colorHex'] ?? '#4E9F3D',
       avatarText: map['avatarText'] ?? (map['firstname'] != null && map['firstname'].isNotEmpty ? map['firstname'][0] : 'E'),
+      email: map['email'],
+      imagePath: map['imagePath'],
     );
   }
 

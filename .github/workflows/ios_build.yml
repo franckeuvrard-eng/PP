@@ -8,6 +8,8 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -24,20 +26,45 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
 
+      - name: Recreate iOS platform files
+        run: |
+          mv ios/Runner/Info.plist Info.plist.bak
+          flutter create --project-name=petitpas --platforms=ios .
+          mv Info.plist.bak ios/Runner/Info.plist
+          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
+          echo "DEVELOPMENT_TEAM=0000000000" >> ios/Flutter/Release.xcconfig
+          rm -rf test
+
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          if [ -f ios/Podfile ]; then
+            sed -i '' 's/# platform :ios/platform :ios/g' ios/Podfile
+            sed -i '' "s/platform :ios, .*/platform :ios, '14.0'/g" ios/Podfile
+          fi
+
+      - name: Generate App Launcher Icons
+        run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true
 
       - name: Build iOS App
-        run: flutter build ios --release --no-codesign
+        env:
+          CODE_SIGNING_ALLOWED: 'NO'
+          CODE_SIGNING_REQUIRED: 'NO'
+          CODE_SIGN_IDENTITY: ''
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || (echo "=== LAST 100 LINES OF BUILD OUTPUT ===" && tail -n 100 build_output.txt && exit 1)
 
       - name: Package Payload to IPA
         run: |
           mkdir -p Payload
-          mv build/ios/iphoneos/Runner.app Payload/
-          zip -r Runner.ipa Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -r PetitPas_v1.3.0.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PetitPas-iOS-IPA
-          path: Runner.ipa
+          name: PetitPas-v1.3.0-iOS-IPA
+          path: PetitPas_v1.3.0.ipa

@@ -3,25 +3,39 @@ import 'dart:convert';
 class ActivityType {
   final String id;
   final String name;
-  final String category;
-  final String iconName;
+  final String spaceId;
   final String colorHex;
+  final String? description;
+  final String? imagePath;
+  final String domaine;
+  final List<String> objectifs;
+  final bool isObligatory;
 
   ActivityType({
     required this.id,
     required this.name,
-    required this.category,
-    required this.iconName,
+    required this.spaceId,
     required this.colorHex,
+    this.description,
+    this.imagePath,
+    this.domaine = '',
+    this.objectifs = const [],
+    this.isObligatory = false,
   });
 
+  // Backwards compatibility: map old 'category' field to 'spaceId'
+  // and old 'pedagogicalDomains' to 'objectifs'
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
-      'category': category,
-      'iconName': iconName,
+      'spaceId': spaceId,
       'colorHex': colorHex,
+      'description': description,
+      'imagePath': imagePath,
+      'domaine': domaine,
+      'objectifs': objectifs,
+      'isObligatory': isObligatory,
     };
   }
 
@@ -29,9 +43,13 @@ class ActivityType {
     return ActivityType(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
-      category: map['category'] ?? 'Général',
-      iconName: map['iconName'] ?? 'palette',
+      spaceId: map['spaceId'] ?? map['category'] ?? '',
       colorHex: map['colorHex'] ?? '#FF7043',
+      description: map['description'],
+      imagePath: map['imagePath'],
+      domaine: map['domaine'] ?? '',
+      objectifs: List<String>.from(map['objectifs'] ?? map['pedagogicalDomains'] ?? []),
+      isObligatory: map['isObligatory'] ?? false,
     );
   }
 

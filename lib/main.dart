@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
@@ -21,9 +24,12 @@ class PetitPasApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appProvider = Provider.of<AppStateProvider>(context);
+
     return MaterialApp(
       title: 'PetitPas - Suivi Maternelle',
       debugShowCheckedModeBanner: false,
+      themeMode: appProvider.themeMode,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Outfit',
@@ -32,6 +38,7 @@ class PetitPasApp extends StatelessWidget {
           primary: const Color(0xFF4E9F3D),
           secondary: const Color(0xFFFF7043),
           surface: const Color(0xFFF8FAF7),
+          brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAF7),
         appBarTheme: const AppBarTheme(
@@ -46,7 +53,151 @@ class PetitPasApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainNavigationFrame(),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Outfit',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4E9F3D),
+          primary: const Color(0xFF66BB6A),
+          secondary: const Color(0xFFFF8A65),
+          surface: const Color(0xFF1E293B),
+          onSurface: Colors.white,
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardTheme: CardTheme(
+          color: const Color(0xFF1E293B),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        dividerColor: const Color(0xFF334155),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E293B),
+          elevation: 0,
+          scrolledUnderElevation: 1,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Color(0xFF1E293B),
+          selectedItemColor: Color(0xFF66BB6A),
+          unselectedItemColor: Color(0xFF94A3B8),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF334155),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF475569))),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF475569))),
+          labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFFE2E8F0)),
+          bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
+          titleMedium: TextStyle(color: Colors.white),
+        ),
+        dialogTheme: const DialogTheme(
+          backgroundColor: Color(0xFF1E293B),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Color(0xFF334155),
+          contentTextStyle: TextStyle(color: Colors.white),
+        ),
+      ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+      ],
+      home: const LockScreen(),
+    );
+  }
+}
+
+class LockScreen extends StatefulWidget {
+  const LockScreen({super.key});
+
+  @override
+  State<LockScreen> createState() => _LockScreenState();
+}
+
+class _LockScreenState extends State<LockScreen> {
+  final LocalAuthentication auth = LocalAuthentication();
+  bool _isAuthenticated = false;
+  bool _isAuthenticating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authenticate();
+  }
+
+  Future<void> _authenticate() async {
+    bool authenticated = false;
+    try {
+      setState(() {
+        _isAuthenticating = true;
+      });
+      authenticated = await auth.authenticate(
+        localizedReason: 'Veuillez vous authentifier pour accéder à l\'espace enseignant.',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: false,
+        ),
+      );
+    } on PlatformException catch (e) {
+      debugPrint('Auth error: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _isAuthenticated = authenticated;
+      _isAuthenticating = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isAuthenticated) {
+      return const MainNavigationFrame();
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF4E9F3D),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline, size: 80, color: Colors.white),
+            const SizedBox(height: 20),
+            const Text(
+              'Application Verrouillée',
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 40),
+            if (_isAuthenticating)
+              const CircularProgressIndicator(color: Colors.white)
+            else
+              ElevatedButton.icon(
+                onPressed: _authenticate,
+                icon: const Icon(Icons.fingerprint),
+                label: const Text('S\'authentifier (FaceID / Code)'),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4E9F3D),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

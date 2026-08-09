@@ -5,18 +5,18 @@ class ActivityLog {
   final String childId;
   final String activityTypeId;
   final DateTime timestamp;
-  final String emotion;
   final String? note;
-  final String? photoPath;
+  final List<String> photoPaths;
+  final String? evaluationStatus;
 
   ActivityLog({
     required this.id,
     required this.childId,
     required this.activityTypeId,
     required this.timestamp,
-    required this.emotion,
     this.note,
-    this.photoPath,
+    this.photoPaths = const [],
+    this.evaluationStatus,
   });
 
   Map<String, dynamic> toMap() {
@@ -25,9 +25,9 @@ class ActivityLog {
       'childId': childId,
       'activityTypeId': activityTypeId,
       'timestamp': timestamp.toIso8601String(),
-      'emotion': emotion,
       'note': note,
-      'photoPath': photoPath,
+      'photoPaths': photoPaths,
+      'evaluationStatus': evaluationStatus,
     };
   }
 
@@ -37,9 +37,9 @@ class ActivityLog {
       childId: map['childId'] ?? '',
       activityTypeId: map['activityTypeId'] ?? '',
       timestamp: DateTime.parse(map['timestamp'] ?? DateTime.now().toIso8601String()),
-      emotion: map['emotion'] ?? '😊 Joyeux',
       note: map['note'],
-      photoPath: map['photoPath'],
+      photoPaths: List<String>.from(map['photoPaths'] ?? []),
+      evaluationStatus: map['evaluationStatus'],
     );
   }
 
