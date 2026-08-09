@@ -371,7 +371,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 // Customizable Evaluation Status
                 if (provider.evaluationStatuses.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
-                    value: _selectedEvaluationStatus,
+                    value: (provider.evaluationStatuses.contains(_selectedEvaluationStatus)) ? _selectedEvaluationStatus : null,
                     decoration: const InputDecoration(
                       labelText: 'Statut de l\'évaluation',
                       border: OutlineInputBorder(),
