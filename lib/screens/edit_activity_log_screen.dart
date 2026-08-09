@@ -201,7 +201,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                     evaluationStatus: _evaluationStatus,
                     note: _noteController.text.trim(),
                   );
-                  provider.saveActivityLog(updated);
+                  provider.updateActivityLog(updated);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Observation mise à jour ✅'), backgroundColor: Color(0xFF4E9F3D)),
