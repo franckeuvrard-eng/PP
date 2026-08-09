@@ -17,6 +17,7 @@ import '../models/activity.dart';
 import '../models/space.dart';
 import '../services/excel_export_service.dart';
 import 'child_profile_screen.dart';
+import 'edit_activity_log_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
 
@@ -803,7 +804,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => _EditActivityLogScreen(
+        builder: (context) => EditActivityLogScreen(
           activityLog: log,
           actType: actType,
           child: child,
