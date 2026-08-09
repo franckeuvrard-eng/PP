@@ -40,12 +40,12 @@ class AppStateProvider extends ChangeNotifier {
   ];
 
   List<ActivityType> _activityTypes = [
-    ActivityType(id: 'act_1', name: 'Peinture Libre', spaceId: 'space_1', colorHex: '#FF7043', description: 'Peinture, dessin libre ou dirigé, collages.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: ['Choisir différents outils', 'Mélanger les couleurs']),
-    ActivityType(id: 'act_2', name: 'Parcours Gymnique', spaceId: 'space_2', colorHex: '#4E9F3D', description: 'Parcours gymnique, lancer, jeux d\'opposition, danse.', domaine: 'Agir, s\'exprimer à travers l\'activité physique', objectifs: ['Courir, sauter', 'Se repérer dans l\'espace']),
-    ActivityType(id: 'act_3', name: 'Lecture & Contes', spaceId: 'space_3', colorHex: '#7E57C2', description: 'Écoute de contes, manipulation d\'albums, langage oral.', domaine: 'Mobiliser le langage', objectifs: ['Écouter une histoire', 'Reformuler avec ses mots']),
-    ActivityType(id: 'act_4', name: 'Graphisme & Tracés', spaceId: 'space_1', colorHex: '#FFA726', description: 'Exercices de motricité fine, tracés de lignes, ronds.', domaine: 'Mobiliser le langage dans sa dimension écrite', objectifs: ['Tracer des lignes', 'Reproduire des formes']),
-    ActivityType(id: 'act_5', name: 'Tri & Dénombrement', spaceId: 'space_4', colorHex: '#00BCD4', description: 'Classer, trier, dénombrer de petites collections.', domaine: 'Acquérir les premiers outils mathématiques', objectifs: ['Trier par couleur', 'Dénombrer jusqu\'à 3']),
-    ActivityType(id: 'act_6', name: 'Comptines & Chansons', spaceId: 'space_5', colorHex: '#E91E63', description: 'Apprentissage de comptines, instruments de percussion.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: ['Mémoriser une comptine', 'Marquer un rythme']),
+    ActivityType(id: 'act_1', name: 'Peinture Libre', spaceId: 'space_1', colorHex: '#FF7043', description: 'Peinture, dessin libre ou dirigé, collages.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: []),
+    ActivityType(id: 'act_2', name: 'Parcours Gymnique', spaceId: 'space_2', colorHex: '#4E9F3D', description: 'Parcours gymnique, lancer, jeux d\'opposition, danse.', domaine: 'Agir, s\'exprimer à travers l\'activité physique', objectifs: []),
+    ActivityType(id: 'act_3', name: 'Lecture & Contes', spaceId: 'space_3', colorHex: '#7E57C2', description: 'Écoute de contes, manipulation d\'albums, langage oral.', domaine: 'Mobiliser le langage dans toutes ses dimensions', objectifs: []),
+    ActivityType(id: 'act_4', name: 'Graphisme & Tracés', spaceId: 'space_1', colorHex: '#FFA726', description: 'Exercices de motricité fine, tracés de lignes, ronds.', domaine: 'Mobiliser le langage dans toutes ses dimensions', objectifs: []),
+    ActivityType(id: 'act_5', name: 'Tri & Dénombrement', spaceId: 'space_4', colorHex: '#00BCD4', description: 'Classer, trier, dénombrer de petites collections.', domaine: 'Acquérir les premiers outils mathématiques', objectifs: []),
+    ActivityType(id: 'act_6', name: 'Comptines & Chansons', spaceId: 'space_5', colorHex: '#E91E63', description: 'Apprentissage de comptines, instruments de percussion.', domaine: 'Agir, s\'exprimer à travers les activités artistiques', objectifs: []),
   ];
 
   List<ActivityLog> _activities = [

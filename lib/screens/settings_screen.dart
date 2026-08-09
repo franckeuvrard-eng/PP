@@ -322,7 +322,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         if (atelier.domaine.isNotEmpty)
                           Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 11)),
                         if (atelier.objectifs.isNotEmpty)
-                          Text('🎯 ${atelier.objectifs.join(", ")}', style: const TextStyle(fontSize: 11)),
+                          Text('🏁 ${atelier.objectifs.length} objectif(s) associé(s)', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        if (atelier.isObligatory)
+                          const Text('⭐ Atelier Obligatoire', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange)),
                       ],
                     ),
                     trailing: Row(
@@ -761,7 +763,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
 
     _selectedDomainId = EduscolData.domains.any((d) => d.title == act?.domaine)
         ? EduscolData.domains.firstWhere((d) => d.title == act?.domaine).id
-        : (act?.domaine.isNotEmpty == true ? 'custom' : EduscolData.domains.first.id);
+        : (act?.domaine.isNotEmpty == true ? 'custom' : 'none');
 
     if (_selectedDomainId == 'custom') {
       _customDomaineCtrl.text = act?.domaine ?? '';
@@ -881,12 +883,16 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     DropdownButtonFormField<String>(
                       value: _selectedDomainId,
                       decoration: const InputDecoration(
-                        labelText: 'Domaine d\'apprentissage Éduscol',
+                        labelText: 'Domaine d\'apprentissage Éduscol (Optionnel)',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.school),
                       ),
                       isExpanded: true,
                       items: [
+                        const DropdownMenuItem(
+                          value: 'none',
+                          child: Text('-- Aucun domaine sélectionné --', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ),
                         ...EduscolData.domains.map((d) => DropdownMenuItem(
                           value: d.id,
                           child: Text(d.title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
@@ -915,7 +921,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ],
                     const SizedBox(height: 16),
 
-                    if (_selectedDomainId != 'custom') ...[
+                    if (_selectedDomainId != 'custom' && _selectedDomainId != 'none') ...[
                       Row(
                         children: [
                           const Text('🎯 Tranche d\'âge / Niveau :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
