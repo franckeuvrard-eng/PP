@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
@@ -259,9 +260,18 @@ class ChildProfileScreen extends StatelessWidget {
                       final couleur = _sonColor(statut);
                       return InkWell(
                         onTap: () => provider.cycleSonStatut(child.id, son),
-                        onLongPress: () => provider.reculeSonStatut(child.id, son),
+                        onLongPress: () {
+                          HapticFeedback.selectionClick();
+                          provider.reculeSonStatut(child.id, son);
+                        },
                         borderRadius: BorderRadius.circular(12),
                         child: Tooltip(
+                          // Sans « manual », le Tooltip enregistre son propre
+                          // LongPressGestureRecognizer ; imbrique dans l'InkWell
+                          // il remporte l'arene de gestes et l'appui long de
+                          // retour en arriere n'etait jamais declenche. Le
+                          // survol reste gere a part, donc actif sur ordinateur.
+                          triggerMode: TooltipTriggerMode.manual,
                           message: '$son — ${statut.libelle}',
                           child: Container(
                             width: 54,
