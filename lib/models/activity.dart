@@ -9,6 +9,10 @@ class ActivityLog {
   final List<String> photoPaths;
   final String? evaluationStatus;
 
+  /// Legende de chaque photo, indexee par chemin plutot que par position :
+  /// supprimer une photo ne decale alors pas les commentaires des suivantes.
+  final Map<String, String> photoCaptions;
+
   ActivityLog({
     required this.id,
     required this.childId,
@@ -17,7 +21,15 @@ class ActivityLog {
     this.note,
     this.photoPaths = const [],
     this.evaluationStatus,
+    this.photoCaptions = const {},
   });
+
+  /// Legende associee a une photo, ou null si aucune.
+  String? captionFor(String path) {
+    final caption = photoCaptions[path];
+    if (caption == null || caption.trim().isEmpty) return null;
+    return caption.trim();
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -28,6 +40,7 @@ class ActivityLog {
       'note': note,
       'photoPaths': photoPaths,
       'evaluationStatus': evaluationStatus,
+      'photoCaptions': photoCaptions,
     };
   }
 
@@ -40,6 +53,7 @@ class ActivityLog {
       note: map['note'],
       photoPaths: List<String>.from(map['photoPaths'] ?? []),
       evaluationStatus: map['evaluationStatus'],
+      photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
     );
   }
 

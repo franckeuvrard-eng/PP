@@ -5,6 +5,7 @@ import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../data/eduscol_data.dart';
 import '../services/excel_export_service.dart';
 import '../utils/app_icons.dart';
 
@@ -178,6 +179,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+
+            // ─── Répartition par domaine Éduscol ───
+            _buildDomainSection(context, filteredActivities, types, isDark),
             const SizedBox(height: 24),
 
             // ─── Mandatory Workshops Tracking ───
@@ -397,6 +402,119 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Repartition des observations par domaine Eduscol.
+  ///
+  /// Les domaines officiels sont toujours listes, meme a zero : l'interet est
+  /// justement de reperer celui qu'on delaisse.
+  Widget _buildDomainSection(
+    BuildContext context,
+    List<ActivityLog> logs,
+    List<ActivityType> types,
+    bool isDark,
+  ) {
+    final typeById = {for (final t in types) t.id: t};
+    final counts = <String, int>{
+      for (final d in EduscolData.domains) d.title: 0,
+    };
+    var sansDomaine = 0;
+
+    for (final log in logs) {
+      final domaine = typeById[log.activityTypeId]?.domaine ?? '';
+      if (domaine.isEmpty) {
+        sansDomaine++;
+      } else {
+        counts[domaine] = (counts[domaine] ?? 0) + 1;
+      }
+    }
+
+    final total = counts.values.fold<int>(0, (a, b) => a + b) + sansDomaine;
+    final entries = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Répartition par domaine Éduscol',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(
+          total == 0
+              ? 'Aucune observation sur la période.'
+              : 'Les domaines à zéro signalent un apprentissage à programmer.',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              ...entries.map((entry) {
+                final ratio = total == 0 ? 0.0 : entry.value / total;
+                final domain = EduscolData.domains.firstWhere(
+                  (d) => d.title == entry.key,
+                  orElse: () => EduscolData.domains.first,
+                );
+                final couleur = Color(int.parse(domain.colorHex.replaceFirst('#', '0xff')));
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(entry.key,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: entry.value == 0 ? FontWeight.normal : FontWeight.w600,
+                                  color: entry.value == 0 ? Colors.grey : null,
+                                )),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('${entry.value}',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold, color: couleur)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: ratio,
+                          minHeight: 8,
+                          backgroundColor: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation<Color>(couleur),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              if (sansDomaine > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Ateliers sans domaine renseigné',
+                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                      ),
+                      Text('$sansDomaine',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

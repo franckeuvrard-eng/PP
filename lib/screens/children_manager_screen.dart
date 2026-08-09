@@ -88,6 +88,20 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
       ),
       body: Column(
         children: [
+          // Export du rapport de toute la classe en un seul document.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: allChildren.isEmpty
+                    ? null
+                    : () => _chooseClassPdfPeriod(context, provider),
+                icon: const Icon(Icons.picture_as_pdf),
+                label: Text('Rapport PDF de la classe (${allChildren.length} élèves)'),
+              ),
+            ),
+          ),
           // ── SEARCH & FILTER HEADER ──
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -495,6 +509,24 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     DateTime? from,
     DateTime? to,
   ) async {
+    final doc = pw.Document();
+    doc.addPage(pw.MultiPage(
+      pageFormat: format,
+      build: (context) => _buildChildReport(child, provider, from, to),
+    ));
+    return doc.save();
+  }
+
+  /// Rapport complet d'un eleve, sous forme de contenu de page.
+  ///
+  /// Isole du document pour pouvoir etre repris tel quel dans l'export de
+  /// toute la classe, ou chaque eleve occupe sa propre section.
+  List<pw.Widget> _buildChildReport(
+    Child child,
+    AppStateProvider provider,
+    DateTime? from,
+    DateTime? to,
+  ) {
     // Filter logs by period
     var childLogs = provider.activities.where((log) => log.childId == child.id).toList();
     if (from != null) {
@@ -504,8 +536,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
       childLogs = childLogs.where((l) => l.timestamp.isBefore(to)).toList();
     }
     childLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    final doc = pw.Document();
 
     // Profile photo bytes
     pw.MemoryImage? profileImage;
@@ -518,11 +548,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
         ? '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}'
         : 'Toute la période';
 
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: format,
-        build: (pw.Context context) {
-          return [
+    return [
             pw.Header(
               level: 0,
               child: pw.Row(
@@ -601,11 +627,15 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                   orElse: () => Space(id: '', name: '', colorHex: ''),
                 );
 
-                final List<pw.MemoryImage> activityImages = [];
+                // Chaque photo est accompagnee de sa legende quand elle en a une.
+                final List<({pw.MemoryImage image, String? caption})> activityImages = [];
                 for (final path in log.photoPaths) {
                   final resolvedPath = provider.getAbsolutePath(path);
                   if (resolvedPath != null && File(resolvedPath).existsSync()) {
-                    activityImages.add(pw.MemoryImage(File(resolvedPath).readAsBytesSync()));
+                    activityImages.add((
+                      image: pw.MemoryImage(File(resolvedPath).readAsBytesSync()),
+                      caption: log.captionFor(path),
+                    ));
                   }
                 }
 
@@ -663,15 +693,30 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                         pw.Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children: activityImages.map((img) {
-                            return pw.Container(
-                              width: 70,
-                              height: 70,
-                              decoration: const pw.BoxDecoration(
-                                borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
-                                color: PdfColors.grey100,
+                          children: activityImages.map((photo) {
+                            return pw.SizedBox(
+                              width: 92,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                mainAxisSize: pw.MainAxisSize.min,
+                                children: [
+                                  pw.Container(
+                                    width: 92,
+                                    height: 70,
+                                    decoration: const pw.BoxDecoration(
+                                      borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+                                      color: PdfColors.grey100,
+                                    ),
+                                    child: pw.Image(photo.image, fit: pw.BoxFit.cover),
+                                  ),
+                                  if (photo.caption != null)
+                                    pw.Padding(
+                                      padding: const pw.EdgeInsets.only(top: 2),
+                                      child: pw.Text(pdfSafe(photo.caption!),
+                                          style: const pw.TextStyle(fontSize: 7.5, color: PdfColors.grey800)),
+                                    ),
+                                ],
                               ),
-                              child: pw.Image(img, fit: pw.BoxFit.cover),
                             );
                           }).toList(),
                         ),
@@ -680,12 +725,127 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                   ),
                 );
               }).toList(),
-          ];
-        },
+    ];
+  }
+
+  /// Rapport de toute la classe : une page de garde puis chaque eleve.
+  Future<Uint8List> _generateClassReportBytes(
+    AppStateProvider provider,
+    PdfPageFormat format,
+    DateTime? from,
+    DateTime? to,
+  ) async {
+    final settings = provider.classSettings;
+    final children = provider.children.toList()
+      ..sort((a, b) => a.firstname.toLowerCase().compareTo(b.firstname.toLowerCase()));
+
+    final periodLabel = (from != null && to != null)
+        ? '${DateFormat('dd/MM/yyyy').format(from)} - ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}'
+        : 'Toute la période';
+
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: format,
+        build: (context) => pw.Center(
+          child: pw.Column(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Text('Rapport de classe',
+                  style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 12),
+              pw.Text(pdfSafe(settings.name), style: const pw.TextStyle(fontSize: 16)),
+              pw.Text(pdfSafe(settings.teacher), style: const pw.TextStyle(fontSize: 13)),
+              pw.Text(pdfSafe(settings.schoolYear), style: const pw.TextStyle(fontSize: 13)),
+              pw.SizedBox(height: 18),
+              pw.Text('Période : ${pdfSafe(periodLabel)}',
+                  style: pw.TextStyle(fontSize: 12, fontStyle: pw.FontStyle.italic)),
+              pw.Text('${children.length} élève(s)', style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 24),
+              pw.Text('Édité le ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            ],
+          ),
+        ),
       ),
     );
 
+    // Un MultiPage par eleve : chacun demarre ainsi sur une page neuve, ce qui
+    // permet d'imprimer et de distribuer les rapports separement.
+    for (final child in children) {
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: format,
+          build: (context) => _buildChildReport(child, provider, from, to),
+        ),
+      );
+    }
+
     return doc.save();
+  }
+
+  void _chooseClassPdfPeriod(BuildContext context, AppStateProvider provider) {
+    final now = DateTime.now();
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Période du rapport de classe',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.all_inclusive),
+              title: const Text('Toute la période'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _openClassPdfPreview(context, provider, null, null);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month),
+              title: const Text('Ce mois-ci'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _openClassPdfPreview(context, provider,
+                    DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 1));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.view_week),
+              title: const Text('Semaine en cours'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                final monday = now.subtract(Duration(days: now.weekday - 1));
+                _openClassPdfPreview(
+                  context,
+                  provider,
+                  DateTime(monday.year, monday.month, monday.day),
+                  DateTime(monday.year, monday.month, monday.day).add(const Duration(days: 7)),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openClassPdfPreview(
+      BuildContext context, AppStateProvider provider, DateTime? from, DateTime? to) {
+    openPdfViewer(
+      context,
+      title: 'Rapport de classe',
+      fileName: 'Rapport_classe.pdf',
+      build: (format) => _generateClassReportBytes(provider, format, from, to),
+      shareSubject: 'Rapport de classe - ${provider.classSettings.name}',
+      shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de la classe.',
+    );
   }
 }
 

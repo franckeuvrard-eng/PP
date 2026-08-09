@@ -26,7 +26,8 @@ class HelpScreen extends StatelessWidget {
             steps: [
               'Paramètres > Ma classe : renseignez le nom de la classe, l\'enseignant et le niveau.',
               'Paramètres > Espaces & Ateliers : créez vos espaces (coin lecture, motricité...), puis un ou plusieurs ateliers dans chacun.',
-              'Élèves > Ajouter Élève : saisissez vos élèves, en indiquant leur section dans le champ Groupe.',
+              'Paramètres > Ma classe > Sections : définissez vos sections (PS, MS, Groupe Rouge...).',
+              'Élèves > Ajouter Élève : saisissez vos élèves en choisissant leur section.',
               'Badges QR : imprimez les étiquettes des élèves et des ateliers.',
             ],
           ),
@@ -37,6 +38,8 @@ class HelpScreen extends StatelessWidget {
               'Scannez le badge de l\'élève puis celui de l\'atelier, dans n\'importe quel ordre.',
               'Sans badge sous la main, utilisez la sélection manuelle.',
               'Choisissez le niveau d\'évaluation, ajoutez une note et des photos si besoin.',
+              'Chaque photo peut recevoir un commentaire, repris dans l\'export PDF.',
+              'Saisie groupée : avant de valider, ajoutez d\'autres élèves via « Enregistrer aussi pour ». Une observation est créée pour chacun, avec la même note et les mêmes photos.',
               'Validez : l\'observation apparaît aussitôt dans le fil du jour.',
             ],
           ),
@@ -46,8 +49,8 @@ class HelpScreen extends StatelessWidget {
             steps: [
               'Onglet Profil : informations, photo et compteurs d\'observations.',
               'Onglet Activités : historique complet, modifiable en touchant une ligne.',
-              'Onglet Acquis : analyse des sons. Un appui fait passer un son de non acquis (rouge) à en cours (jaune), puis acquis (vert), puis revient à non acquis.',
-              'Le crayon en haut à droite modifie la fiche, la corbeille supprime l\'élève et tout son historique.',
+              'Onglet Acquis : analyse des sons. Un appui fait progresser un son de non acquis (rouge) à en cours (jaune) puis acquis (vert). Appui long pour revenir en arrière.',
+              'Le crayon en haut à droite modifie la fiche, la corbeille supprime l\'élève.',
             ],
           ),
           _HelpSection(
@@ -64,6 +67,7 @@ class HelpScreen extends StatelessWidget {
             title: 'Exports',
             steps: [
               'Rapport d\'un élève : icône PDF depuis sa fiche, avec choix de la période. L\'analyse des sons figure toujours en tête, quelle que soit la période.',
+              'Rapport de toute la classe : bouton en haut de l\'écran Élèves, un document unique avec une section par élève.',
               'Fiche d\'un atelier : icône PDF dans Paramètres > Espaces & Ateliers. Elle décrit l\'atelier et ses photos légendées.',
               'Tableur de la classe : bouton Excel depuis les Statistiques.',
               'Dans un aperçu PDF, double-tapez une page pour l\'agrandir, puis pincez pour zoomer.',
@@ -74,6 +78,7 @@ class HelpScreen extends StatelessWidget {
             title: 'Sécurité et sauvegarde',
             steps: [
               'Paramètres > Sécurité : activez ou non la demande de Face ID au démarrage. Le changement s\'applique au prochain lancement.',
+              'Une sauvegarde automatique est créée chaque jour et les 5 dernières sont conservées : Paramètres > Sécurité > Voir et restaurer. Elle ne contient pas les photos.',
               'Sauvegardez régulièrement : le ZIP contient les données et les photos.',
               'La restauration remplace l\'intégralité des données existantes.',
             ],
@@ -83,7 +88,8 @@ class HelpScreen extends StatelessWidget {
             title: 'Bon à savoir',
             steps: [
               'Les photos sont enregistrées dans l\'application, pas dans la pellicule.',
-              'Supprimer un élève efface aussi ses observations et son analyse des sons.',
+              'Après une suppression d\'élève ou d\'observation, « Annuler » reste proposé quelques secondes.',
+              'Les photos qui ne sont plus rattachées à rien sont effacées automatiquement au démarrage.',
               'Supprimer un espace supprime les ateliers qu\'il contient.',
               'Les niveaux d\'évaluation sont modifiables dans les Paramètres.',
             ],

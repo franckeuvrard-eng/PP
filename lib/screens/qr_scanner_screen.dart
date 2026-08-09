@@ -24,7 +24,99 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   String? _selectedEvaluationStatus;
   final TextEditingController _noteController = TextEditingController();
   final List<String> _selectedPhotoPaths = [];
+  final Map<String, String> _photoCaptions = {};
+
+  /// Eleves supplementaires pour la saisie groupee : le meme atelier est
+  /// enregistre pour chacun, avec la meme note et les memes photos.
+  final Set<String> _extraChildIds = {};
   bool _showManualSelection = false;
+
+  Future<void> _editPhotoCaption(String path) async {
+    final ctrl = TextEditingController(text: _photoCaptions[path] ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Commentaire de la photo'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Ce que montre la photo...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, ctrl.text.trim()),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      if (result.isEmpty) {
+        _photoCaptions.remove(path);
+      } else {
+        _photoCaptions[path] = result;
+      }
+    });
+  }
+
+  Future<void> _pickExtraChildren(AppStateProvider provider) async {
+    final selection = Set<String>.from(_extraChildIds);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setSt) => AlertDialog(
+          title: const Text('Autres élèves concernés'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: ListView(
+                children: provider.children
+                    .where((c) => c.id != _selectedChildId)
+                    .map((c) => CheckboxListTile(
+                          dense: true,
+                          value: selection.contains(c.id),
+                          activeColor: const Color(0xFF4E9F3D),
+                          title: Text('${c.firstname} ${c.lastname ?? ''}'.trim()),
+                          subtitle: c.group == null || c.group!.isEmpty
+                              ? null
+                              : Text(c.group!, style: const TextStyle(fontSize: 11)),
+                          onChanged: (checked) => setSt(() {
+                            if (checked == true) {
+                              selection.add(c.id);
+                            } else {
+                              selection.remove(c.id);
+                            }
+                          }),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, selection),
+              child: const Text('Valider'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _extraChildIds
+        ..clear()
+        ..addAll(result);
+    });
+  }
 
   Future<void> _startQrScanner(BuildContext context, AppStateProvider provider) async {
     if (!isMobilePlatform) {
@@ -140,7 +232,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 84,
+          height: 124,
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
@@ -161,42 +253,68 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ..._selectedPhotoPaths.asMap().entries.map((entry) {
                 final int index = entry.key;
                 final String path = entry.value;
+                final caption = _photoCaptions[path];
+                final hasCaption = caption != null && caption.trim().isNotEmpty;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Stack(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.file(
-                          File(path.replaceFirst('file://', '')),
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 2,
-                        right: 2,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedPhotoPaths.removeAt(index);
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.file(
+                              File(path.replaceFirst('file://', '')),
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
                             ),
-                            child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedPhotoPaths.removeAt(index);
+                                  _photoCaptions.remove(path);
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close, size: 12, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(
+                        width: 80,
+                        child: TextButton.icon(
+                          onPressed: () => _editPhotoCaption(path),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 30),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          icon: Icon(hasCaption ? Icons.edit_note : Icons.add_comment, size: 13),
+                          label: Text(
+                            hasCaption ? caption.trim() : 'Commenter',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10),
                           ),
                         ),
                       ),
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),
@@ -414,42 +532,109 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+
+                // Saisie groupee : meme atelier, meme note, memes photos pour
+                // plusieurs eleves a la fois.
+                if (_selectedChildId != null) ...[
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Enregistrer aussi pour :',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => _pickExtraChildren(provider),
+                        icon: const Icon(Icons.group_add, size: 18),
+                        label: Text(_extraChildIds.isEmpty
+                            ? 'Ajouter'
+                            : '${_extraChildIds.length} élève(s)'),
+                      ),
+                    ],
+                  ),
+                  if (_extraChildIds.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _extraChildIds.map((id) {
+                        final c = provider.children.firstWhere(
+                          (c) => c.id == id,
+                          orElse: () => Child(
+                              id: id, firstname: '?', colorHex: '#718096', avatarText: '?'),
+                        );
+                        return Chip(
+                          label: Text('${c.firstname} ${c.lastname ?? ''}'.trim(),
+                              style: const TextStyle(fontSize: 12)),
+                          onDeleted: () => setState(() => _extraChildIds.remove(id)),
+                        );
+                      }).toList(),
+                    ),
+                  const SizedBox(height: 8),
+                ],
+
+                const SizedBox(height: 16),
 
                 ElevatedButton.icon(
                   onPressed: (_selectedChildId != null && _selectedActivityTypeId != null)
                       ? () async {
                           // Copy all picked photos permanently to Documents
                           final List<String> savedRelativePaths = [];
+                          final Map<String, String> savedCaptions = {};
                           for (final absPath in _selectedPhotoPaths) {
+                            String? relPath;
                             if (absPath.contains('activities/')) {
                               final filename = absPath.split('activities/').last;
-                              savedRelativePaths.add('activities/$filename');
+                              relPath = 'activities/$filename';
                             } else if (File(absPath.replaceFirst('file://', '')).existsSync()) {
-                              final relPath = await provider.saveImageToDocs(absPath, 'activities');
-                              savedRelativePaths.add(relPath);
+                              relPath = await provider.saveImageToDocs(absPath, 'activities');
+                            }
+                            if (relPath == null) continue;
+                            savedRelativePaths.add(relPath);
+                            // Les legendes sont saisies sur le chemin temporaire :
+                            // on les rebascule sur le chemin definitif.
+                            final caption = _photoCaptions[absPath];
+                            if (caption != null && caption.trim().isNotEmpty) {
+                              savedCaptions[relPath] = caption.trim();
                             }
                           }
 
-                          final log = ActivityLog(
-                            id: 'log_${DateTime.now().millisecondsSinceEpoch}',
-                            childId: _selectedChildId!,
-                            activityTypeId: _selectedActivityTypeId!,
-                            timestamp: DateTime.now(),
-                            note: _noteController.text.trim(),
-                            photoPaths: savedRelativePaths,
-                            evaluationStatus: _selectedEvaluationStatus,
-                          );
-                          provider.logActivity(log);
+                          // Saisie groupee : un enregistrement distinct par
+                          // eleve, tous partageant atelier, note et photos.
+                          final targetIds = <String>{_selectedChildId!, ..._extraChildIds};
+                          final baseStamp = DateTime.now();
+                          var offset = 0;
+                          for (final childId in targetIds) {
+                            provider.logActivity(ActivityLog(
+                              // millisecondsSinceEpoch seul pourrait se repeter
+                              // sur une boucle rapide : on decale chaque id.
+                              id: 'log_${baseStamp.millisecondsSinceEpoch + offset}_$childId',
+                              childId: childId,
+                              activityTypeId: _selectedActivityTypeId!,
+                              timestamp: baseStamp,
+                              note: _noteController.text.trim(),
+                              photoPaths: savedRelativePaths,
+                              evaluationStatus: _selectedEvaluationStatus,
+                              photoCaptions: savedCaptions,
+                            ));
+                            offset++;
+                          }
+
                           HapticFeedback.mediumImpact();
                           if (context.mounted) {
-                            _showAnimatedSuccessOverlay(context, 'Activité enregistrée avec succès ! 🎉');
+                            _showAnimatedSuccessOverlay(
+                              context,
+                              targetIds.length > 1
+                                  ? '${targetIds.length} observations enregistrées ! 🎉'
+                                  : 'Activité enregistrée avec succès ! 🎉',
+                            );
                             setState(() {
                               _selectedChildId = null;
                               _selectedActivityTypeId = null;
                               _selectedEvaluationStatus = null;
                               _noteController.clear();
                               _selectedPhotoPaths.clear();
+                              _photoCaptions.clear();
+                              _extraChildIds.clear();
                             });
                           }
                         }
