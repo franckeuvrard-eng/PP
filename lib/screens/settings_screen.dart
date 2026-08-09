@@ -554,6 +554,79 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  Future<void> _showAutoBackups(BuildContext context, AppStateProvider provider) async {
+    final backups = await provider.listAutoBackups();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sauvegardes automatiques'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: backups.isEmpty
+              ? const Text(
+                  'Aucune sauvegarde automatique pour le moment. La première sera '
+                  'créée au prochain démarrage, dès que la classe contient des données.',
+                  style: TextStyle(fontSize: 13),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: backups.map((file) {
+                    final stamp = file.path.split(RegExp(r'[/\\]')).last
+                        .replaceFirst('auto_', '')
+                        .replaceFirst('.json', '');
+                    final sizeKo = (file.lengthSync() / 1024).toStringAsFixed(0);
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.description_outlined),
+                      title: Text(stamp.replaceAll('T', ' à ').replaceAll('-', '/'),
+                          style: const TextStyle(fontSize: 13)),
+                      subtitle: Text('$sizeKo Ko', style: const TextStyle(fontSize: 11)),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          final confirme = await showDialog<bool>(
+                            context: dialogContext,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Restaurer cette sauvegarde ?'),
+                              content: const Text(
+                                  'Toutes les données actuelles seront remplacées. '
+                                  'Les photos ne sont pas concernées.'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                  child: const Text('Restaurer'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirme != true) return;
+                          final ok = await provider.restoreAutoBackup(file);
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(ok ? 'Sauvegarde restaurée.' : 'Échec de la restauration.'),
+                              backgroundColor: ok ? const Color(0xFF4E9F3D) : Colors.red,
+                            ),
+                          );
+                        },
+                        child: const Text('Restaurer'),
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fermer')),
+        ],
+      ),
+    );
+  }
+
   // ─────────────────── TAB 4 : SECURITE & BACKUP ───────────────────
   Widget _buildSecurityBackupTab(AppStateProvider provider) {
     return SingleChildScrollView(
@@ -604,6 +677,40 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   const Text(
                     'La modification prend effet au prochain démarrage de l\'application.',
                     style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Sauvegardes automatiques
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.history_toggle_off, color: Color(0xFF4E9F3D)),
+                      SizedBox(width: 8),
+                      Text('Sauvegardes automatiques', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'L\'application enregistre seule vos données une fois par jour et '
+                    'conserve les 5 dernières. Les photos n\'y sont pas incluses : '
+                    'seul l\'export ZIP ci-dessous est une sauvegarde complète.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => _showAutoBackups(context, provider),
+                    icon: const Icon(Icons.restore),
+                    label: const Text('Voir et restaurer'),
                   ),
                 ],
               ),

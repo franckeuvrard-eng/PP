@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -14,6 +15,7 @@ import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
 import '../data/sons_data.dart';
+import '../services/app_database.dart';
 
 class AppStateProvider extends ChangeNotifier {
   ClassSettings _classSettings = ClassSettings(
@@ -82,6 +84,8 @@ class AppStateProvider extends ChangeNotifier {
 
   bool _isLoaded = false;
 
+  final AppDatabase _db = AppDatabase();
+
   /// Suivi « Analyse des sons » : idEleve -> son -> statut.
   ///
   /// Les sons absents valent [SonStatut.nonAcquis], on ne stocke donc que ce
@@ -91,7 +95,7 @@ class AppStateProvider extends ChangeNotifier {
   String? _docsDirPath;
 
   AppStateProvider() {
-    _loadFromPrefs();
+    _load();
   }
 
   Map<String, Map<String, int>> _sonsProgressAsMap() {
@@ -121,7 +125,7 @@ class AppStateProvider extends ChangeNotifier {
 
   void setBiometricLockEnabled(bool enabled) {
     _biometricLockEnabled = enabled;
-    _saveToPrefs();
+    _write(_db.setSetting('biometric_lock_enabled', enabled.toString()));
     notifyListeners();
   }
 
@@ -144,121 +148,280 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       sons[son] = next;
     }
-    _saveToPrefs();
+    _write(_db.setSon(childId, son, next));
     notifyListeners();
   }
 
   /// Remet tous les sons d'un eleve a non acquis.
   void resetSons(String childId) {
     if (_sonsProgress.remove(childId) == null) return;
-    _saveToPrefs();
+    _write(_db.clearSons(childId));
     notifyListeners();
   }
 
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
-    _saveToPrefs();
+    _write(_db.setSetting('theme_mode', _themeModeToString(mode)));
     notifyListeners();
   }
 
-  Future<void> _loadFromPrefs() async {
+  /// Les mutations restent synchrones pour l'interface : l'ecriture en base
+  /// part en arriere-plan. On journalise les echecs plutot que de laisser
+  /// remonter une exception asynchrone non capturee, qui ferait crasher
+  /// l'application pour une simple ecriture manquee.
+  void _write(Future<void> operation) {
+    operation.catchError(
+      (Object e) => debugPrint('Echec d\'ecriture en base : $e'),
+    );
+  }
+
+  Future<void> _load() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final directory = await getApplicationDocumentsDirectory();
       _docsDirPath = directory.path;
 
-      final settingsJson = prefs.getString('class_settings');
-      if (settingsJson != null) {
-        _classSettings = ClassSettings.fromJson(settingsJson);
-      }
+      // Reprise unique des donnees de l'ancienne version. Les preferences ne
+      // sont pas effacees : elles restent un recours si la migration s'averait
+      // fautive.
+      final prefs = await SharedPreferences.getInstance();
+      await _db.migrateFromPrefs({
+        'children': prefs.getString('children'),
+        'spaces': prefs.getString('spaces'),
+        'activity_types': prefs.getString('activity_types'),
+        'activities': prefs.getString('activities'),
+        'sons_progress': prefs.getString('sons_progress'),
+        'class_settings': prefs.getString('class_settings'),
+        'evaluation_statuses': prefs.getString('evaluation_statuses'),
+        'theme_mode': prefs.getString('theme_mode'),
+        'biometric_lock_enabled': prefs.containsKey('biometric_lock_enabled')
+            ? prefs.getBool('biometric_lock_enabled').toString()
+            : null,
+      });
 
-      final childrenJson = prefs.getString('children');
-      if (childrenJson != null) {
-        final List<dynamic> decoded = json.decode(childrenJson);
-        _children = decoded.map((item) => Child.fromMap(item)).toList();
-      }
+      final children = await _db.readChildren();
+      final spaces = await _db.readSpaces();
+      final types = await _db.readActivityTypes();
+      final activities = await _db.readActivities();
+      final settings = await _db.readSettings();
 
-      final spacesJson = prefs.getString('spaces');
-      if (spacesJson != null) {
-        final List<dynamic> decoded = json.decode(spacesJson);
-        _spaces = decoded.map((item) => Space.fromMap(item)).toList();
-      }
+      // Premier demarrage sans aucune donnee : on conserve les espaces et
+      // ateliers d'exemple definis a la construction, sinon l'application
+      // s'ouvrirait entierement vide.
+      final isFirstRun = settings['class_settings'] == null &&
+          children.isEmpty &&
+          spaces.isEmpty &&
+          types.isEmpty &&
+          activities.isEmpty;
+      if (isFirstRun) {
+        await _seedInitialData();
+      } else {
+        _children = children;
+        _spaces = spaces;
+        _activityTypes = types;
+        _activities = activities;
+        _sonsProgress = await _db.readSons();
 
-      final typesJson = prefs.getString('activity_types');
-      if (typesJson != null) {
-        final List<dynamic> decoded = json.decode(typesJson);
-        _activityTypes = decoded.map((item) => ActivityType.fromMap(item)).toList();
-      }
-
-      final activitiesJson = prefs.getString('activities');
-      if (activitiesJson != null) {
-        final List<dynamic> decoded = json.decode(activitiesJson);
-        _activities = decoded.map((item) => ActivityLog.fromMap(item)).toList();
-      }
-
-      final evaluationStatusesJson = prefs.getString('evaluation_statuses');
-      if (evaluationStatusesJson != null) {
-        final List<dynamic> decoded = json.decode(evaluationStatusesJson);
-        _evaluationStatuses = List<String>.from(decoded);
-      }
-
-      final sonsJson = prefs.getString('sons_progress');
-      if (sonsJson != null) {
-        final Map<String, dynamic> decoded = json.decode(sonsJson);
-        _sonsProgress = decoded.map(
-          (childId, sons) => MapEntry(
-            childId,
-            (sons as Map<String, dynamic>).map(
-              (son, code) => MapEntry(son, SonStatut.fromCode(code)),
-            ),
-          ),
-        );
-      }
-
-      _biometricLockEnabled = prefs.getBool('biometric_lock_enabled') ?? true;
-
-      final themeStr = prefs.getString('theme_mode');
-      if (themeStr != null) {
-        if (themeStr == 'light') {
-          _themeMode = ThemeMode.light;
-        } else if (themeStr == 'dark') {
-          _themeMode = ThemeMode.dark;
-        } else {
-          _themeMode = ThemeMode.system;
+        final settingsJson = settings['class_settings'];
+        if (settingsJson != null) {
+          _classSettings = ClassSettings.fromJson(settingsJson);
+        }
+        final statusesJson = settings['evaluation_statuses'];
+        if (statusesJson != null) {
+          _evaluationStatuses = List<String>.from(json.decode(statusesJson));
+        }
+        _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
+        switch (settings['theme_mode']) {
+          case 'light':
+            _themeMode = ThemeMode.light;
+          case 'dark':
+            _themeMode = ThemeMode.dark;
+          default:
+            _themeMode = ThemeMode.system;
         }
       }
 
-      _isLoaded = true;
-      notifyListeners();
+      _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
+      // l'affichage de l'application.
+      unawaited(_maybeAutoBackup(settings['last_auto_backup']));
+      unawaited(purgeOrphanPhotos());
     } catch (e) {
-      debugPrint('Error loading preferences: $e');
+      debugPrint('Erreur au chargement des donnees : $e');
       // Meme en cas d'echec l'application doit demarrer, sur les valeurs
       // par defaut, plutot que rester bloquee sur l'ecran d'attente.
-      _isLoaded = true;
-      notifyListeners();
+    }
+    _isLoaded = true;
+    notifyListeners();
+  }
+
+  /// Ecrit en base le jeu de donnees d'exemple present en memoire.
+  Future<void> _seedInitialData() async {
+    await _db.replaceAll(
+      classSettings: _classSettings,
+      children: _children,
+      spaces: _spaces,
+      activityTypes: _activityTypes,
+      activities: _activities,
+      evaluationStatuses: _evaluationStatuses,
+      sons: _sonsProgress,
+    );
+  }
+
+  static String _themeModeToString(ThemeMode mode) {
+    if (mode == ThemeMode.light) return 'light';
+    if (mode == ThemeMode.dark) return 'dark';
+    return 'system';
+  }
+
+
+  // ─── SAUVEGARDE AUTOMATIQUE & ENTRETIEN DU STOCKAGE ───
+
+  static const int _maxAutoBackups = 5;
+
+  /// Repertoire des sauvegardes automatiques, dans les documents de
+  /// l'application : elles survivent ainsi a un redemarrage et sont reprises
+  /// par la sauvegarde iCloud/iTunes de l'appareil.
+  Future<Directory> _autoBackupDir() async {
+    _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+    final dir = Directory('$_docsDirPath/backups');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  /// Ecrit une sauvegarde JSON horodatee et ne conserve que les plus recentes.
+  ///
+  /// Ne contient pas les photos : l'objectif est de proteger le travail de
+  /// saisie sans saturer le stockage de l'appareil. L'export ZIP manuel reste
+  /// la sauvegarde complete.
+  Future<void> _writeAutoBackup() async {
+    try {
+      final dir = await _autoBackupDir();
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final file = File('${dir.path}/auto_$stamp.json');
+      await file.writeAsString(json.encode({
+        'version': 2,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'class_settings': _classSettings.toMap(),
+        'children': _children.map((c) => c.toMap()).toList(),
+        'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
+        'activities': _activities.map((l) => l.toMap()).toList(),
+        'evaluation_statuses': _evaluationStatuses,
+        'sons_progress': _sonsProgressAsMap(),
+      }));
+
+      final backups = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.json'))
+          .toList()
+        ..sort((a, b) => b.path.compareTo(a.path));
+      for (final old in backups.skip(_maxAutoBackups)) {
+        await old.delete();
+      }
+      await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
+    } catch (e) {
+      debugPrint('Echec de la sauvegarde automatique : $e');
     }
   }
 
-  Future<void> _saveToPrefs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('class_settings', _classSettings.toJson());
-      await prefs.setString('children', json.encode(_children.map((c) => c.toMap()).toList()));
-      await prefs.setString('spaces', json.encode(_spaces.map((s) => s.toMap()).toList()));
-      await prefs.setString('activity_types', json.encode(_activityTypes.map((a) => a.toMap()).toList()));
-      await prefs.setString('activities', json.encode(_activities.map((l) => l.toMap()).toList()));
-      await prefs.setString('evaluation_statuses', json.encode(_evaluationStatuses));
-      await prefs.setString('sons_progress', json.encode(_sonsProgressAsMap()));
-      await prefs.setBool('biometric_lock_enabled', _biometricLockEnabled);
-
-
-      String themeStr = 'system';
-      if (_themeMode == ThemeMode.light) themeStr = 'light';
-      if (_themeMode == ThemeMode.dark) themeStr = 'dark';
-      await prefs.setString('theme_mode', themeStr);
-    } catch (e) {
-      debugPrint('Error saving preferences: $e');
+  /// Sauvegarde au plus une fois par jour, au demarrage.
+  Future<void> _maybeAutoBackup(String? lastIso) async {
+    if (_children.isEmpty && _activities.isEmpty) return;
+    final last = lastIso == null ? null : DateTime.tryParse(lastIso);
+    if (last != null && DateTime.now().difference(last) < const Duration(hours: 20)) {
+      return;
     }
+    await _writeAutoBackup();
+  }
+
+  /// Sauvegardes automatiques disponibles, de la plus recente a la plus ancienne.
+  Future<List<File>> listAutoBackups() async {
+    final dir = await _autoBackupDir();
+    return dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList()
+      ..sort((a, b) => b.path.compareTo(a.path));
+  }
+
+  /// Restaure une sauvegarde automatique (donnees seules, sans les photos).
+  Future<bool> restoreAutoBackup(File backup) async {
+    try {
+      final data = json.decode(await backup.readAsString()) as Map<String, dynamic>;
+      _classSettings = ClassSettings.fromMap(data['class_settings']);
+      _children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+      _spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
+      _activityTypes =
+          (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
+      _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
+      _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      final sons = data['sons_progress'];
+      _sonsProgress = sons is Map
+          ? sons.map((childId, entries) => MapEntry(
+                childId as String,
+                (entries as Map).map(
+                    (son, code) => MapEntry(son as String, SonStatut.fromCode(code))),
+              ))
+          : {};
+      await _db.replaceAll(
+        classSettings: _classSettings,
+        children: _children,
+        spaces: _spaces,
+        activityTypes: _activityTypes,
+        activities: _activities,
+        evaluationStatuses: _evaluationStatuses,
+        sons: _sonsProgress,
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Echec de la restauration automatique : $e');
+      return false;
+    }
+  }
+
+  /// Supprime les photos du disque qui ne sont plus referencees.
+  ///
+  /// Supprimer une observation ou un atelier laissait jusqu'ici ses fichiers
+  /// en place : le stockage ne faisait que croitre.
+  Future<int> purgeOrphanPhotos() async {
+    try {
+      _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+      final referenced = <String>{
+        for (final c in _children)
+          if (c.imagePath != null && c.imagePath!.isNotEmpty) c.imagePath!,
+        for (final a in _activityTypes) ...a.allPhotoPaths,
+        for (final l in _activities) ...l.photoPaths,
+        if (_classSettings.logoPath != null && _classSettings.logoPath!.isNotEmpty)
+          _classSettings.logoPath!,
+      }.map(_normalizeRelPath).toSet();
+
+      var removed = 0;
+      for (final subDir in ['profiles', 'workshops', 'activities', 'ateliers', 'settings']) {
+        final dir = Directory('$_docsDirPath/$subDir');
+        if (!await dir.exists()) continue;
+        for (final file in dir.listSync().whereType<File>()) {
+          final name = file.path.split(Platform.pathSeparator).last;
+          if (referenced.contains('$subDir/$name')) continue;
+          await file.delete();
+          removed++;
+        }
+      }
+      if (removed > 0) debugPrint('Photos orphelines supprimees : $removed');
+      return removed;
+    } catch (e) {
+      debugPrint('Echec de la purge des photos : $e');
+      return 0;
+    }
+  }
+
+  /// Les chemins ont pu etre enregistres en absolu par d'anciennes versions.
+  String _normalizeRelPath(String path) {
+    var p = path.replaceAll(r'\', '/');
+    final docs = _docsDirPath?.replaceAll(r'\', '/');
+    if (docs != null && p.startsWith(docs)) {
+      p = p.substring(docs.length);
+    }
+    return p.startsWith('/') ? p.substring(1) : p;
   }
 
   // ─── ULTRA-ROBUST PHOTO PICKER & STORAGE ───
@@ -533,7 +696,15 @@ class AppStateProvider extends ChangeNotifier {
         }
       }
 
-      await _saveToPrefs();
+      await _db.replaceAll(
+        classSettings: _classSettings,
+        children: _children,
+        spaces: _spaces,
+        activityTypes: _activityTypes,
+        activities: _activities,
+        evaluationStatuses: _evaluationStatuses,
+        sons: _sonsProgress,
+      );
       notifyListeners();
       return 'success';
     } catch (e) {
@@ -544,7 +715,7 @@ class AppStateProvider extends ChangeNotifier {
 
   void updateClassSettings(ClassSettings settings) {
     _classSettings = settings;
-    _saveToPrefs();
+    _write(_db.setSetting('class_settings', settings.toJson()));
     notifyListeners();
   }
 
@@ -555,15 +726,15 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       _children.add(child);
     }
-    _saveToPrefs();
+    _write(_db.saveChild(child));
     notifyListeners();
   }
 
   void deleteChild(String id) {
     _children.removeWhere((c) => c.id == id);
-    // Sans cela le suivi des sons resterait indefiniment dans les preferences.
+    // Sans cela le suivi des sons resterait indefiniment en base.
     _sonsProgress.remove(id);
-    _saveToPrefs();
+    _write(_db.deleteChildCascade(id));
     notifyListeners();
   }
 
@@ -575,15 +746,19 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       _spaces.add(space);
     }
-    _saveToPrefs();
+    _write(_db.saveSpace(space));
     notifyListeners();
   }
 
   void deleteSpace(String id) {
     _spaces.removeWhere((s) => s.id == id);
     // Also remove ateliers in this space
+    final orphanIds = _activityTypes.where((a) => a.spaceId == id).map((a) => a.id).toList();
     _activityTypes.removeWhere((a) => a.spaceId == id);
-    _saveToPrefs();
+    _write(_db.deleteSpace(id));
+    for (final atelierId in orphanIds) {
+      _write(_db.deleteActivityType(atelierId));
+    }
     notifyListeners();
   }
 
@@ -594,7 +769,7 @@ class AppStateProvider extends ChangeNotifier {
     } else {
       _activityTypes.add(actType);
     }
-    _saveToPrefs();
+    _write(_db.saveActivityType(actType));
     notifyListeners();
   }
 
@@ -602,13 +777,13 @@ class AppStateProvider extends ChangeNotifier {
 
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
-    _saveToPrefs();
+    _write(_db.deleteActivityType(id));
     notifyListeners();
   }
 
   void logActivity(ActivityLog activity) {
     _activities.insert(0, activity);
-    _saveToPrefs();
+    _write(_db.saveActivity(activity));
     notifyListeners();
   }
 
@@ -616,20 +791,20 @@ class AppStateProvider extends ChangeNotifier {
     final index = _activities.indexWhere((a) => a.id == updatedActivity.id);
     if (index >= 0) {
       _activities[index] = updatedActivity;
-      _saveToPrefs();
+      _write(_db.saveActivity(updatedActivity));
       notifyListeners();
     }
   }
 
   void deleteActivityLog(String id) {
     _activities.removeWhere((a) => a.id == id);
-    _saveToPrefs();
+    _write(_db.deleteActivity(id));
     notifyListeners();
   }
 
   void setEvaluationStatuses(List<String> statuses) {
     _evaluationStatuses = statuses;
-    _saveToPrefs();
+    _write(_db.setSetting('evaluation_statuses', json.encode(statuses)));
     notifyListeners();
   }
 
@@ -682,7 +857,16 @@ class AppStateProvider extends ChangeNotifier {
     if (clearPhotos) {
       _deleteAllPhotos();
     }
-    _saveToPrefs();
+    // Remise a zero : un remplacement global est ici le geste correct.
+    _write(_db.replaceAll(
+      classSettings: _classSettings,
+      children: _children,
+      spaces: _spaces,
+      activityTypes: _activityTypes,
+      activities: _activities,
+      evaluationStatuses: _evaluationStatuses,
+      sons: _sonsProgress,
+    ));
     notifyListeners();
   }
 
