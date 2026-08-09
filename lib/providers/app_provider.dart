@@ -510,6 +510,14 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   // ─── ULTRA-ROBUST PHOTO PICKER & STORAGE ───
+
+  /// Cote le plus long des photos enregistrees, et qualite JPEG.
+  ///
+  /// Applique a toutes les prises de vue et imports, pour que le stockage ne
+  /// depende pas de la provenance de l'image.
+  static const int photoMaxSize = 1600;
+  static const int photoQuality = 85;
+
   Future<String?> pickAndSavePhoto({
     required ImageSource source,
     required String subDir,
@@ -518,9 +526,13 @@ class AppStateProvider extends ChangeNotifier {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: source,
-        maxWidth: source == ImageSource.camera ? null : 1200,
-        maxHeight: source == ImageSource.camera ? null : 1200,
-        imageQuality: source == ImageSource.camera ? null : 85,
+        // Meme traitement pour l'appareil photo que pour la galerie. Les prises
+        // de vue etaient auparavant conservees brutes (2 a 5 Mo chacune) : a
+        // 1600 px et qualite 85 on tombe autour de 400 Ko, sans difference
+        // visible a l'ecran ni a l'impression A4 (~270 dpi sur 15 cm).
+        maxWidth: photoMaxSize.toDouble(),
+        maxHeight: photoMaxSize.toDouble(),
+        imageQuality: photoQuality,
         requestFullMetadata: false,
       );
 

@@ -458,10 +458,11 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     final enCours = tous.where((s) => provider.sonStatut(child.id, s) == SonStatut.enCours).length;
 
     return [
-      pw.Text('Analyse des sons — état actuel',
+      pw.Text(pdfSafe('Analyse des sons — état actuel'),
           style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
       pw.Text(
-        'Langage · conscience phonémique & signes graphiques — $acquis acquis, $enCours en cours sur ${tous.length} sons.',
+        pdfSafe('Langage · conscience phonémique & signes graphiques — '
+            '$acquis acquis, $enCours en cours sur ${tous.length} sons.'),
         style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
       ),
       pw.SizedBox(height: 6),

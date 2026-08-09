@@ -178,9 +178,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   Navigator.pop(context);
                   try {
                     final List<XFile> images = await picker.pickMultiImage(
-                      maxWidth: 1200,
-                      maxHeight: 1200,
-                      imageQuality: 85,
+                      maxWidth: AppStateProvider.photoMaxSize.toDouble(),
+                      maxHeight: AppStateProvider.photoMaxSize.toDouble(),
+                      imageQuality: AppStateProvider.photoQuality,
                     );
                     for (final img in images) {
                       final relPath = await provider.saveXFileToDocs(img, 'activities');

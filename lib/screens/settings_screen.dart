@@ -1171,9 +1171,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                   Navigator.pop(sheetContext);
                   try {
                     final images = await picker.pickMultiImage(
-                      maxWidth: 1600,
-                      maxHeight: 1600,
-                      imageQuality: 85,
+                      maxWidth: AppStateProvider.photoMaxSize.toDouble(),
+                      maxHeight: AppStateProvider.photoMaxSize.toDouble(),
+                      imageQuality: AppStateProvider.photoQuality,
                     );
                     for (final img in images) {
                       final relPath = await provider.saveXFileToDocs(img, 'ateliers');
