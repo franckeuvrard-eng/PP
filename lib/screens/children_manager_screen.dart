@@ -678,9 +678,9 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                           child: pw.Text('- ${pdfSafe(obj)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
                         )),
                       ],
-                      if (log.evaluationStatus != null) ...[
+                      if (provider.statusLabel(log) != null) ...[
                         pw.SizedBox(height: 4),
-                        pw.Text('Statut : ${pdfSafe(log.evaluationStatus!)}',
+                        pw.Text('Statut : ${pdfSafe(provider.statusLabel(log)!)}',
                             style: pw.TextStyle(
                                 fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                       ],

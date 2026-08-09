@@ -91,7 +91,7 @@ class HelpScreen extends StatelessWidget {
               'Après une suppression d\'élève ou d\'observation, « Annuler » reste proposé quelques secondes.',
               'Les photos qui ne sont plus rattachées à rien sont effacées automatiquement au démarrage.',
               'Supprimer un espace supprime les ateliers qu\'il contient.',
-              'Les niveaux d\'évaluation sont modifiables dans les Paramètres.',
+              'Les niveaux d\'évaluation se modifient dans Paramètres > Ma classe. Les renommer ne touche pas aux évaluations déjà enregistrées.',
             ],
           ),
         ],

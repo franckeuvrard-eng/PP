@@ -25,13 +25,13 @@ class EditActivityLogScreen extends StatefulWidget {
 
 class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
   late TextEditingController _noteController;
-  String? _evaluationStatus;
+  String? _evaluationStatusId;
 
   @override
   void initState() {
     super.initState();
     _noteController = TextEditingController(text: widget.activityLog.note);
-    _evaluationStatus = widget.activityLog.evaluationStatus;
+    _evaluationStatusId = widget.activityLog.evaluationStatusId;
   }
 
   @override
@@ -176,14 +176,19 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
               spacing: 8,
               runSpacing: 8,
               children: provider.evaluationStatuses.map((status) {
-                final isSelected = _evaluationStatus == status;
+                final isSelected = _evaluationStatusId == status.id;
+                final couleur = Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
                 return ChoiceChip(
-                  label: Text(status),
+                  label: Text(status.label),
                   selected: isSelected,
-                  selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                  selectedColor: couleur.withOpacity(0.2),
+                  labelStyle: TextStyle(
+                    color: isSelected ? couleur : Theme.of(context).colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
                   onSelected: (selected) {
                     setState(() {
-                      _evaluationStatus = selected ? status : null;
+                      _evaluationStatusId = selected ? status.id : null;
                     });
                   },
                 );
@@ -207,13 +212,10 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
               height: 50,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  final updated = ActivityLog(
-                    id: widget.activityLog.id,
-                    childId: widget.activityLog.childId,
-                    activityTypeId: widget.activityLog.activityTypeId,
-                    timestamp: widget.activityLog.timestamp,
-                    photoPaths: widget.activityLog.photoPaths,
-                    evaluationStatus: _evaluationStatus,
+                  // copyWith plutot qu'une reconstruction champ par champ :
+                  // c'est ainsi que les legendes de photos etaient perdues.
+                  final updated = widget.activityLog.copyWith(
+                    evaluationStatusId: _evaluationStatusId,
                     note: _noteController.text.trim(),
                   );
                   provider.updateActivityLog(updated);

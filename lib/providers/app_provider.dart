@@ -14,6 +14,7 @@ import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
+import '../models/evaluation_status.dart';
 import '../data/sons_data.dart';
 import '../services/app_database.dart';
 
@@ -57,7 +58,7 @@ class AppStateProvider extends ChangeNotifier {
       activityTypeId: "act_1",
       timestamp: DateTime.now().subtract(const Duration(hours: 1)),
       note: "A mélangé du bleu et du jaune pour créer du vert !",
-      evaluationStatus: "Acquis 🟢",
+      evaluationStatusId: "acquis",
     ),
     ActivityLog(
       id: "log_2",
@@ -65,15 +66,12 @@ class AppStateProvider extends ChangeNotifier {
       activityTypeId: "act_2",
       timestamp: DateTime.now().subtract(const Duration(hours: 2)),
       note: "A franchi la poutre d'équilibre sans aide.",
-      evaluationStatus: "En cours 🟡",
+      evaluationStatusId: "en_cours",
     ),
   ];
 
-  List<String> _evaluationStatuses = [
-    'Non acquis 🔴',
-    'En cours 🟡',
-    'Acquis 🟢',
-  ];
+  List<EvaluationStatus> _evaluationStatuses =
+      List<EvaluationStatus>.from(EvaluationStatus.defaults);
 
 
 
@@ -119,7 +117,20 @@ class AppStateProvider extends ChangeNotifier {
   List<Space> get spaces => List.unmodifiable(_spaces);
   List<ActivityType> get activityTypes => List.unmodifiable(_activityTypes);
   List<ActivityLog> get activities => List.unmodifiable(_activities);
-  List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
+  List<EvaluationStatus> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
+
+  /// Niveau correspondant a un identifiant, ou null s'il a ete supprime.
+  EvaluationStatus? statusById(String? id) {
+    if (id == null) return null;
+    for (final s in _evaluationStatuses) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  /// Libelle affichable d'une observation, robuste a la suppression du niveau.
+  String? statusLabel(ActivityLog log) =>
+      statusById(log.evaluationStatusId)?.label ?? log.legacyStatusLabel;
   List<String> get sections => List.unmodifiable(_sections);
 
   void setSections(List<String> sections) {
@@ -145,12 +156,7 @@ class AppStateProvider extends ChangeNotifier {
     for (var i = 0; i < _children.length; i++) {
       final c = _children[i];
       if (c.group != from) continue;
-      final updated = Child(
-        id: c.id, firstname: c.firstname, lastname: c.lastname,
-        birthdate: c.birthdate, group: target, notes: c.notes,
-        colorHex: c.colorHex, avatarText: c.avatarText, email: c.email,
-        imagePath: c.imagePath,
-      );
+      final updated = c.copyWith(group: target);
       _children[i] = updated;
       _write(_db.saveChild(updated));
     }
@@ -158,11 +164,7 @@ class AppStateProvider extends ChangeNotifier {
     for (var i = 0; i < _activityTypes.length; i++) {
       final a = _activityTypes[i];
       if (!a.obligatoryGroups.contains(from)) continue;
-      final updated = ActivityType(
-        id: a.id, name: a.name, spaceId: a.spaceId, colorHex: a.colorHex,
-        description: a.description, imagePath: a.imagePath, domaine: a.domaine,
-        objectifs: a.objectifs, isObligatory: a.isObligatory, iconName: a.iconName,
-        photoPaths: a.photoPaths, photoCaptions: a.photoCaptions,
+      final updated = a.copyWith(
         obligatoryGroups: [for (final g in a.obligatoryGroups) if (g == from) target else g],
       );
       _activityTypes[i] = updated;
@@ -311,7 +313,14 @@ class AppStateProvider extends ChangeNotifier {
 
         final statusesJson = settings['evaluation_statuses'];
         if (statusesJson != null) {
-          _evaluationStatuses = List<String>.from(json.decode(statusesJson));
+          _evaluationStatuses = _decodeEvaluationStatuses(statusesJson);
+          // Reecrit au format objet si la valeur lue etait l'ancienne liste de
+          // libelles, pour ne pas la redecoder a chaque demarrage.
+          final decoded = json.decode(statusesJson);
+          if (decoded is List && decoded.any((e) => e is String)) {
+            await _db.setSetting('evaluation_statuses',
+                json.encode(_evaluationStatuses.map((s) => s.toMap()).toList()));
+          }
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
         switch (settings['theme_mode']) {
@@ -325,6 +334,7 @@ class AppStateProvider extends ChangeNotifier {
       }
 
       _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      await _migrateStatusLabels();
 
       // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
       // l'affichage de l'application.
@@ -391,7 +401,7 @@ class AppStateProvider extends ChangeNotifier {
         'spaces': _spaces.map((s) => s.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
-        'evaluation_statuses': _evaluationStatuses,
+        'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
         'sections': _sections,
         'sons_progress': _sonsProgressAsMap(),
       }));
@@ -438,7 +448,7 @@ class AppStateProvider extends ChangeNotifier {
       _activityTypes =
           (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
       _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
-      _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      _evaluationStatuses = _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
       final sons = data['sons_progress'];
       _sonsProgress = sons is Map
           ? sons.map((childId, entries) => MapEntry(
@@ -685,7 +695,7 @@ class AppStateProvider extends ChangeNotifier {
         'spaces': _spaces.map((s) => s.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
-        'evaluation_statuses': _evaluationStatuses,
+        'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
         'sections': _sections,
         'sons_progress': _sonsProgressAsMap(),
       };
@@ -770,7 +780,7 @@ class AppStateProvider extends ChangeNotifier {
       }
       _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
       _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
-      _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      _evaluationStatuses = _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
       if (data['sections'] != null) {
         _sections = List<String>.from(data['sections']);
         _write(_db.setSetting('sections', json.encode(_sections)));
@@ -938,10 +948,101 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setEvaluationStatuses(List<String> statuses) {
+  void setEvaluationStatuses(List<EvaluationStatus> statuses) {
     _evaluationStatuses = statuses;
-    _write(_db.setSetting('evaluation_statuses', json.encode(statuses)));
+    _persistEvaluationStatuses();
     notifyListeners();
+  }
+
+  void _persistEvaluationStatuses() {
+    _write(_db.setSetting('evaluation_statuses',
+        json.encode(_evaluationStatuses.map((s) => s.toMap()).toList())));
+  }
+
+  /// Relit les niveaux d'evaluation, en acceptant l'ancien format.
+  ///
+  /// Les versions precedentes enregistraient une simple liste de libelles.
+  /// On leur fabrique un identifiant stable, en reutilisant ceux des niveaux
+  /// par defaut quand le libelle correspond, emojis mis a part.
+  static List<EvaluationStatus> _decodeEvaluationStatuses(String raw) {
+    final decoded = json.decode(raw);
+    if (decoded is! List) return List<EvaluationStatus>.from(EvaluationStatus.defaults);
+
+    final result = <EvaluationStatus>[];
+    for (final item in decoded) {
+      if (item is Map) {
+        result.add(EvaluationStatus.fromMap(Map<String, dynamic>.from(item)));
+      } else if (item is String) {
+        result.add(_statusFromLegacyLabel(item, result.length));
+      }
+    }
+    return result.isEmpty ? List<EvaluationStatus>.from(EvaluationStatus.defaults) : result;
+  }
+
+  /// Fabrique un niveau a partir d'un libelle historique.
+  static EvaluationStatus _statusFromLegacyLabel(String label, int index) {
+    final normalized = _normalizeLabel(label);
+    for (final d in EvaluationStatus.defaults) {
+      if (_normalizeLabel(d.label) == normalized) {
+        // Meme intitule qu'un niveau par defaut : on conserve le libelle de
+        // l'enseignant, mais avec l'identifiant et la couleur connus.
+        return d.copyWith(label: label.trim());
+      }
+    }
+    return EvaluationStatus(
+      id: 'statut_${index}_${normalized.replaceAll(RegExp(r'[^a-z0-9]+'), '_')}',
+      label: label.trim(),
+      colorHex: '#1976D2',
+    );
+  }
+
+  /// Compare des libelles sans tenir compte des emojis, de la casse ni des
+  /// accents : « Acquis 🟢 » et « acquis » designent le meme niveau.
+  static String _normalizeLabel(String label) {
+    const accents = {
+      'à': 'a', 'â': 'a', 'ä': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+      'î': 'i', 'ï': 'i', 'ô': 'o', 'ö': 'o', 'ù': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c',
+    };
+    var out = label.toLowerCase();
+    accents.forEach((k, v) => out = out.replaceAll(k, v));
+    return out.replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  /// Convertit les observations qui portent encore un libelle en identifiant.
+  ///
+  /// Un libelle inconnu — niveau renomme ou supprime depuis — donne lieu a la
+  /// creation d'un niveau dedie, pour qu'aucune evaluation ne soit perdue.
+  Future<void> _migrateStatusLabels() async {
+    final pending = _activities
+        .where((a) => a.evaluationStatusId == null && (a.legacyStatusLabel?.isNotEmpty ?? false))
+        .toList();
+    if (pending.isEmpty) return;
+
+    var statusesChanged = false;
+    for (var i = 0; i < _activities.length; i++) {
+      final log = _activities[i];
+      final label = log.legacyStatusLabel;
+      if (log.evaluationStatusId != null || label == null || label.isEmpty) continue;
+
+      final normalized = _normalizeLabel(label);
+      var match = _evaluationStatuses
+          .where((s) => _normalizeLabel(s.label) == normalized)
+          .firstOrNull;
+
+      if (match == null) {
+        match = _statusFromLegacyLabel(label, _evaluationStatuses.length);
+        _evaluationStatuses.add(match);
+        statusesChanged = true;
+      }
+
+      final updated = log.copyWith(evaluationStatusId: match.id);
+      _activities[i] = updated;
+      await _db.saveActivity(updated);
+    }
+
+    if (statusesChanged) _persistEvaluationStatuses();
+    debugPrint('Migration des niveaux d evaluation : ${pending.length} observation(s).');
   }
 
 
@@ -966,11 +1067,7 @@ class AppStateProvider extends ChangeNotifier {
       _activities = [];
     }
     if (clearEvaluationStatuses) {
-      _evaluationStatuses = [
-        'Non acquis 🔴',
-        'En cours 🟡',
-        'Acquis 🟢',
-      ];
+      _evaluationStatuses = List<EvaluationStatus>.from(EvaluationStatus.defaults);
     }
     if (clearSpaces) {
       _spaces = [

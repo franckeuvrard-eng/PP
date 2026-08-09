@@ -55,7 +55,7 @@ class ExcelExportService {
           xl.TextCellValue(actType.name),
           xl.TextCellValue(actType.domaine),
           xl.TextCellValue(actType.objectifs.join(' ; ')),
-          xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
+          xl.TextCellValue(provider.statusLabel(log) ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);
       }
@@ -136,7 +136,7 @@ class ExcelExportService {
           xl.TextCellValue(actType.name),
           xl.TextCellValue(actType.domaine),
           xl.TextCellValue(actType.objectifs.join(' ; ')),
-          xl.TextCellValue(log.evaluationStatus ?? 'Non renseigné'),
+          xl.TextCellValue(provider.statusLabel(log) ?? 'Non renseigné'),
           xl.TextCellValue(log.note ?? ''),
         ]);
       }

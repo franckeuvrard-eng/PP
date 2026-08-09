@@ -21,7 +21,7 @@ class QrScannerScreen extends StatefulWidget {
 class _QrScannerScreenState extends State<QrScannerScreen> {
   String? _selectedChildId;
   String? _selectedActivityTypeId;
-  String? _selectedEvaluationStatus;
+  String? _selectedEvaluationStatusId;
   final TextEditingController _noteController = TextEditingController();
   final List<String> _selectedPhotoPaths = [];
   final Map<String, String> _photoCaptions = {};
@@ -326,11 +326,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
 
-    // Default selection of evaluation status if null
-    if (_selectedEvaluationStatus == null && provider.evaluationStatuses.isNotEmpty) {
-      _selectedEvaluationStatus = provider.evaluationStatuses.first;
-    }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -501,7 +496,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 // Customizable Evaluation Status
                 if (provider.evaluationStatuses.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
-                    value: (provider.evaluationStatuses.contains(_selectedEvaluationStatus)) ? _selectedEvaluationStatus : null,
+                    value: provider.evaluationStatuses.any((s) => s.id == _selectedEvaluationStatusId)
+                        ? _selectedEvaluationStatusId
+                        : null,
                     decoration: const InputDecoration(
                       labelText: 'Statut de l\'évaluation',
                       border: OutlineInputBorder(),
@@ -509,11 +506,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     ),
                     items: provider.evaluationStatuses.map((status) {
                       return DropdownMenuItem(
-                        value: status,
-                        child: Text(status),
+                        value: status.id,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Color(int.parse(status.colorHex.replaceFirst('#', '0xff'))),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(status.label),
+                          ],
+                        ),
                       );
                     }).toList(),
-                    onChanged: (val) => setState(() => _selectedEvaluationStatus = val),
+                    onChanged: (val) => setState(() => _selectedEvaluationStatusId = val),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -613,7 +623,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               timestamp: baseStamp,
                               note: _noteController.text.trim(),
                               photoPaths: savedRelativePaths,
-                              evaluationStatus: _selectedEvaluationStatus,
+                              evaluationStatusId: _selectedEvaluationStatusId,
                               photoCaptions: savedCaptions,
                             ));
                             offset++;
@@ -630,7 +640,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             setState(() {
                               _selectedChildId = null;
                               _selectedActivityTypeId = null;
-                              _selectedEvaluationStatus = null;
+                              _selectedEvaluationStatusId = null;
                               _noteController.clear();
                               _selectedPhotoPaths.clear();
                               _photoCaptions.clear();

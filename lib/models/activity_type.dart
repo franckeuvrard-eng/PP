@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'undefined.dart';
+
 class ActivityType {
   final String id;
   final String name;
@@ -65,6 +67,40 @@ class ActivityType {
         if (imagePath != null && imagePath!.isNotEmpty) imagePath!,
         ...photoPaths,
       ];
+
+  /// Copie modifiee. Les champs non fournis restent inchanges ; passer
+  /// explicitement `null` a un champ optionnel le vide.
+  ActivityType copyWith({
+    String? id,
+    String? name,
+    String? spaceId,
+    String? colorHex,
+    Object? description = kUndefined,
+    Object? imagePath = kUndefined,
+    String? domaine,
+    List<String>? objectifs,
+    bool? isObligatory,
+    Object? iconName = kUndefined,
+    List<String>? photoPaths,
+    Map<String, String>? photoCaptions,
+    List<String>? obligatoryGroups,
+  }) {
+    return ActivityType(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      spaceId: spaceId ?? this.spaceId,
+      colorHex: colorHex ?? this.colorHex,
+      description: description == kUndefined ? this.description : description as String?,
+      imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
+      domaine: domaine ?? this.domaine,
+      objectifs: objectifs ?? this.objectifs,
+      isObligatory: isObligatory ?? this.isObligatory,
+      iconName: iconName == kUndefined ? this.iconName : iconName as String?,
+      photoPaths: photoPaths ?? this.photoPaths,
+      photoCaptions: photoCaptions ?? this.photoCaptions,
+      obligatoryGroups: obligatoryGroups ?? this.obligatoryGroups,
+    );
+  }
 
   // Backwards compatibility: map old 'category' field to 'spaceId'
   // and old 'pedagogicalDomains' to 'objectifs'

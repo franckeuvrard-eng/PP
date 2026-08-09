@@ -54,12 +54,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     // Stats calculations
     final Map<String, int> childActivityCounts = {for (var c in children) c.id: 0};
     final Map<String, Map<String, int>> childStatusCounts = {
-      for (var c in children) c.id: {for (var s in statuses) s: 0}
+      for (var c in children) c.id: {for (var s in statuses) s.id: 0}
     };
 
     final Map<String, int> typeActivityCounts = {for (var t in types) t.id: 0};
     final Map<String, int> domainCounts = {};
-    final Map<String, int> evaluationCounts = {for (var s in statuses) s: 0};
+    final Map<String, int> evaluationCounts = {for (var s in statuses) s.id: 0};
     int unratedCount = 0;
 
     for (var act in filteredActivities) {
@@ -67,9 +67,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       if (childActivityCounts.containsKey(act.childId)) {
         childActivityCounts[act.childId] = childActivityCounts[act.childId]! + 1;
       }
-      if (act.evaluationStatus != null && childStatusCounts.containsKey(act.childId)) {
+      final statusId = act.evaluationStatusId;
+      if (statusId != null && childStatusCounts.containsKey(act.childId)) {
         final cMap = childStatusCounts[act.childId]!;
-        cMap[act.evaluationStatus!] = (cMap[act.evaluationStatus!] ?? 0) + 1;
+        cMap[statusId] = (cMap[statusId] ?? 0) + 1;
       }
 
       // Type & Domain stats
@@ -88,8 +89,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       domainCounts[cat] = (domainCounts[cat] ?? 0) + 1;
 
       // Evaluation stats
-      if (act.evaluationStatus != null && evaluationCounts.containsKey(act.evaluationStatus!)) {
-        evaluationCounts[act.evaluationStatus!] = evaluationCounts[act.evaluationStatus!]! + 1;
+      if (statusId != null && evaluationCounts.containsKey(statusId)) {
+        evaluationCounts[statusId] = evaluationCounts[statusId]! + 1;
       } else {
         unratedCount++;
       }
@@ -202,10 +203,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               child: Column(
                 children: [
                   ...statuses.map((status) {
-                    final count = evaluationCounts[status] ?? 0;
+                    final count = evaluationCounts[status.id] ?? 0;
                     final total = filteredActivities.isEmpty ? 1 : filteredActivities.length;
                     final ratio = count / total;
-                    final color = _getStatusColor(status);
+                    final color = Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -215,7 +216,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(status, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(status.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                               Text('$count (${(ratio * 100).toStringAsFixed(1)}%)', style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13)),
                             ],
                           ),
@@ -312,11 +313,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   final child = sortedChildren[index];
                   final totalCount = childActivityCounts[child.id] ?? 0;
                   final sMap = childStatusCounts[child.id] ?? {};
-                  // Les libelles de statut sont parametrables et contiennent des
-                  // emojis, donc on compare sur le libelle normalise.
-                  final acquisCount = sMap.entries
-                      .where((e) => _normalizeStatus(e.key).startsWith('acquis'))
-                      .fold<int>(0, (sum, e) => sum + e.value);
+                  // Identifiant stable : plus besoin de deviner depuis le texte.
+                  final acquisCount = sMap['acquis'] ?? 0;
 
                   return ExpansionTile(
                     leading: CircleAvatar(
@@ -345,12 +343,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               spacing: 8,
                               runSpacing: 6,
                               children: statuses.map((st) {
-                                final cnt = sMap[st] ?? 0;
-                                final col = _getStatusColor(st);
+                                final cnt = sMap[st.id] ?? 0;
+                                final col = Color(int.parse(st.colorHex.replaceFirst('#', '0xff')));
                                 return Chip(
                                   backgroundColor: col.withOpacity(0.1),
                                   side: BorderSide(color: col.withOpacity(0.3)),
-                                  label: Text('$st : $cnt', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: col)),
+                                  label: Text('${st.label} : $cnt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: col)),
                                   visualDensity: VisualDensity.compact,
                                 );
                               }).toList(),
@@ -538,27 +536,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
-  /// Retire les emojis et la ponctuation d'un libelle de statut pour permettre
-  /// une comparaison stable, quels que soient les statuts saisis dans les
-  /// parametres (ex. 'Acquis 🟢' -> 'acquis').
-  String _normalizeStatus(String status) {
-    return status
-        .toLowerCase()
-        .replaceAll(RegExp(r"[^a-zà-ÿ' ]"), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
-
-  Color _getStatusColor(String status) {
-    final s = _normalizeStatus(status);
-    if (s.startsWith('non acquis')) return const Color(0xFFD32F2F);
-    if (s.startsWith('acquis')) return const Color(0xFF388E3C);
-    if (s.startsWith('en cours')) return const Color(0xFFF57C00);
-    if (s.startsWith('à revoir') || s.startsWith('a revoir')) {
-      return const Color(0xFF7B1FA2);
-    }
-    return const Color(0xFF1976D2);
-  }
 
   Widget _buildMandatoryWorkshopsSection(
     BuildContext context,

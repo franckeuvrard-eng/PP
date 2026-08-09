@@ -228,7 +228,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                   ),
                                   
                                   // Evaluation Status pill
-                                  if (act.evaluationStatus != null) ...[
+                                  if (provider.statusLabel(act) != null) ...[
                                     const SizedBox(height: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -237,7 +237,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        act.evaluationStatus!,
+                                        provider.statusLabel(act)!,
                                         style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                                       ),
                                     ),

@@ -6,6 +6,7 @@ import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../models/evaluation_status.dart';
 import '../data/eduscol_data.dart';
 import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
@@ -138,6 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           const SizedBox(height: 20),
 
           _buildSectionsCard(context, provider),
+          const SizedBox(height: 16),
+
+          _buildStatusesCard(context, provider),
           const SizedBox(height: 16),
 
           // Level Selector Chips
@@ -607,6 +611,185 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ),
       ),
     );
+  }
+
+  /// Gestion des niveaux d'évaluation.
+  ///
+  /// Renommer est sans danger : les observations référencent un identifiant
+  /// stable, pas le libellé. La couleur est portée par le niveau, ce qui évite
+  /// les emojis dans les intitulés — ils ne sont pas imprimables en PDF.
+  Widget _buildStatusesCard(BuildContext context, AppStateProvider provider) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.rule, color: Color(0xFF4E9F3D)),
+                SizedBox(width: 8),
+                Text('Niveaux d\'évaluation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Proposés lors de chaque observation. Les renommer ne modifie pas '
+              'les évaluations déjà enregistrées.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            ...provider.evaluationStatuses.map((status) {
+              final couleur = Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(color: couleur, shape: BoxShape.circle),
+                ),
+                title: Text(status.label, style: const TextStyle(fontSize: 14)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                      tooltip: 'Renommer',
+                      onPressed: () => _editStatus(context, provider, status),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      tooltip: 'Supprimer',
+                      onPressed: () => _deleteStatus(context, provider, status),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: () => _editStatus(context, provider, null),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter un niveau'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editStatus(
+      BuildContext context, AppStateProvider provider, EvaluationStatus? status) async {
+    final ctrl = TextEditingController(text: status?.label ?? '');
+    var color = status?.colorHex ?? '#1976D2';
+    const palette = ['#D32F2F', '#F9A825', '#388E3C', '#1976D2', '#7B1FA2', '#00838F', '#EF6C00'];
+
+    final result = await showDialog<EvaluationStatus>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: Text(status == null ? 'Nouveau niveau' : 'Modifier le niveau'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Intitulé',
+                  hintText: 'Acquis, En cours, À revoir...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Couleur :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: palette.map((c) {
+                  final selected = c == color;
+                  return GestureDetector(
+                    onTap: () => setSt(() => color = c),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Color(int.parse(c.replaceFirst('#', '0xff'))),
+                        shape: BoxShape.circle,
+                        border: selected ? Border.all(color: Colors.white, width: 3) : null,
+                      ),
+                      child: selected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () {
+                final label = ctrl.text.trim();
+                if (label.isEmpty) return;
+                Navigator.pop(
+                  ctx,
+                  status?.copyWith(label: label, colorHex: color) ??
+                      EvaluationStatus(
+                        id: 'statut_${DateTime.now().millisecondsSinceEpoch}',
+                        label: label,
+                        colorHex: color,
+                      ),
+                );
+              },
+              child: const Text('Valider'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+
+    final updated = List<EvaluationStatus>.from(provider.evaluationStatuses);
+    final index = updated.indexWhere((s) => s.id == result.id);
+    if (index >= 0) {
+      updated[index] = result;
+    } else {
+      updated.add(result);
+    }
+    provider.setEvaluationStatuses(updated);
+  }
+
+  Future<void> _deleteStatus(
+      BuildContext context, AppStateProvider provider, EvaluationStatus status) async {
+    final used = provider.activities.where((a) => a.evaluationStatusId == status.id).length;
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Supprimer « ${status.label} » ?'),
+        content: Text(
+          used == 0
+              ? 'Ce niveau n\'est utilisé par aucune observation.'
+              : '$used observation(s) portent ce niveau. Elles le conserveront, '
+                  'mais il ne sera plus proposé à la saisie.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+    provider.setEvaluationStatuses(
+        provider.evaluationStatuses.where((s) => s.id != status.id).toList());
   }
 
   Future<void> _addSection(BuildContext context, AppStateProvider provider) async {

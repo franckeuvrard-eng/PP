@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'undefined.dart';
+
 class Child {
   final String id;
   final String firstname;
@@ -24,6 +26,34 @@ class Child {
     this.email,
     this.imagePath,
   });
+
+  /// Copie modifiee. Les champs non fournis restent inchanges ; passer
+  /// explicitement `null` a un champ optionnel le vide.
+  Child copyWith({
+    String? id,
+    String? firstname,
+    Object? lastname = kUndefined,
+    Object? birthdate = kUndefined,
+    Object? group = kUndefined,
+    Object? notes = kUndefined,
+    String? colorHex,
+    String? avatarText,
+    Object? email = kUndefined,
+    Object? imagePath = kUndefined,
+  }) {
+    return Child(
+      id: id ?? this.id,
+      firstname: firstname ?? this.firstname,
+      lastname: lastname == kUndefined ? this.lastname : lastname as String?,
+      birthdate: birthdate == kUndefined ? this.birthdate : birthdate as String?,
+      group: group == kUndefined ? this.group : group as String?,
+      notes: notes == kUndefined ? this.notes : notes as String?,
+      colorHex: colorHex ?? this.colorHex,
+      avatarText: avatarText ?? this.avatarText,
+      email: email == kUndefined ? this.email : email as String?,
+      imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {

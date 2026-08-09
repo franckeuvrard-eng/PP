@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'undefined.dart';
+
 class ClassSettings {
   String name;
   String teacher;
@@ -18,6 +20,28 @@ class ClassSettings {
     required this.schoolYear,
     this.logoPath,
   });
+
+  /// Copie modifiee. Les champs non fournis restent inchanges ; passer
+  /// explicitement `null` a un champ optionnel le vide.
+  ClassSettings copyWith({
+    String? name,
+    String? teacher,
+    Object? atsem = kUndefined,
+    Object? schoolName = kUndefined,
+    String? level,
+    String? schoolYear,
+    Object? logoPath = kUndefined,
+  }) {
+    return ClassSettings(
+      name: name ?? this.name,
+      teacher: teacher ?? this.teacher,
+      atsem: atsem == kUndefined ? this.atsem : atsem as String?,
+      schoolName: schoolName == kUndefined ? this.schoolName : schoolName as String?,
+      level: level ?? this.level,
+      schoolYear: schoolYear ?? this.schoolYear,
+      logoPath: logoPath == kUndefined ? this.logoPath : logoPath as String?,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {

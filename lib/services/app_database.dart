@@ -9,6 +9,7 @@ import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/class_settings.dart';
+import '../models/evaluation_status.dart';
 import '../models/space.dart';
 import '../utils/platform_support.dart';
 
@@ -197,7 +198,7 @@ class AppDatabase {
     required List<Space> spaces,
     required List<ActivityType> activityTypes,
     required List<ActivityLog> activities,
-    required List<String> evaluationStatuses,
+    required List<EvaluationStatus> evaluationStatuses,
     required Map<String, Map<String, SonStatut>> sons,
   }) async {
     final db = await _database;
@@ -233,7 +234,7 @@ class AppDatabase {
           {'key': 'class_settings', 'value': classSettings.toJson()},
           conflictAlgorithm: ConflictAlgorithm.replace);
       await txn.insert('settings',
-          {'key': 'evaluation_statuses', 'value': json.encode(evaluationStatuses)},
+          {'key': 'evaluation_statuses', 'value': json.encode(evaluationStatuses.map((s) => s.toMap()).toList())},
           conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }

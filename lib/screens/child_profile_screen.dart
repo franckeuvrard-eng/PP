@@ -500,19 +500,27 @@ class ChildProfileScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey.shade700),
                         ),
                       ],
-                      if (log.evaluationStatus != null) ...[
+                      if (provider.statusLabel(log) != null) ...[
                         const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            log.evaluationStatus!,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                        Builder(builder: (context) {
+                          final status = provider.statusById(log.evaluationStatusId);
+                          final couleur = status == null
+                              ? null
+                              : Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: couleur?.withOpacity(0.15) ??
+                                  (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              provider.statusLabel(log)!,
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold, color: couleur),
+                            ),
+                          );
+                        }),
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         const SizedBox(height: 6),
