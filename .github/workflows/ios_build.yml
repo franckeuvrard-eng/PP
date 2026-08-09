@@ -45,6 +45,10 @@ jobs:
           echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
+          # flutter create regenere le test/widget_test.dart du template, qui
+          # reference MyApp() alors que la classe racine est PetitPasApp :
+          # il ferait echouer 'flutter analyze'.
+          rm -rf test
 
       - name: Normalize iOS deployment target
         # flutter create reecrit project.pbxproj et AppFrameworkInfo.plist avec 12.0.
