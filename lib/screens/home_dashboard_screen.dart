@@ -184,7 +184,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   // Activity Type, Space, Obligatory & Time
                                   Wrap(
-                                    cross: WrapCrossAlignment.center,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     spacing: 6,
                                     runSpacing: 4,
                                     children: [
