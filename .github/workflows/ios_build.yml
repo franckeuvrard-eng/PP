@@ -43,6 +43,15 @@ jobs:
           if [ -f ios/Podfile ]; then
             sed -i '' 's/# platform :ios/platform :ios/g' ios/Podfile
             sed -i '' "s/platform :ios, .*/platform :ios, '14.0'/g" ios/Podfile
+            echo "" >> ios/Podfile
+            echo "post_install do |installer|" >> ios/Podfile
+            echo "  installer.pods_project.targets.each do |target|" >> ios/Podfile
+            echo "    flutter_additional_ios_build_settings(target)" >> ios/Podfile
+            echo "    target.build_configurations.each do |config|" >> ios/Podfile
+            echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'" >> ios/Podfile
+            echo "    end" >> ios/Podfile
+            echo "  end" >> ios/Podfile
+            echo "end" >> ios/Podfile
           fi
 
       - name: Generate App Launcher Icons
