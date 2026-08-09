@@ -6,6 +6,7 @@ import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../data/eduscol_data.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -437,14 +438,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
-  // ─────────────────── ATELIER DIALOG ───────────────────
+  // ─────────────────── ATELIER DIALOG (AVEC EDUSCOL & SUR-MESURE) ───────────────────
   void _openActivityTypeDialog(BuildContext context, AppStateProvider provider, {ActivityType? activityType, String? preselectedSpaceId}) {
     final nameCtrl = TextEditingController(text: activityType?.name ?? '');
     final descCtrl = TextEditingController(text: activityType?.description ?? '');
-    final domaineCtrl = TextEditingController(text: activityType?.domaine ?? '');
-    final objectifsCtrl = TextEditingController(text: activityType?.objectifs.join('\n') ?? '');
+    final customDomaineCtrl = TextEditingController();
+    final customObjectiveCtrl = TextEditingController();
+
     String spaceId = preselectedSpaceId ?? activityType?.spaceId ?? (provider.spaces.isNotEmpty ? provider.spaces.first.id : '');
     String color = activityType?.colorHex ?? '#4E9F3D';
+
+    // Domaine selection
+    String? selectedDomainId = EduscolData.domains.any((d) => d.title == activityType?.domaine)
+        ? EduscolData.domains.firstWhere((d) => d.title == activityType?.domaine).id
+        : (activityType?.domaine.isNotEmpty == true ? 'custom' : EduscolData.domains.first.id);
+
+    if (selectedDomainId == 'custom') {
+      customDomaineCtrl.text = activityType?.domaine ?? '';
+    }
+
+    // Filter by age/level
+    String selectedLevelFilter = 'Tous';
+
+    // Objectives set
+    final List<String> selectedObjectives = List<String>.from(activityType?.objectifs ?? []);
 
     final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
 
@@ -453,84 +470,266 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSt) {
+            final availableEduscolObjectives = EduscolData.objectives.where((obj) {
+              final matchDomain = obj.domainId == selectedDomainId;
+              final matchLevel = selectedLevelFilter == 'Tous' || obj.level == selectedLevelFilter;
+              return matchDomain && matchLevel;
+            }).toList();
+
             return AlertDialog(
               title: Text(activityType == null ? 'Ajouter un Atelier' : 'Modifier l\'Atelier'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom de l\'atelier')),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: provider.spaces.any((s) => s.id == spaceId) ? spaceId : null,
-                      decoration: const InputDecoration(labelText: 'Espace'),
-                      items: provider.spaces.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
-                      onChanged: (val) {
-                        if (val != null) setSt(() => spaceId = val);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(controller: domaineCtrl, decoration: const InputDecoration(labelText: 'Domaine pédagogique', hintText: 'Ex: Mobiliser le langage')),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: objectifsCtrl,
-                      decoration: const InputDecoration(labelText: 'Objectifs (un par ligne)', hintText: 'Écouter une histoire\nReformuler avec ses mots'),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-                    const SizedBox(height: 12),
-                    const Text('Couleur :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: colors.map((c) {
-                        final isSelected = c == color;
-                        return GestureDetector(
-                          onTap: () => setSt(() => color = c),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Color(int.parse(c.replaceFirst('#', '0xff'))),
-                              shape: BoxShape.circle,
-                              border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
-                              boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(c.replaceFirst('#', '0xff'))), blurRadius: 8)] : null,
-                            ),
-                            child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(labelText: 'Nom de l\'atelier', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+
+                      DropdownButtonFormField<String>(
+                        value: provider.spaces.any((s) => s.id == spaceId) ? spaceId : null,
+                        decoration: const InputDecoration(labelText: 'Espace de classe', border: OutlineInputBorder()),
+                        items: provider.spaces.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setSt(() => spaceId = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Domaine Éduscol Dropdown
+                      DropdownButtonFormField<String>(
+                        value: selectedDomainId,
+                        decoration: const InputDecoration(
+                          labelText: '📚 Domaine Éduscol (Cycle 1)',
+                          border: OutlineInputBorder(),
+                        ),
+                        isExpanded: true,
+                        items: [
+                          ...EduscolData.domains.map((d) => DropdownMenuItem(
+                            value: d.id,
+                            child: Text(d.title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                          )),
+                          const DropdownMenuItem(
+                            value: 'custom',
+                            child: Text('➕ Autre (Saisie personnalisée)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setSt(() => selectedDomainId = val);
+                          }
+                        },
+                      ),
+
+                      if (selectedDomainId == 'custom') ...[
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: customDomaineCtrl,
+                          decoration: const InputDecoration(labelText: 'Nom du domaine personnalisé', border: OutlineInputBorder()),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+
+                      // Filter by Level (Age)
+                      if (selectedDomainId != 'custom') ...[
+                        Row(
+                          children: [
+                            const Text('🎯 Tranche d\'âge / Niveau :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
+                                    final isSelected = selectedLevelFilter == lvl;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 4),
+                                      child: ChoiceChip(
+                                        label: Text(
+                                          lvl == 'PS' ? 'PS (2-4 ans)' : lvl == 'MS' ? 'MS (4-5 ans)' : lvl == 'GS' ? 'GS (5-6 ans)' : 'Tous',
+                                          style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : Colors.black87),
+                                        ),
+                                        selected: isSelected,
+                                        selectedColor: const Color(0xFF4E9F3D),
+                                        onSelected: (sel) {
+                                          if (sel) setSt(() => selectedLevelFilter = lvl);
+                                        },
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Éduscol Objectives Checkboxes Container
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: availableEduscolObjectives.isEmpty
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Text('Aucun objectif officiel pour ce filtre.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: availableEduscolObjectives.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  itemBuilder: (context, idx) {
+                                    final obj = availableEduscolObjectives[idx];
+                                    final isChecked = selectedObjectives.contains(obj.text);
+                                    return CheckboxListTile(
+                                      dense: true,
+                                      title: Text(obj.text, style: const TextStyle(fontSize: 12)),
+                                      subtitle: Text('Niveau : ${obj.level}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                      value: isChecked,
+                                      activeColor: const Color(0xFF4E9F3D),
+                                      onChanged: (val) {
+                                        setSt(() {
+                                          if (val == true) {
+                                            if (!selectedObjectives.contains(obj.text)) {
+                                              selectedObjectives.add(obj.text);
+                                            }
+                                          } else {
+                                            selectedObjectives.remove(obj.text);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Selected Objectives Chips
+                      const Text('Objectifs retenus pour cet atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      if (selectedObjectives.isEmpty)
+                        const Text('Aucun objectif sélectionné.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey))
+                      else
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: selectedObjectives.map((objText) {
+                            return Chip(
+                              label: Text(objText, style: const TextStyle(fontSize: 11)),
+                              deleteIcon: const Icon(Icons.close, size: 14),
+                              onDeleted: () {
+                                setSt(() {
+                                  selectedObjectives.remove(objText);
+                                });
+                              },
+                              backgroundColor: const Color(0xFF4E9F3D).withOpacity(0.15),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 12),
+
+                      // Add Custom Objective Input
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: customObjectiveCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Ajouter un objectif sur-mesure',
+                                hintText: 'Ex: Utiliser des ciseaux à bouts ronds',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () {
+                              final txt = customObjectiveCtrl.text.trim();
+                              if (txt.isNotEmpty) {
+                                setSt(() {
+                                  if (!selectedObjectives.contains(txt)) {
+                                    selectedObjectives.add(txt);
+                                  }
+                                  customObjectiveCtrl.clear();
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.add_circle, color: Color(0xFF4E9F3D), size: 32),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: descCtrl,
+                        decoration: const InputDecoration(labelText: 'Description complémentaire', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+
+                      const Text('Couleur de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: colors.map((c) {
+                          final isSelected = c == color;
+                          return GestureDetector(
+                            onTap: () => setSt(() => color = c),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Color(int.parse(c.replaceFirst('#', '0xff'))),
+                                shape: BoxShape.circle,
+                                border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                                boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(c.replaceFirst('#', '0xff'))), blurRadius: 8)] : null,
+                              ),
+                              child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E9F3D), foregroundColor: Colors.white),
                   onPressed: () {
                     if (nameCtrl.text.trim().isNotEmpty) {
-                      final objectifs = objectifsCtrl.text
-                          .split('\n')
-                          .map((o) => o.trim())
-                          .where((o) => o.isNotEmpty)
-                          .toList();
+                      String finalDomaine = '';
+                      if (selectedDomainId == 'custom') {
+                        finalDomaine = customDomaineCtrl.text.trim();
+                      } else if (selectedDomainId != null) {
+                        final dom = EduscolData.domains.firstWhere((d) => d.id == selectedDomainId, orElse: () => EduscolData.domains.first);
+                        finalDomaine = dom.title;
+                      }
+
                       final newType = ActivityType(
                         id: activityType?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
                         name: nameCtrl.text.trim(),
                         spaceId: spaceId,
                         colorHex: color,
                         description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                        domaine: domaineCtrl.text.trim(),
-                        objectifs: objectifs,
+                        domaine: finalDomaine,
+                        objectifs: selectedObjectives,
                       );
                       provider.saveActivityType(newType);
                       Navigator.pop(context);
                     }
                   },
-                  child: const Text('Enregistrer'),
+                  child: const Text('Enregistrer l\'Atelier'),
                 ),
               ],
             );
