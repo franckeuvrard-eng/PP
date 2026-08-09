@@ -1,6 +1,6 @@
 name: petitpas
 description: Application iOS de suivi d'activités petite enfance et maternelle avec scan QR Code, prise de photo et paramétrage 100% UI.
-
+# Flutter version: 3.19.0 - Mon Suivi Maternelle (Build 84)
 publish_to: 'none'
 
 version: 1.3.0+2
