@@ -138,25 +138,24 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           // Level Selector Chips
           const Text('Niveau de Maternelle :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['TPS', 'PS', 'MS', 'GS', 'Multi-niveaux'].map((level) {
-                final isSelected = _selectedLevel == level;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(level),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF4E9F3D),
-                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
-                    onSelected: (sel) {
-                      if (sel) setState(() => _selectedLevel = level);
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ['TPS', 'PS', 'MS', 'GS', 'Multi-niveaux'].map((level) {
+              final isSelected = _selectedLevel == level;
+              return ChoiceChip(
+                label: Text(level),
+                selected: isSelected,
+                selectedColor: const Color(0xFF4E9F3D),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (sel) {
+                  if (sel) setState(() => _selectedLevel = level);
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 16),
 
@@ -922,42 +921,39 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     const SizedBox(height: 16),
 
                     if (_selectedDomainId != 'custom' && _selectedDomainId != 'none') ...[
-                      Row(
-                        children: [
-                          const Text('🎯 Tranche d\'âge / Niveau :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
-                                  final isSelected = _selectedLevelFilter == lvl;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: ChoiceChip(
-                                      label: Text(
-                                        lvl == 'PS' ? 'PS (2-4 ans)' : lvl == 'MS' ? 'MS (4-5 ans)' : lvl == 'GS' ? 'GS (5-6 ans)' : 'Tous',
-                                        style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : Colors.black87),
-                                      ),
-                                      selected: isSelected,
-                                      selectedColor: const Color(0xFF4E9F3D),
-                                      onSelected: (sel) {
-                                        if (sel) setState(() => _selectedLevelFilter = lvl);
-                                      },
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
+                      // Le libelle sur sa propre ligne et un Wrap plutot qu'un
+                      // defilement horizontal : sur telephone, partager la Row
+                      // avec le titre ne laissait qu'une bande etroite.
+                      const Text('🎯 Tranche d\'âge / Niveau :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
+                          final isSelected = _selectedLevelFilter == lvl;
+                          return ChoiceChip(
+                            label: Text(
+                              lvl == 'PS' ? 'PS (2-4 ans)' : lvl == 'MS' ? 'MS (4-5 ans)' : lvl == 'GS' ? 'GS (5-6 ans)' : 'Tous',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                             ),
-                          ),
-                        ],
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF4E9F3D),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            onSelected: (sel) {
+                              if (sel) setState(() => _selectedLevelFilter = lvl);
+                            },
+                          );
+                        }).toList(),
                       ),
                       const SizedBox(height: 8),
 
                       Container(
                         constraints: const BoxConstraints(maxHeight: 220),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: Theme.of(context).dividerColor),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: availableEduscolObjectives.isEmpty

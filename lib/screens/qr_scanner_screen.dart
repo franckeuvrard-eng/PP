@@ -140,11 +140,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Theme.of(context).colorScheme.surfaceVariant,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[300]!),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
-                  child: const Icon(Icons.add_a_photo, color: Colors.grey, size: 24),
+                  child: Icon(Icons.add_a_photo, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 24),
                 ),
               ),
               const SizedBox(width: 8),
@@ -211,7 +211,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              // Etait Colors.white en dur : en mode sombre, le texte clair du
+              // theme devenait illisible sur ce fond blanc.
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),

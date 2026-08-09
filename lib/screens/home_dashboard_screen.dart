@@ -53,6 +53,7 @@ class HomeDashboardScreen extends StatelessWidget {
                   icon: Icons.bolt,
                   color: isDark ? const Color(0xFF3B2E15) : const Color(0xFFFFF3E0),
                   textColor: isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(width: 12),
@@ -67,6 +68,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     icon: Icons.bar_chart,
                     color: isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD),
                     textColor: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
+                    isDark: isDark,
                   ),
                 ),
               ),
@@ -332,7 +334,7 @@ class HomeDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard({required String title, required String value, required IconData icon, required Color color, required Color textColor}) {
+  Widget _buildStatCard({required String title, required String value, required IconData icon, required Color color, required Color textColor, required bool isDark}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -342,7 +344,9 @@ class HomeDashboardScreen extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: Colors.white,
+            // Pastille teintee en mode sombre : un cercle blanc franc sur la
+            // carte sombre etait trop contraste.
+            backgroundColor: isDark ? textColor.withOpacity(0.18) : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
           ),

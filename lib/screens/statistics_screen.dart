@@ -41,6 +41,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = Provider.of<AppStateProvider>(context);
     final allActivities = provider.activities;
     final filteredActivities = _filterLogs(allActivities);
@@ -160,8 +161,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     title: 'Total Activités',
                     value: '${filteredActivities.length}',
                     icon: Icons.auto_graph,
-                    color: Colors.blue.shade50,
-                    textColor: Colors.blue.shade900,
+                    color: isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD),
+                    textColor: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -170,8 +171,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     title: 'Élèves Actifs',
                     value: '${sortedChildren.where((c) => (childActivityCounts[c.id] ?? 0) > 0).length} / ${children.length}',
                     icon: Icons.people,
-                    color: Colors.orange.shade50,
-                    textColor: Colors.orange.shade900,
+                    color: isDark ? const Color(0xFF3B2E15) : const Color(0xFFFFF3E0),
+                    textColor: isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
                   ),
                 ),
               ],
@@ -404,7 +405,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       selected: isSelected,
       selectedColor: const Color(0xFF4E9F3D),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
+        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
       onSelected: (selected) {
@@ -446,6 +447,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     List<Child> children,
     List<ActivityType> types,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mandatoryTypes = types.where((t) => t.isObligatory).toList();
 
     return Column(
@@ -464,18 +466,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: isDark ? const Color(0xFF3B2E15) : Colors.orange.shade50,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: isDark ? const Color(0xFF6B5220) : Colors.orange.shade200),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.orange),
-                SizedBox(width: 12),
+                Icon(Icons.info_outline, color: isDark ? const Color(0xFFFFB74D) : Colors.orange),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Aucun atelier n\'est configuré comme obligatoire.\nPour rendre un atelier obligatoire, allez dans Paramètres > Espaces & Ateliers et cochez "Atelier Obligatoire".',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFE2E8F0) : Colors.black87),
                   ),
                 ),
               ],
@@ -644,7 +646,11 @@ class _StatCard extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: Colors.white,
+            // Un cercle blanc franc sur une carte sombre etait trop dur :
+            // en mode sombre on utilise une pastille teintee.
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? textColor.withOpacity(0.18)
+                : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
           ),

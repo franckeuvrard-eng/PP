@@ -41,6 +41,9 @@ class PetitPasApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAF7),
+        // cardColor doit etre defini explicitement : plusieurs ecrans batissent
+        // leurs Container de contenu sur Theme.of(context).cardColor.
+        cardColor: Colors.white,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -65,6 +68,7 @@ class PetitPasApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardColor: const Color(0xFF1E293B),
         cardTheme: CardTheme(
           color: const Color(0xFF1E293B),
           elevation: 2,
