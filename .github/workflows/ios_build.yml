@@ -55,7 +55,7 @@ jobs:
           CODE_SIGN_IDENTITY: ''
         run: |
           set -o pipefail
-          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || (echo "=== FAILURE DIAGNOSTICS ===" && grep -i -C 2 -E "error:|failed|fatal:" build_output.txt | tail -n 100 && exit 1)
+          flutter build ios --release --no-codesign 2>&1 | tee build_output.txt || (echo "=== LAST 100 LINES OF BUILD OUTPUT ===" && tail -n 100 build_output.txt && exit 1)
 
       - name: Package Payload to IPA
         run: |
