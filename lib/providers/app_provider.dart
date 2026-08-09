@@ -77,6 +77,13 @@ class AppStateProvider extends ChangeNotifier {
 
 
 
+  /// Sections / groupes de la classe.
+  ///
+  /// Le groupe etait auparavant un champ libre saisi sur chaque fiche eleve :
+  /// une faute de frappe creait une section fantome, qui reapparaissait dans le
+  /// ciblage des ateliers obligatoires.
+  List<String> _sections = ['TPS', 'PS', 'MS', 'GS'];
+
   ThemeMode _themeMode = ThemeMode.system;
 
   /// Verrouillage de l'application par FaceID / code a l'ouverture.
@@ -113,6 +120,62 @@ class AppStateProvider extends ChangeNotifier {
   List<ActivityType> get activityTypes => List.unmodifiable(_activityTypes);
   List<ActivityLog> get activities => List.unmodifiable(_activities);
   List<String> get evaluationStatuses => List.unmodifiable(_evaluationStatuses);
+  List<String> get sections => List.unmodifiable(_sections);
+
+  void setSections(List<String> sections) {
+    final cleaned = <String>[];
+    for (final s in sections.map((s) => s.trim())) {
+      if (s.isNotEmpty && !cleaned.contains(s)) cleaned.add(s);
+    }
+    _sections = cleaned;
+    _write(_db.setSetting('sections', json.encode(_sections)));
+    notifyListeners();
+  }
+
+  /// Renomme une section et reporte le changement sur les eleves et les
+  /// ateliers concernes, pour ne pas laisser de references orphelines.
+  void renameSection(String from, String to) {
+    final target = to.trim();
+    if (target.isEmpty || from == target) return;
+
+    _sections = [
+      for (final s in _sections) if (s == from) target else s,
+    ];
+
+    for (var i = 0; i < _children.length; i++) {
+      final c = _children[i];
+      if (c.group != from) continue;
+      final updated = Child(
+        id: c.id, firstname: c.firstname, lastname: c.lastname,
+        birthdate: c.birthdate, group: target, notes: c.notes,
+        colorHex: c.colorHex, avatarText: c.avatarText, email: c.email,
+        imagePath: c.imagePath,
+      );
+      _children[i] = updated;
+      _write(_db.saveChild(updated));
+    }
+
+    for (var i = 0; i < _activityTypes.length; i++) {
+      final a = _activityTypes[i];
+      if (!a.obligatoryGroups.contains(from)) continue;
+      final updated = ActivityType(
+        id: a.id, name: a.name, spaceId: a.spaceId, colorHex: a.colorHex,
+        description: a.description, imagePath: a.imagePath, domaine: a.domaine,
+        objectifs: a.objectifs, isObligatory: a.isObligatory, iconName: a.iconName,
+        photoPaths: a.photoPaths, photoCaptions: a.photoCaptions,
+        obligatoryGroups: [for (final g in a.obligatoryGroups) if (g == from) target else g],
+      );
+      _activityTypes[i] = updated;
+      _write(_db.saveActivityType(updated));
+    }
+
+    _write(_db.setSetting('sections', json.encode(_sections)));
+    notifyListeners();
+  }
+
+  /// Nombre d'eleves rattaches a une section, pour avertir avant suppression.
+  int childCountInSection(String section) =>
+      _children.where((c) => c.group == section).length;
   ThemeMode get themeMode => _themeMode;
   bool get biometricLockEnabled => _biometricLockEnabled;
 
@@ -137,10 +200,14 @@ class AppStateProvider extends ChangeNotifier {
   Map<String, SonStatut> sonsOf(String childId) =>
       Map.unmodifiable(_sonsProgress[childId] ?? const {});
 
-  /// Fait passer un son a l'etat suivant : non acquis -> en cours -> acquis,
-  /// puis retour a non acquis.
-  void cycleSonStatut(String childId, String son) {
-    final next = sonStatut(childId, son).suivant;
+  /// Fait progresser un son : non acquis -> en cours -> acquis.
+  void cycleSonStatut(String childId, String son) => _setSon(childId, son, sonStatut(childId, son).suivant);
+
+  /// Fait reculer un son d'un cran. Reserve a l'appui long : un simple appui
+  /// de trop ne doit pas effacer un acquis.
+  void reculeSonStatut(String childId, String son) => _setSon(childId, son, sonStatut(childId, son).precedent);
+
+  void _setSon(String childId, String son, SonStatut next) {
     final sons = _sonsProgress.putIfAbsent(childId, () => {});
     if (next == SonStatut.nonAcquis) {
       sons.remove(son);
@@ -225,6 +292,23 @@ class AppStateProvider extends ChangeNotifier {
         if (settingsJson != null) {
           _classSettings = ClassSettings.fromJson(settingsJson);
         }
+        final sectionsJson = settings['sections'];
+        if (sectionsJson != null) {
+          _sections = List<String>.from(json.decode(sectionsJson));
+        } else {
+          // Premiere ouverture apres la mise a jour : on reprend les groupes
+          // deja saisis sur les fiches eleves plutot que d'imposer une liste.
+          final existing = children
+              .map((c) => c.group)
+              .whereType<String>()
+              .where((g) => g.trim().isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+          if (existing.isNotEmpty) _sections = existing;
+          await _db.setSetting('sections', json.encode(_sections));
+        }
+
         final statusesJson = settings['evaluation_statuses'];
         if (statusesJson != null) {
           _evaluationStatuses = List<String>.from(json.decode(statusesJson));
@@ -308,6 +392,7 @@ class AppStateProvider extends ChangeNotifier {
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses,
+        'sections': _sections,
         'sons_progress': _sonsProgressAsMap(),
       }));
 
@@ -589,6 +674,7 @@ class AppStateProvider extends ChangeNotifier {
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses,
+        'sections': _sections,
         'sons_progress': _sonsProgressAsMap(),
       };
       final jsonBytes = utf8.encode(json.encode(backupData));
@@ -673,6 +759,10 @@ class AppStateProvider extends ChangeNotifier {
       _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
       _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
       _evaluationStatuses = List<String>.from(data['evaluation_statuses'] ?? []);
+      if (data['sections'] != null) {
+        _sections = List<String>.from(data['sections']);
+        _write(_db.setSetting('sections', json.encode(_sections)));
+      }
       final sonsData = data['sons_progress'];
       _sonsProgress = sonsData is Map
           ? sonsData.map(
@@ -730,11 +820,32 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void deleteChild(String id) {
+  /// Supprime un eleve et renvoie de quoi revenir en arriere.
+  ///
+  /// Ses observations sont conservees en base et en memoire : seule la fiche
+  /// disparait, ce qui rend l'annulation possible sans avoir a tout recreer.
+  DeletedChild deleteChild(String id) {
+    final child = _children.firstWhere((c) => c.id == id,
+        orElse: () => Child(id: id, firstname: '', colorHex: '#718096', avatarText: '?'));
+    final sons = Map<String, SonStatut>.from(_sonsProgress[id] ?? const {});
+
     _children.removeWhere((c) => c.id == id);
-    // Sans cela le suivi des sons resterait indefiniment en base.
     _sonsProgress.remove(id);
     _write(_db.deleteChildCascade(id));
+    notifyListeners();
+    return DeletedChild(child: child, sons: sons);
+  }
+
+  /// Retablit un eleve supprime, avec son suivi des sons.
+  void restoreChild(DeletedChild deleted) {
+    _children.add(deleted.child);
+    if (deleted.sons.isNotEmpty) {
+      _sonsProgress[deleted.child.id] = Map<String, SonStatut>.from(deleted.sons);
+    }
+    _write(_db.saveChild(deleted.child));
+    deleted.sons.forEach((son, statut) {
+      _write(_db.setSon(deleted.child.id, son, statut));
+    });
     notifyListeners();
   }
 
@@ -796,9 +907,22 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
-  void deleteActivityLog(String id) {
-    _activities.removeWhere((a) => a.id == id);
+  /// Supprime une observation et renvoie l'enregistrement retire, pour
+  /// permettre une annulation immediate.
+  ActivityLog? deleteActivityLog(String id) {
+    final index = _activities.indexWhere((a) => a.id == id);
+    if (index < 0) return null;
+    final removed = _activities.removeAt(index);
     _write(_db.deleteActivity(id));
+    notifyListeners();
+    return removed;
+  }
+
+  /// Retablit une observation supprimee.
+  void restoreActivityLog(ActivityLog log) {
+    _activities.add(log);
+    _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    _write(_db.saveActivity(log));
     notifyListeners();
   }
 
@@ -886,4 +1010,12 @@ class AppStateProvider extends ChangeNotifier {
       debugPrint('Error deleting photos: $e');
     }
   }
+}
+
+/// Instantane d'un eleve supprime, suffisant pour le retablir.
+class DeletedChild {
+  final Child child;
+  final Map<String, SonStatut> sons;
+
+  const DeletedChild({required this.child, required this.sons});
 }

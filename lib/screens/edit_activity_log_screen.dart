@@ -63,14 +63,29 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Supprimer l\'observation ?'),
-                  content: const Text('Cette action est irréversible.'),
+                  content: const Text('Vous pourrez annuler juste après la suppression.'),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
                     TextButton(
                       onPressed: () {
-                        provider.deleteActivityLog(widget.activityLog.id);
+                        final messenger = ScaffoldMessenger.of(context);
+                        final removed = provider.deleteActivityLog(widget.activityLog.id);
                         Navigator.pop(context); // close alert
                         Navigator.pop(context); // close edit screen
+                        if (removed != null) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: const Text('Observation supprimée'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 8),
+                              action: SnackBarAction(
+                                label: 'Annuler',
+                                textColor: Colors.white,
+                                onPressed: () => provider.restoreActivityLog(removed),
+                              ),
+                            ),
+                          );
+                        }
                       },
                       child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
                     ),

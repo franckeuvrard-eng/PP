@@ -137,6 +137,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 20),
 
+          _buildSectionsCard(context, provider),
+          const SizedBox(height: 16),
+
           // Level Selector Chips
           const Text('Niveau de Maternelle :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
@@ -554,6 +557,124 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  /// Gestion des sections de la classe.
+  ///
+  /// Elles alimentent la fiche eleve et le ciblage des ateliers obligatoires :
+  /// les definir ici evite les sections fantomes nees d'une faute de frappe.
+  Widget _buildSectionsCard(BuildContext context, AppStateProvider provider) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.groups, color: Color(0xFF4E9F3D)),
+                SizedBox(width: 8),
+                Text('Sections / Groupes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Utilisées sur les fiches élèves et pour cibler les ateliers obligatoires.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 10),
+            if (provider.sections.isEmpty)
+              const Text('Aucune section définie.',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: provider.sections.map((section) {
+                final count = provider.childCountInSection(section);
+                return InputChip(
+                  label: Text('$section  ($count)', style: const TextStyle(fontSize: 13)),
+                  onPressed: () => _renameSection(context, provider, section),
+                  onDeleted: () => _deleteSection(context, provider, section, count),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _addSection(context, provider),
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter une section'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addSection(BuildContext context, AppStateProvider provider) async {
+    final name = await _askSectionName(context, 'Nouvelle section', '');
+    if (name == null || name.isEmpty) return;
+    provider.setSections([...provider.sections, name]);
+  }
+
+  Future<void> _renameSection(
+      BuildContext context, AppStateProvider provider, String section) async {
+    final name = await _askSectionName(context, 'Renommer la section', section);
+    if (name == null || name.isEmpty || name == section) return;
+    // Le renommage est repercute sur les eleves et les ateliers concernes.
+    provider.renameSection(section, name);
+  }
+
+  Future<void> _deleteSection(BuildContext context, AppStateProvider provider,
+      String section, int childCount) async {
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Supprimer « $section » ?'),
+        content: Text(
+          childCount == 0
+              ? 'Aucun élève n\'est rattaché à cette section.'
+              : '$childCount élève(s) y sont rattaché(s). Leur fiche conservera '
+                  'la mention actuelle, mais la section ne sera plus proposée.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+    provider.setSections(provider.sections.where((s) => s != section).toList());
+  }
+
+  Future<String?> _askSectionName(BuildContext context, String title, String initial) {
+    final ctrl = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nom de la section',
+            hintText: 'Petite Section, Groupe Rouge...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showAutoBackups(BuildContext context, AppStateProvider provider) async {
     final backups = await provider.listAutoBackups();
     if (!context.mounted) return;
@@ -946,6 +1067,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   late Map<String, String> _photoCaptions;
   late String? _imagePath;
   final ScrollController _objectivesScrollCtrl = ScrollController();
+  String _objectiveQuery = '';
 
   final List<String> _colors = [
     '#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5',
@@ -1021,18 +1143,11 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     });
   }
 
-  /// Sections existantes, deduites des eleves : le groupe est un champ libre
-  /// saisi sur la fiche eleve, il n'y a pas de referentiel separe.
+  /// Sections proposees pour le ciblage : celles definies dans les parametres,
+  /// completees d'un eventuel ciblage devenu obsolete pour qu'il reste
+  /// decochable.
   List<String> _knownGroups(AppStateProvider provider) {
-    final groups = provider.children
-        .map((c) => c.group)
-        .whereType<String>()
-        .where((g) => g.trim().isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    // Un groupe deja cible mais dont plus aucun eleve ne fait partie doit
-    // rester visible, sinon on ne pourrait plus le decocher.
+    final groups = List<String>.from(provider.sections);
     for (final g in _obligatoryGroups) {
       if (!groups.contains(g)) groups.add(g);
     }
@@ -1103,10 +1218,12 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
+    final query = _objectiveQuery.trim().toLowerCase();
     final availableEduscolObjectives = EduscolData.objectives.where((obj) {
       final matchDomain = obj.domainId == _selectedDomainId;
       final matchLevel = _selectedLevelFilter == 'Tous' || obj.level == _selectedLevelFilter;
-      return matchDomain && matchLevel;
+      final matchQuery = query.isEmpty || obj.text.toLowerCase().contains(query);
+      return matchDomain && matchLevel && matchQuery;
     }).toList();
 
     return Scaffold(
@@ -1198,7 +1315,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                           final groups = _knownGroups(provider);
                           if (groups.isEmpty) {
                             return const Text(
-                              'Aucune section définie sur les fiches élèves pour le moment.',
+                              'Aucune section définie. Ajoutez-en dans Paramètres > Ma classe.',
                               style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
                             );
                           }
@@ -1314,6 +1431,23 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                       const SizedBox(height: 8),
 
+                      TextField(
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'Rechercher un objectif...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: _objectiveQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () => setState(() => _objectiveQuery = ''),
+                                ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (val) => setState(() => _objectiveQuery = val),
+                      ),
+                      const SizedBox(height: 8),
+
                       Container(
                         // Liste plus haute et barre de defilement toujours
                         // visible : a 220 px sans ascenseur, on ne voyait pas
@@ -1326,7 +1460,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         child: availableEduscolObjectives.isEmpty
                             ? const Padding(
                                 padding: EdgeInsets.all(16),
-                                child: Text('Aucun objectif officiel disponible pour ce filtre.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                child: Text('Aucun objectif ne correspond à ce filtre.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                               )
                             : Scrollbar(
                                 controller: _objectivesScrollCtrl,

@@ -716,7 +716,9 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     final provider = widget.provider;
     _firstnameController = TextEditingController(text: child?.firstname ?? '');
     _lastnameController = TextEditingController(text: child?.lastname ?? '');
-    _groupController = TextEditingController(text: child?.group ?? 'Petite Section (PS)');
+    _groupController = TextEditingController(
+      text: child?.group ?? (provider.sections.isNotEmpty ? provider.sections.first : ''),
+    );
     _notesController = TextEditingController(text: child?.notes ?? '');
     _emailController = TextEditingController(text: child?.email ?? '');
     _relativeImagePath = child?.imagePath;
@@ -797,27 +799,32 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             TextField(controller: _lastnameController, decoration: const InputDecoration(labelText: 'Nom')),
             const SizedBox(height: 14),
 
-            // Group/Section ComboBox Dropdown
-            DropdownButtonFormField<String>(
-              value: ['Petite Section (PS)', 'Moyenne Section (MS)', 'Grande Section (GS)', 'Groupe Rouge', 'Groupe Bleu', 'Groupe Jaune', 'Groupe Vert'].contains(_groupController.text)
-                  ? _groupController.text
-                  : 'Petite Section (PS)',
-              decoration: const InputDecoration(labelText: 'Groupe / Section', border: OutlineInputBorder()),
-              items: const [
-                DropdownMenuItem(value: 'Petite Section (PS)', child: Text('Petite Section (PS)')),
-                DropdownMenuItem(value: 'Moyenne Section (MS)', child: Text('Moyenne Section (MS)')),
-                DropdownMenuItem(value: 'Grande Section (GS)', child: Text('Grande Section (GS)')),
-                DropdownMenuItem(value: 'Groupe Rouge', child: Text('Groupe Rouge')),
-                DropdownMenuItem(value: 'Groupe Bleu', child: Text('Groupe Bleu')),
-                DropdownMenuItem(value: 'Groupe Jaune', child: Text('Groupe Jaune')),
-                DropdownMenuItem(value: 'Groupe Vert', child: Text('Groupe Vert')),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _groupController.text = val;
-                  });
-                }
+            // Sections gerees dans les parametres. Le groupe deja enregistre
+            // est ajoute a la liste s'il n'y figure plus, pour ne pas le
+            // remplacer silencieusement a l'enregistrement.
+            Builder(
+              builder: (context) {
+                final current = _groupController.text.trim();
+                final options = [
+                  ...widget.provider.sections,
+                  if (current.isNotEmpty && !widget.provider.sections.contains(current)) current,
+                ];
+                return DropdownButtonFormField<String>(
+                  value: options.contains(current) ? current : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Groupe / Section',
+                    border: OutlineInputBorder(),
+                    helperText: 'Modifiable dans Paramètres > Ma classe',
+                  ),
+                  hint: const Text('Choisir une section'),
+                  items: options
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _groupController.text = val);
+                  },
+                );
               },
             ),
             const SizedBox(height: 12),

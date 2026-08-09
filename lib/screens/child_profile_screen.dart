@@ -237,7 +237,8 @@ class ChildProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Appuyez sur un son pour le faire évoluer : non acquis → en cours → acquis.',
+          'Appuyez sur un son pour le faire progresser : non acquis → en cours → acquis. '
+          'Appui long pour revenir en arrière.',
           style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
         const SizedBox(height: 16),
@@ -258,6 +259,7 @@ class ChildProfileScreen extends StatelessWidget {
                       final couleur = _sonColor(statut);
                       return InkWell(
                         onTap: () => provider.cycleSonStatut(child.id, son),
+                        onLongPress: () => provider.reculeSonStatut(child.id, son),
                         borderRadius: BorderRadius.circular(12),
                         child: Tooltip(
                           message: '$son — ${statut.libelle}',
@@ -535,7 +537,8 @@ class ChildProfileScreen extends StatelessWidget {
             ],
           ),
           content: Text(
-            'Voulez-vous vraiment supprimer ${child.firstname} ${child.lastname ?? ""} ?\n\nCette action est irréversible.',
+            'Voulez-vous vraiment supprimer ${child.firstname} ${child.lastname ?? ""} ?\n\n'
+            'Vous pourrez annuler juste après la suppression.',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
@@ -543,13 +546,20 @@ class ChildProfileScreen extends StatelessWidget {
               icon: const Icon(Icons.delete_forever),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
               onPressed: () {
-                provider.deleteChild(child.id);
+                final messenger = ScaffoldMessenger.of(context);
+                final deleted = provider.deleteChild(child.id);
                 Navigator.pop(context); // close dialog
                 Navigator.pop(context); // go back to list
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('${child.firstname} a été supprimé(e)'),
                     backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 8),
+                    action: SnackBarAction(
+                      label: 'Annuler',
+                      textColor: Colors.white,
+                      onPressed: () => provider.restoreChild(deleted),
+                    ),
                   ),
                 );
               },

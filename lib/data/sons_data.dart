@@ -36,8 +36,13 @@ enum SonStatut {
   enCours,
   acquis;
 
-  /// Etat suivant dans le cycle rouge -> jaune -> vert -> rouge.
-  SonStatut get suivant => SonStatut.values[(index + 1) % SonStatut.values.length];
+  /// Etat suivant : non acquis -> en cours -> acquis. S'arrete a [acquis],
+  /// pour qu'un appui de trop ne detruise pas un pointage.
+  SonStatut get suivant =>
+      index >= SonStatut.values.length - 1 ? this : SonStatut.values[index + 1];
+
+  /// Etat precedent, atteint par appui long.
+  SonStatut get precedent => index <= 0 ? this : SonStatut.values[index - 1];
 
   String get libelle => switch (this) {
         SonStatut.nonAcquis => 'Non acquis',
