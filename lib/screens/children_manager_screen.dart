@@ -733,40 +733,40 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('🎯 Atelier : ${_sanitizeEmoji(actType.name)}',
+                          pw.Text('Atelier : ${_sanitizeEmoji(actType.name)}',
                               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                          pw.Text('📍 Espace : ${_sanitizeEmoji(space.name.isEmpty ? "Non défini" : space.name)}',
+                          pw.Text('Espace : ${_sanitizeEmoji(space.name.isEmpty ? "Non défini" : space.name)}',
                               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.teal800)),
                         ],
                       ),
                       pw.SizedBox(height: 3),
                       pw.Text(
-                        '📅 ${DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)}',
+                        'Date : ${DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)}',
                         style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
                       ),
                       if (actType.domaine.isNotEmpty) ...[
                         pw.SizedBox(height: 3),
-                        pw.Text('📚 Domaine : ${_sanitizeEmoji(actType.domaine)}',
+                        pw.Text('Domaine : ${_sanitizeEmoji(actType.domaine)}',
                             style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.indigo900)),
                       ],
                       if (actType.objectifs.isNotEmpty) ...[
                         pw.SizedBox(height: 3),
-                        pw.Text('🏁 Objectifs visés :',
+                        pw.Text('Objectifs visés :',
                             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
                         ...actType.objectifs.map((obj) => pw.Padding(
                           padding: const pw.EdgeInsets.only(left: 8, top: 1),
-                          child: pw.Text('• ${_sanitizeEmoji(obj)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
+                          child: pw.Text('- ${_sanitizeEmoji(obj)}', style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey800)),
                         )),
                       ],
                       if (log.evaluationStatus != null) ...[
                         pw.SizedBox(height: 4),
-                        pw.Text('📊 Statut : ${_sanitizeEmoji(log.evaluationStatus!)}',
+                        pw.Text('Statut : ${_sanitizeEmoji(log.evaluationStatus!)}',
                             style: pw.TextStyle(
                                 fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
                       ],
                       if (log.note != null && log.note!.isNotEmpty) ...[
                         pw.SizedBox(height: 6),
-                        pw.Text('📝 Observation : ${_sanitizeEmoji(log.note!)}',
+                        pw.Text('Observation : ${_sanitizeEmoji(log.note!)}',
                             style: pw.TextStyle(fontSize: 9.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey900)),
                       ],
                       if (activityImages.isNotEmpty) ...[
