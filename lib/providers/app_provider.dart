@@ -19,6 +19,7 @@ import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import '../services/app_database.dart';
+import '../services/icloud_backup_service.dart';
 
 class AppStateProvider extends ChangeNotifier {
   /// Recalcule les index avant de prevenir les ecrans.
@@ -97,6 +98,12 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Verrouillage de l'application par FaceID / code a l'ouverture.
   bool _biometricLockEnabled = true;
+
+  /// Recopie des sauvegardes automatiques vers iCloud Drive.
+  ///
+  /// Active par defaut : sans elle, perdre l'iPad revient a perdre l'annee,
+  /// l'export ZIP manuel etant le seul filet restant.
+  bool _icloudSyncEnabled = true;
 
   bool _isLoaded = false;
 
@@ -273,6 +280,7 @@ class AppStateProvider extends ChangeNotifier {
       _children.where((c) => c.group == section).length;
   ThemeMode get themeMode => _themeMode;
   bool get biometricLockEnabled => _biometricLockEnabled;
+  bool get icloudSyncEnabled => _icloudSyncEnabled;
 
   /// Vrai si les donnees n'ont pas pu etre relues : la classe affichee est
   /// vide, et rien ne doit etre saisi avant une restauration.
@@ -420,6 +428,7 @@ class AppStateProvider extends ChangeNotifier {
           }
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
+        _icloudSyncEnabled = settings['icloud_sync_enabled'] != 'false';
         switch (settings['theme_mode']) {
           case 'light':
             _themeMode = ThemeMode.light;
@@ -525,6 +534,9 @@ class AppStateProvider extends ChangeNotifier {
       debugPrint('Echec de la sauvegarde automatique : $e');
       return;
     }
+    // Apres l'ecriture locale seulement : iCloud est une copie de ce qui est
+    // deja sur le disque, un echec de televersement ne doit rien annuler.
+    if (_icloudSyncEnabled) await syncToICloud();
   }
 
   /// Sauvegarde au plus une fois par jour, au demarrage.
@@ -578,6 +590,61 @@ class AppStateProvider extends ChangeNotifier {
       debugPrint('Echec de la restauration automatique : $e');
       return false;
     }
+  }
+
+  // ─── COPIE ICLOUD DES SAUVEGARDES AUTOMATIQUES ───
+
+  /// Vrai si l'appareil peut atteindre le conteneur iCloud de l'application.
+  ///
+  /// Faux hors iOS, sans compte iCloud, ou si iCloud Drive est desactive dans
+  /// les reglages du systeme : l'interface doit alors le dire plutot que de
+  /// laisser croire a une sauvegarde distante inexistante.
+  Future<bool> isICloudAvailable() => ICloudBackupService.isAvailable();
+
+  /// Televerse les sauvegardes locales manquantes et rend leur nombre.
+  Future<int> syncToICloud() async {
+    final local = await listAutoBackups();
+    return ICloudBackupService.push(
+      local.map((f) => f.path).toList(),
+      keep: _maxAutoBackups,
+    );
+  }
+
+  /// Sauvegardes disponibles sur iCloud, y compris celles deposees par un
+  /// autre appareil et pas encore rapatriees sur celui-ci.
+  Future<List<ICloudBackup>> listICloudBackups() => ICloudBackupService.list();
+
+  /// Restaure une sauvegarde iCloud : telechargement puis relecture par le
+  /// meme chemin que les sauvegardes locales, le format etant identique.
+  Future<bool> restoreICloudBackup(String name) async {
+    File? local;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final path = await ICloudBackupService.pull(name, '${tempDir.path}/$name');
+      if (path == null) return false;
+      local = File(path);
+      return await restoreAutoBackup(local);
+    } catch (e) {
+      debugPrint('Echec de la restauration iCloud : $e');
+      return false;
+    } finally {
+      if (local != null && await local.exists()) {
+        try {
+          await local.delete();
+        } catch (_) {
+          // Fichier temporaire : son maintien ne compromet pas la restauration.
+        }
+      }
+    }
+  }
+
+  Future<void> setICloudSyncEnabled(bool enabled) async {
+    _icloudSyncEnabled = enabled;
+    await _db.setSetting('icloud_sync_enabled', enabled.toString());
+    _notify();
+    // Reactiver la synchronisation doit rattraper les sauvegardes ecrites
+    // pendant qu'elle etait coupee, sans attendre le prochain demarrage.
+    if (enabled) await syncToICloud();
   }
 
   // ─── FIN D'ANNEE SCOLAIRE ───

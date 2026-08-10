@@ -10,6 +10,7 @@ import '../models/evaluation_status.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../services/atelier_pdf_service.dart';
+import '../services/icloud_backup_service.dart';
 import '../utils/app_icons.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -1021,6 +1022,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Copie iCloud des sauvegardes automatiques
+          _ICloudBackupCard(provider: provider),
           const SizedBox(height: 16),
 
           // Backup Card
@@ -2193,6 +2198,220 @@ class _SchoolYearCardState extends State<_SchoolYearCard> {
                       ],
                     ),
                   )),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Carte « Sauvegarde iCloud » de l'onglet Sauvegarde & Securite.
+///
+/// Widget a part entiere car la disponibilite d'iCloud n'est connue qu'apres
+/// un aller-retour avec le systeme : la garder dans l'etat de l'ecran
+/// obligerait a reconstruire tout l'onglet a chaque synchronisation.
+class _ICloudBackupCard extends StatefulWidget {
+  const _ICloudBackupCard({required this.provider});
+
+  final AppStateProvider provider;
+
+  @override
+  State<_ICloudBackupCard> createState() => _ICloudBackupCardState();
+}
+
+class _ICloudBackupCardState extends State<_ICloudBackupCard> {
+  /// Null tant que le systeme n'a pas repondu : l'interface ne doit pas
+  /// annoncer « iCloud indisponible » avant d'avoir reellement verifie.
+  bool? _available;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAvailability();
+  }
+
+  Future<void> _refreshAvailability() async {
+    final available = await widget.provider.isICloudAvailable();
+    if (!mounted) return;
+    setState(() => _available = available);
+  }
+
+  void _toast(String message, {bool success = true}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? const Color(0xFF4E9F3D) : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _busy = true);
+    final sent = await widget.provider.syncToICloud();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _toast(sent == 0
+        ? 'iCloud est déjà à jour.'
+        : '$sent sauvegarde${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''} sur iCloud.');
+  }
+
+  Future<void> _showICloudBackups() async {
+    setState(() => _busy = true);
+    final backups = await widget.provider.listICloudBackups();
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sauvegardes sur iCloud'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: backups.isEmpty
+              ? const Text(
+                  'Aucune sauvegarde sur iCloud pour le moment. Elles y sont '
+                  'déposées à la suite de la sauvegarde automatique quotidienne.',
+                  style: TextStyle(fontSize: 13),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: backups
+                      .map((backup) => ListTile(
+                            dense: true,
+                            leading: Icon(
+                              backup.downloaded
+                                  ? Icons.cloud_done
+                                  : Icons.cloud_download_outlined,
+                              color: const Color(0xFF4E9F3D),
+                            ),
+                            title: Text(backup.label, style: const TextStyle(fontSize: 13)),
+                            // La taille d'un fichier pas encore rapatrie serait
+                            // celle de son marqueur, pas de la sauvegarde.
+                            subtitle: Text(
+                              backup.downloaded
+                                  ? '${(backup.sizeBytes / 1024).toStringAsFixed(0)} Ko'
+                                  : 'À télécharger depuis iCloud',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () => _restore(dialogContext, backup),
+                              child: const Text('Restaurer'),
+                            ),
+                          ))
+                      .toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext), child: const Text('Fermer')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _restore(BuildContext dialogContext, ICloudBackup backup) async {
+    final confirme = await showDialog<bool>(
+      context: dialogContext,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restaurer cette sauvegarde ?'),
+        content: Text(
+          'Toutes les données actuelles seront remplacées. Les photos ne sont '
+          'pas concernées.'
+          '${backup.downloaded ? '' : '\n\nLe fichier sera d\'abord téléchargé depuis iCloud, ce qui peut prendre un moment.'}',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Restaurer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true) return;
+
+    final ok = await widget.provider.restoreICloudBackup(backup.name);
+    if (!dialogContext.mounted) return;
+    Navigator.pop(dialogContext);
+    _toast(
+      ok ? 'Sauvegarde iCloud restaurée.' : 'Échec de la restauration depuis iCloud.',
+      success: ok,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.cloud_outlined, color: Color(0xFF4E9F3D)),
+                SizedBox(width: 8),
+                Text('Sauvegarde iCloud',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (_available == null)
+              const Text('Vérification du compte iCloud…',
+                  style: TextStyle(fontSize: 12, color: Colors.grey))
+            else if (_available == false)
+              const Text(
+                'iCloud n\'est pas disponible sur cet appareil. Activez iCloud '
+                'Drive dans Réglages > votre nom > iCloud pour conserver une '
+                'copie des sauvegardes hors de la tablette.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              )
+            else ...[
+              const Text(
+                'Les sauvegardes automatiques sont copiées dans iCloud Drive > '
+                'PetitPas. Elles restent accessibles si la tablette est perdue, '
+                'et depuis un autre appareil relié au même compte. Les photos '
+                'n\'y sont pas incluses.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Copier automatiquement sur iCloud',
+                    style: TextStyle(fontSize: 14)),
+                value: widget.provider.icloudSyncEnabled,
+                activeColor: const Color(0xFF4E9F3D),
+                onChanged: _busy
+                    ? null
+                    : (value) async {
+                        setState(() => _busy = true);
+                        await widget.provider.setICloudSyncEnabled(value);
+                        if (!mounted) return;
+                        setState(() => _busy = false);
+                      },
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _showICloudBackups,
+                    icon: const Icon(Icons.restore),
+                    label: const Text('Voir et restaurer'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _syncNow,
+                    icon: const Icon(Icons.cloud_upload_outlined),
+                    label: const Text('Synchroniser maintenant'),
+                  ),
+                ],
+              ),
             ],
           ],
         ),

@@ -79,7 +79,8 @@ class HelpScreen extends StatelessWidget {
             steps: [
               'Paramètres > Sécurité : activez ou non la demande de Face ID au démarrage. Le changement s\'applique au prochain lancement.',
               'Une sauvegarde automatique est créée chaque jour et les 5 dernières sont conservées : Paramètres > Sécurité > Voir et restaurer. Elle ne contient pas les photos.',
-              'Sauvegardez régulièrement : le ZIP contient les données et les photos.',
+              'Ces sauvegardes sont aussi copiées sur iCloud Drive > PetitPas : elles survivent à la perte de la tablette et se restaurent depuis un autre appareil relié au même compte iCloud.',
+              'Sauvegardez régulièrement : le ZIP contient les données et les photos, que la copie iCloud n\'inclut pas.',
               'La restauration remplace l\'intégralité des données existantes.',
             ],
           ),
