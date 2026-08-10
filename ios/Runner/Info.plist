@@ -59,5 +59,28 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!--
+	  Expose le conteneur iCloud de l'application dans l'app Fichiers, sous
+	  iCloud Drive > PetitPas. Sans NSUbiquitousContainerIsDocumentScopePublic
+	  les sauvegardes seraient bien synchronisees mais invisibles pour
+	  l'enseignant, qui ne pourrait pas les recuperer depuis un ordinateur.
+
+	  L'identifiant du conteneur doit rester identique a celui de
+	  Runner.entitlements. iOS ne relit cette declaration qu'a l'installation
+	  et lors d'un changement de CFBundleVersion : apres modification, il faut
+	  incrementer la version dans pubspec.yaml pour qu'elle prenne effet.
+	-->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.example.petitpas</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>PetitPas</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

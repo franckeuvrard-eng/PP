@@ -1,0 +1,13 @@
+# `flutter_lints` etait declare dans pubspec.yaml sans ce fichier : aucune regle
+# n'etait donc appliquee, et le `flutter analyze` de la CI ne verifiait guere
+# plus que la compilation.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # L'application manipule des donnees d'eleves saisies sur une annee : une
+    # ecriture perdue ne se rattrape pas. Ces deux regles font remonter les
+    # Future laisses sans await, cause classique de sauvegarde silencieusement
+    # ignoree.
+    unawaited_futures: true
+    discarded_futures: false

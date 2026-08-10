@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Conteneur iCloud Drive de l'application.
+
+	  L'identifiant doit rester aligne sur trois endroits, sans quoi la
+	  signature echoue avec "Provisioning profile doesn't match the
+	  entitlements file" :
+	    1. PRODUCT_BUNDLE_IDENTIFIER dans project.pbxproj
+	    2. la cle NSUbiquitousContainers de Runner/Info.plist
+	    3. le conteneur declare sur le portail developpeur Apple
+	  Renommer le bundle identifier impose donc de renommer aussi le
+	  conteneur, qui vaut toujours "iCloud." + bundle identifier.
+	-->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.example.petitpas</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.com.example.petitpas</string>
+	</array>
+	<!--
+	  CloudDocuments seul : l'application depose des fichiers dans son
+	  conteneur, elle n'utilise ni CloudKit ni base de donnees distante.
+	-->
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
+</dict>
+</plist>

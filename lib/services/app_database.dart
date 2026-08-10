@@ -10,6 +10,7 @@ import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
+import '../models/school_year_archive.dart';
 import '../models/space.dart';
 import '../utils/platform_support.dart';
 
@@ -27,16 +28,31 @@ import '../utils/platform_support.dart';
 /// volumes en jeu (quelques milliers de lignes) ne justifient pas d'indexer
 /// davantage.
 class AppDatabase {
-  static const _dbName = 'petitpas.db';
-  static const _schemaVersion = 1;
+  static const _defaultDbName = 'petitpas.db';
+
+  /// Version du schema. **Toute evolution passe par [_migrate]**, jamais par une
+  /// retouche de [_createV1] : les installations deja deployees ne rejouent que
+  /// les migrations manquantes.
+  static const _schemaVersion = 2;
 
   /// Tables « entite » : cle primaire texte + JSON.
+  ///
+  /// `archives` en est volontairement absente : [replaceAll] vide cette liste
+  /// avant de restaurer une sauvegarde, et l'historique des annees archivees ne
+  /// doit pas disparaitre a cette occasion. Les helpers [_readAll] et [_upsert]
+  /// etant generiques, ils fonctionnent dessus sans y etre inscrits.
   static const _entityTables = [
     'children',
     'spaces',
     'activity_types',
     'activities',
   ];
+
+  /// Nom du fichier de base. Parametrable pour que chaque test dispose de sa
+  /// propre base sans que la production ait a s'en soucier.
+  AppDatabase({String? fileName}) : _fileName = fileName ?? _defaultDbName;
+
+  final String _fileName;
 
   Database? _db;
 
@@ -52,25 +68,59 @@ class AppDatabase {
 
     final dir = await getDatabasesPath();
     return openDatabase(
-      p.join(dir, _dbName),
+      p.join(dir, _fileName),
       version: _schemaVersion,
+      // Une base neuve part du schema v1 puis rejoue les memes migrations
+      // qu'une base existante. Sans cela, la creation et la mise a jour
+      // finiraient par diverger : c'est le defaut classique qui ne se voit
+      // qu'une fois les premieres installations deja livrees.
       onCreate: (db, version) async {
-        for (final table in _entityTables) {
-          await db.execute(
-            'CREATE TABLE $table (id TEXT PRIMARY KEY, data TEXT NOT NULL)',
-          );
+        await _createV1(db);
+        for (var v = 2; v <= version; v++) {
+          await _migrate(db, v);
         }
-        await db.execute(
-          'CREATE TABLE sons (child_id TEXT NOT NULL, son TEXT NOT NULL, '
-          'statut INTEGER NOT NULL, PRIMARY KEY (child_id, son))',
-        );
-        // Reglages unitaires : theme, verrou biometrique, parametres de classe,
-        // niveaux d'evaluation, marqueurs de migration.
-        await db.execute(
-          'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
-        );
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        for (var v = oldVersion + 1; v <= newVersion; v++) {
+          await _migrate(db, v);
+        }
       },
     );
+  }
+
+  /// Schema d'origine, fige. Ne plus le modifier : ajouter une migration.
+  Future<void> _createV1(Database db) async {
+    for (final table in _entityTables) {
+      await db.execute(
+        'CREATE TABLE $table (id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+      );
+    }
+    await db.execute(
+      'CREATE TABLE sons (child_id TEXT NOT NULL, son TEXT NOT NULL, '
+      'statut INTEGER NOT NULL, PRIMARY KEY (child_id, son))',
+    );
+    // Reglages unitaires : theme, verrou biometrique, parametres de classe,
+    // niveaux d'evaluation, marqueurs de migration.
+    await db.execute(
+      'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+    );
+  }
+
+  /// Applique la migration menant a [version].
+  ///
+  /// Chaque palier doit rester rejouable sur une base v1 d'origine comme sur
+  /// une base neuve, et ne jamais supprimer de donnees.
+  Future<void> _migrate(Database db, int version) async {
+    switch (version) {
+      case 2:
+        // Fiches des annees scolaires archivees (cf. SchoolYearArchive).
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS archives '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
+      default:
+        throw StateError('Migration manquante vers la version $version');
+    }
   }
 
   // ─────────────── Entites ───────────────
@@ -117,6 +167,16 @@ class AppDatabase {
       (await _readAll('activities')).map(ActivityLog.fromMap).toList();
   Future<void> saveActivity(ActivityLog l) => _upsert('activities', l.id, l.toMap());
   Future<void> deleteActivity(String id) => _delete('activities', id);
+
+  // ─────────────── Annees scolaires archivees ───────────────
+
+  Future<List<SchoolYearArchive>> readArchives() async =>
+      (await _readAll('archives')).map(SchoolYearArchive.fromMap).toList();
+
+  Future<void> saveArchive(SchoolYearArchive a) =>
+      _upsert('archives', a.id, a.toMap());
+
+  Future<void> deleteArchive(String id) => _delete('archives', id);
 
   /// Supprime toutes les lignes d'une table entite.
   Future<void> clearTable(String table) async {
