@@ -15,6 +15,7 @@ import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
 import '../models/evaluation_status.dart';
+import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import '../services/app_database.dart';
@@ -99,7 +100,15 @@ class AppStateProvider extends ChangeNotifier {
 
   bool _isLoaded = false;
 
-  final AppDatabase _db = AppDatabase();
+  /// Vrai si `_load()` s'est termine en erreur.
+  ///
+  /// L'application demarre quand meme, mais **sans presenter la classe
+  /// d'exemple des initialiseurs de champs** : une base illisible affichait
+  /// jusqu'ici quatre eleves fictifs indiscernables de vraies donnees, et les
+  /// persistait des la premiere modification.
+  bool _loadFailed = false;
+
+  final AppDatabase _db;
 
   /// Suivi « Analyse des sons » : idEleve -> son -> statut.
   ///
@@ -170,9 +179,22 @@ class AppStateProvider extends ChangeNotifier {
   /// Nombre total d'observations d'un eleve.
   int activityCountForChild(String childId) => _logsByChild[childId]?.length ?? 0;
 
-  AppStateProvider() {
-    _load();
+  /// [database] et [documentsPath] ne servent qu'aux tests, qui ont besoin
+  /// d'une base isolee et ne peuvent pas appeler `getApplicationDocumentsDirectory()`
+  /// (le plugin path_provider n'existe pas hors application). Les valeurs par
+  /// defaut laissent le comportement de production inchange.
+  AppStateProvider({
+    AppDatabase? database,
+    String? documentsPath,
+    bool autoLoad = true,
+  }) : _db = database ?? AppDatabase() {
+    _docsDirPath = documentsPath;
+    if (autoLoad) unawaited(_load());
   }
+
+  /// Relit toutes les donnees. Sert au demarrage, aux tests, et au bouton
+  /// « Reessayer » propose quand [loadFailed] est vrai.
+  Future<void> initialize() => _load();
 
   Map<String, Map<String, int>> _sonsProgressAsMap() {
     return _sonsProgress.map(
@@ -252,6 +274,10 @@ class AppStateProvider extends ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   bool get biometricLockEnabled => _biometricLockEnabled;
 
+  /// Vrai si les donnees n'ont pas pu etre relues : la classe affichee est
+  /// vide, et rien ne doit etre saisi avant une restauration.
+  bool get loadFailed => _loadFailed;
+
   /// Vrai une fois les preferences relues du disque.
   ///
   /// L'ecran de verrouillage doit attendre ce signal : autrement il lirait
@@ -316,9 +342,9 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   Future<void> _load() async {
+    _loadFailed = false;
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      _docsDirPath = directory.path;
+      _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
 
       // Reprise unique des donnees de l'ancienne version. Les preferences ne
       // sont pas effacees : elles restent un recours si la migration s'averait
@@ -414,8 +440,15 @@ class AppStateProvider extends ChangeNotifier {
       unawaited(purgeOrphanPhotos());
     } catch (e) {
       debugPrint('Erreur au chargement des donnees : $e');
-      // Meme en cas d'echec l'application doit demarrer, sur les valeurs
-      // par defaut, plutot que rester bloquee sur l'ecran d'attente.
+      // L'application doit demarrer plutot que rester bloquee sur l'ecran
+      // d'attente : l'enseignante a besoin d'atteindre la restauration.
+      // En revanche elle ne doit surtout pas voir la classe d'exemple des
+      // initialiseurs de champs, qu'elle prendrait pour ses vraies donnees et
+      // qui serait persistee des la premiere modification.
+      _loadFailed = true;
+      _children = [];
+      _activities = [];
+      _sonsProgress = {};
     }
     _isLoaded = true;
     _notify();
@@ -490,6 +523,7 @@ class AppStateProvider extends ChangeNotifier {
       await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
     } catch (e) {
       debugPrint('Echec de la sauvegarde automatique : $e');
+      return;
     }
   }
 
@@ -544,6 +578,114 @@ class AppStateProvider extends ChangeNotifier {
       debugPrint('Echec de la restauration automatique : $e');
       return false;
     }
+  }
+
+  // ─── FIN D'ANNEE SCOLAIRE ───
+
+  Future<Directory> _archivesDir() async {
+    _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+    final dir = Directory('$_docsDirPath/archives');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  /// Annees archivees, de la plus recente a la plus ancienne.
+  Future<List<SchoolYearArchive>> listArchives() async {
+    final archives = await _db.readArchives();
+    archives.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return archives;
+  }
+
+  /// Fichier ZIP d'une archive, ou null s'il a disparu du disque.
+  Future<File?> archiveFile(SchoolYearArchive archive) async {
+    final file = File('${(await _archivesDir()).path}/${archive.fileName}');
+    return await file.exists() ? file : null;
+  }
+
+  Future<bool> shareArchive(SchoolYearArchive archive) async {
+    final file = await archiveFile(archive);
+    if (file == null) return false;
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'application/zip')],
+      subject: 'Archive PetitPas ${archive.schoolYear}',
+    );
+    return true;
+  }
+
+  /// Supprime une archive, fichier compris. Irreversible.
+  Future<void> deleteArchive(SchoolYearArchive archive) async {
+    final file = await archiveFile(archive);
+    if (file != null) {
+      try {
+        await file.delete();
+      } catch (e) {
+        debugPrint('Suppression du fichier d\'archive impossible : $e');
+      }
+    }
+    await _db.deleteArchive(archive.id);
+    _notify();
+  }
+
+  /// Archive l'annee en cours puis repart sur une classe vide.
+  ///
+  /// Efface les eleves, leurs observations et leur suivi des sons. Conserve
+  /// espaces, ateliers, niveaux d'evaluation, groupes et reglages, qui se
+  /// reutilisent d'une annee sur l'autre.
+  ///
+  /// Rend null — **sans avoir rien efface** — si l'archive n'a pas pu etre
+  /// ecrite : c'est la seule protection contre un stockage plein, et il vaut
+  /// mieux une annee non cloturee qu'une annee perdue.
+  Future<SchoolYearArchive?> startNewSchoolYear({required String nouvelleAnnee}) async {
+    final anneeArchivee = _classSettings.schoolYear;
+    final childCount = _children.length;
+    final activityCount = _activities.length;
+
+    SchoolYearArchive archive;
+    try {
+      final bytes = await _buildBackupArchiveBytes();
+      final dir = await _archivesDir();
+      final stamp =
+          DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final fileName =
+          'petitpas_${anneeArchivee.replaceAll(RegExp(r'[^0-9A-Za-z-]'), '_')}_$stamp.zip';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsBytes(bytes, flush: true);
+
+      // Relecture du disque plutot que confiance dans l'ecriture : un
+      // stockage sature peut rendre un fichier tronque sans lever.
+      final taille = await file.exists() ? await file.length() : 0;
+      if (taille == 0) throw Exception('Archive absente ou vide apres ecriture');
+
+      archive = SchoolYearArchive(
+        id: 'archive_${DateTime.now().millisecondsSinceEpoch}',
+        schoolYear: anneeArchivee,
+        createdAt: DateTime.now(),
+        fileName: fileName,
+        childCount: childCount,
+        activityCount: activityCount,
+        sizeBytes: taille,
+      );
+    } catch (e) {
+      debugPrint('Archivage de fin d\'annee abandonne, rien n\'a ete efface : $e');
+      return null;
+    }
+
+    await _db.saveArchive(archive);
+    await _db.clearTable('children');
+    await _db.clearTable('activities');
+    await _db.clearAllSons();
+
+    _children = [];
+    _activities = [];
+    _sonsProgress = {};
+    _classSettings = _classSettings.copyWith(schoolYear: nouvelleAnnee);
+    await _db.setSetting('class_settings', _classSettings.toJson());
+
+    // Les photos des eleves et des observations ne sont plus referencees ;
+    // celles des ateliers le restent et survivent donc a la purge.
+    await purgeOrphanPhotos();
+    _notify();
+    return archive;
   }
 
   /// Supprime les photos du disque qui ne sont plus referencees.
@@ -749,48 +891,54 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   // ───────────────── BACKUP EXPORT ─────────────────
+
+  /// Construit l'archive complete : donnees et photos.
+  ///
+  /// Partagee par l'export manuel et par l'archivage de fin d'annee, pour que
+  /// les deux ne puissent pas diverger sur ce qui est reellement sauvegarde.
+  Future<List<int>> _buildBackupArchiveBytes() async {
+    _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+
+    final archive = Archive();
+
+    // 1. JSON data
+    final backupData = {
+      'version': 2,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'class_settings': _classSettings.toMap(),
+      'children': _children.map((c) => c.toMap()).toList(),
+      'spaces': _spaces.map((s) => s.toMap()).toList(),
+      'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
+      'activities': _activities.map((l) => l.toMap()).toList(),
+      'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
+      'sections': _sections,
+      'sons_progress': _sonsProgressAsMap(),
+    };
+    final jsonBytes = utf8.encode(json.encode(backupData));
+    archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
+
+    // 2. Photos
+    for (final subDir in ['profiles', 'workshops', 'activities']) {
+      final dir = Directory('$_docsDirPath/$subDir');
+      if (!await dir.exists()) continue;
+      for (final file in dir.listSync().whereType<File>()) {
+        final bytes = await file.readAsBytes();
+        // Le nom seul, separateur de la plateforme compris : un `split('/')`
+        // rendait le chemin complet sous Windows et cassait l'arborescence de
+        // l'archive lors des tests.
+        final name = file.path.split(RegExp(r'[/\\]')).last;
+        archive.addFile(ArchiveFile('$subDir/$name', bytes.length, bytes));
+      }
+    }
+
+    final zipBytes = ZipEncoder().encode(archive);
+    if (zipBytes == null) throw Exception('Erreur lors de la création du ZIP');
+    return zipBytes;
+  }
+
   Future<void> exportFullBackup() async {
     try {
-      if (_docsDirPath == null) {
-        final directory = await getApplicationDocumentsDirectory();
-        _docsDirPath = directory.path;
-      }
-
-      final archive = Archive();
-
-      // 1. JSON data
-      final backupData = {
-        'version': 2,
-        'exportedAt': DateTime.now().toIso8601String(),
-        'class_settings': _classSettings.toMap(),
-        'children': _children.map((c) => c.toMap()).toList(),
-        'spaces': _spaces.map((s) => s.toMap()).toList(),
-        'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
-        'activities': _activities.map((l) => l.toMap()).toList(),
-        'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
-        'sections': _sections,
-        'sons_progress': _sonsProgressAsMap(),
-      };
-      final jsonBytes = utf8.encode(json.encode(backupData));
-      archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
-
-      // 2. Photos
-      for (final subDir in ['profiles', 'workshops', 'activities']) {
-        final dir = Directory('$_docsDirPath/$subDir');
-        if (await dir.exists()) {
-          final files = dir.listSync().whereType<File>().toList();
-          for (final file in files) {
-            final bytes = await file.readAsBytes();
-            final entryName = '$subDir/${file.path.split('/').last}';
-            archive.addFile(ArchiveFile(entryName, bytes.length, bytes));
-          }
-        }
-      }
-
-      // 3. Write ZIP
-      final zipEncoder = ZipEncoder();
-      final zipBytes = zipEncoder.encode(archive);
-      if (zipBytes == null) throw Exception('Erreur lors de la création du ZIP');
+      final zipBytes = await _buildBackupArchiveBytes();
 
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;

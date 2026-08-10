@@ -133,7 +133,7 @@ class AtelierPdfService {
             if (atelier.description != null && atelier.description!.trim().isNotEmpty) ...[
               pw.SizedBox(height: 8),
               pw.Text(pdfSafe(atelier.description!),
-                  style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                  style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
             ],
 
             if (atelier.objectifs.isNotEmpty) ...[

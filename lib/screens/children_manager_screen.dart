@@ -575,10 +575,10 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                         style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold)),
                     if (child.group != null && child.group!.isNotEmpty)
                       pw.Text('Groupe/Section : ${pdfSafe(child.group!)}',
-                          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                          style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.email != null && child.email!.isNotEmpty)
                       pw.Text('Email de contact : ${pdfSafe(child.email ?? "")}',
-                          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+                          style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.notes != null && child.notes!.isNotEmpty) ...[
                       pw.SizedBox(height: 6),
                       pw.Text('Notes : ${pdfSafe(child.notes!)}',
@@ -719,7 +719,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
     ];
   }
 

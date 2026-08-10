@@ -97,7 +97,7 @@ class ExcelExportService {
   }) async {
     try {
       final excel = xl.Excel.createExcel();
-      final sheetName = 'Bilan_Classe';
+      const sheetName = 'Bilan_Classe';
       final sheet = excel[sheetName];
       excel.setDefaultSheet(sheetName);
 

@@ -140,6 +140,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       ),
     );
 
+    // L'ecran de scan peut avoir ete quitte pendant que la camera se fermait.
+    // Les deux gardes sont necessaires : `mounted` couvre le setState, et
+    // `context.mounted` le ScaffoldMessenger, le contexte etant recu en
+    // parametre et pouvant donc venir d'un autre arbre que cet Etat.
+    if (!mounted || !context.mounted) return;
+
     if (result != null) {
       setState(() {
         if (result['childId'] != null) {
@@ -164,7 +170,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Future<void> _pickPhotos() async {
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final ImagePicker picker = ImagePicker();
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       builder: (context) {
         return SafeArea(
@@ -388,9 +394,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         child: Row(
                           children: [
-                            Text(
+                            const Text(
                               'SÉLECTION MANUELLE',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: 12, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 4),
                             Icon(
@@ -629,7 +635,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             offset++;
                           }
 
-                          HapticFeedback.mediumImpact();
+                          unawaited(HapticFeedback.mediumImpact());
                           if (context.mounted) {
                             _showAnimatedSuccessOverlay(
                               context,
@@ -915,7 +921,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                   icon: const Icon(Icons.close, color: Colors.white, size: 28),
                   onPressed: () async {
                     await _controller.stop();
-                    if (mounted) Navigator.pop(context);
+                    if (context.mounted) Navigator.pop(context);
                   },
                 ),
                 const Text(
@@ -1052,7 +1058,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                         ),
                         onPressed: () async {
                           await _controller.stop();
-                          if (mounted) {
+                          if (context.mounted) {
                             Navigator.pop(context, {
                               'childId': _scannedChildId,
                               'activityTypeId': _scannedActivityTypeId,

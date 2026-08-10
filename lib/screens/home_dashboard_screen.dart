@@ -44,6 +44,8 @@ class HomeDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (provider.loadFailed) const _LoadFailureBanner(),
+
           // Stat Cards
           Row(
             children: [
@@ -79,9 +81,9 @@ class HomeDashboardScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Header
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text(
                 'Fil d\'actualité du jour',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -355,6 +357,77 @@ class HomeDashboardScreen extends StatelessWidget {
               Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
               Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.8))),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Alerte affichee quand la relecture des donnees a echoue.
+///
+/// La classe est alors volontairement vide : le risque n'est pas de ne rien
+/// voir, c'est de saisir une journee d'observations par-dessus des donnees
+/// qui n'ont pas ete chargees, et de la perdre a la restauration.
+class _LoadFailureBanner extends StatelessWidget {
+  const _LoadFailureBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB3261E),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Données non chargées',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Vos élèves et observations n\'ont pas pu être relus. Ne saisissez '
+            'rien pour l\'instant : restaurez une sauvegarde depuis Paramètres > '
+            'Sauvegarde & Sécurité, ou réessayez.',
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              onPressed: () async {
+                await provider.initialize();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(provider.loadFailed
+                        ? 'Les données restent illisibles.'
+                        : 'Données rechargées.'),
+                    backgroundColor:
+                        provider.loadFailed ? Colors.red : const Color(0xFF4E9F3D),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+            ),
           ),
         ],
       ),
