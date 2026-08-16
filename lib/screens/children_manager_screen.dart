@@ -11,6 +11,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../data/sons_data.dart';
+import '../services/children_import_service.dart';
 import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
@@ -95,6 +96,18 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                     : () => _chooseClassPdfPeriod(context, provider),
                 icon: const Icon(Icons.picture_as_pdf),
                 label: Text('Rapport PDF de la classe (${allChildren.length} élèves)'),
+              ),
+            ),
+          ),
+          // Import en masse depuis un fichier Excel rempli hors ligne.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openImportExcelSheet(context, provider),
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Importer des élèves (Excel)'),
               ),
             ),
           ),
@@ -778,6 +791,43 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
     }
 
     return doc.save();
+  }
+
+  void _openImportExcelSheet(BuildContext context, AppStateProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Importer des élèves depuis Excel',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('Télécharger le modèle Excel'),
+              subtitle: const Text('Une matrice vierge à remplir hors de l\'application.'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ChildrenImportService.shareTemplate(context: context, provider: provider);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload_file),
+              title: const Text('Importer un fichier rempli'),
+              subtitle: const Text('Crée un élève par ligne du fichier.'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ChildrenImportService.pickAndImport(context: context, provider: provider);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   void _chooseClassPdfPeriod(BuildContext context, AppStateProvider provider) {
