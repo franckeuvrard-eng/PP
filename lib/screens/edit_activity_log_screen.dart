@@ -6,6 +6,7 @@ import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/space.dart';
+import '../widgets/voice_note_field.dart';
 
 class EditActivityLogScreen extends StatefulWidget {
   final ActivityLog activityLog;
@@ -26,12 +27,14 @@ class EditActivityLogScreen extends StatefulWidget {
 class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
   late TextEditingController _noteController;
   String? _evaluationStatusId;
+  late String? _audioPath;
 
   @override
   void initState() {
     super.initState();
     _noteController = TextEditingController(text: widget.activityLog.note);
     _evaluationStatusId = widget.activityLog.evaluationStatusId;
+    _audioPath = widget.activityLog.audioPath;
   }
 
   @override
@@ -205,6 +208,12 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
               ),
               maxLines: 4,
             ),
+            const SizedBox(height: 10),
+            VoiceNoteField(
+              provider: provider,
+              audioPath: _audioPath,
+              onChanged: (path) => setState(() => _audioPath = path),
+            ),
             const SizedBox(height: 30),
 
             SizedBox(
@@ -217,6 +226,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                   final updated = widget.activityLog.copyWith(
                     evaluationStatusId: _evaluationStatusId,
                     note: _noteController.text.trim(),
+                    audioPath: _audioPath,
                   );
                   provider.updateActivityLog(updated);
                   Navigator.pop(context);

@@ -10,6 +10,7 @@ import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../utils/platform_support.dart';
+import '../widgets/voice_note_field.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -25,6 +26,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   final TextEditingController _noteController = TextEditingController();
   final List<String> _selectedPhotoPaths = [];
   final Map<String, String> _photoCaptions = {};
+  String? _audioPath;
 
   /// Eleves supplementaires pour la saisie groupee : le meme atelier est
   /// enregistre pour chacun, avec la meme note et les memes photos.
@@ -228,7 +230,25 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
   }
 
+  /// Prenoms des eleves cibles (principal + "Enregistrer aussi pour") qui
+  /// n'ont pas l'autorisation droit a l'image.
+  List<String> _unauthorizedTargets(AppStateProvider provider) {
+    final targetIds = <String>{
+      if (_selectedChildId != null) _selectedChildId!,
+      ..._extraChildIds,
+    };
+    return targetIds
+        .map((id) => provider.children.where((c) => c.id == id).firstOrNull)
+        .whereType<Child>()
+        .where((c) => !c.imageAuthorized)
+        .map((c) => c.firstname)
+        .toList();
+  }
+
   Widget _buildPhotoSelector() {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    final unauthorized = _selectedPhotoPaths.isNotEmpty ? _unauthorizedTargets(provider) : <String>[];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -237,6 +257,30 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         const SizedBox(height: 8),
+        if (unauthorized.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.orange.withOpacity(0.4)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pas d\'autorisation photo pour ${unauthorized.join(", ")} — évitez de '
+                    'l\'inclure/les inclure dans ces photos.',
+                    style: const TextStyle(fontSize: 12, color: Colors.orange),
+                  ),
+                ),
+              ],
+            ),
+          ),
         SizedBox(
           height: 124,
           child: ListView(
@@ -547,6 +591,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     prefixIcon: Icon(Icons.comment),
                   ),
                 ),
+                const SizedBox(height: 10),
+                VoiceNoteField(
+                  provider: provider,
+                  audioPath: _audioPath,
+                  onChanged: (path) => setState(() => _audioPath = path),
+                ),
 
                 const SizedBox(height: 20),
 
@@ -631,6 +681,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               photoPaths: savedRelativePaths,
                               evaluationStatusId: _selectedEvaluationStatusId,
                               photoCaptions: savedCaptions,
+                              audioPath: _audioPath,
                             ));
                             offset++;
                           }
@@ -651,6 +702,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               _selectedPhotoPaths.clear();
                               _photoCaptions.clear();
                               _extraChildIds.clear();
+                              _audioPath = null;
                             });
                           }
                         }

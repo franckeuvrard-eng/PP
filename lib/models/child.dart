@@ -14,6 +14,13 @@ class Child {
   final String? email;
   final String? imagePath;
 
+  /// Autorisation « droit à l'image » donnée par les parents pour les photos.
+  ///
+  /// Faux par defaut a la creation : c'est a l'enseignant de la cocher une
+  /// fois l'autorisation effectivement recueillie, plutot que de supposer un
+  /// accord implicite.
+  final bool imageAuthorized;
+
   Child({
     required this.id,
     required this.firstname,
@@ -25,6 +32,7 @@ class Child {
     required this.avatarText,
     this.email,
     this.imagePath,
+    this.imageAuthorized = false,
   });
 
   /// Copie modifiee. Les champs non fournis restent inchanges ; passer
@@ -40,6 +48,7 @@ class Child {
     String? avatarText,
     Object? email = kUndefined,
     Object? imagePath = kUndefined,
+    bool? imageAuthorized,
   }) {
     return Child(
       id: id ?? this.id,
@@ -52,6 +61,7 @@ class Child {
       avatarText: avatarText ?? this.avatarText,
       email: email == kUndefined ? this.email : email as String?,
       imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
+      imageAuthorized: imageAuthorized ?? this.imageAuthorized,
     );
   }
 
@@ -67,6 +77,7 @@ class Child {
       'avatarText': avatarText,
       'email': email,
       'imagePath': imagePath,
+      'imageAuthorized': imageAuthorized,
     };
   }
 
@@ -82,6 +93,10 @@ class Child {
       avatarText: map['avatarText'] ?? (map['firstname'] != null && map['firstname'].isNotEmpty ? map['firstname'][0] : 'E'),
       email: map['email'],
       imagePath: map['imagePath'],
+      // Absent = fiche creee avant cette fonctionnalite : on ne bloque pas
+      // retroactivement des photos deja en usage. Present mais faux = choix
+      // explicite de l'enseignant, respecte tel quel.
+      imageAuthorized: map.containsKey('imageAuthorized') ? (map['imageAuthorized'] ?? false) : true,
     );
   }
 

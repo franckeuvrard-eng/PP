@@ -15,10 +15,12 @@ import '../models/activity.dart';
 import '../models/class_settings.dart';
 import '../models/space.dart';
 import '../models/evaluation_status.dart';
+import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import '../services/app_database.dart';
+import '../services/reminder_service.dart';
 
 class AppStateProvider extends ChangeNotifier {
   /// Recalcule les index avant de prevenir les ecrans.
@@ -98,6 +100,11 @@ class AppStateProvider extends ChangeNotifier {
   /// Verrouillage de l'application par FaceID / code a l'ouverture.
   bool _biometricLockEnabled = true;
 
+  /// Rappel local quotidien des eleves non evalues (cf. ReminderService).
+  bool _reminderEnabled = false;
+  int _reminderHour = 16;
+  int _reminderMinute = 30;
+
   bool _isLoaded = false;
 
   /// Vrai si `_load()` s'est termine en erreur.
@@ -115,6 +122,13 @@ class AppStateProvider extends ChangeNotifier {
   /// Les sons absents valent [SonStatut.nonAcquis], on ne stocke donc que ce
   /// qui a ete effectivement pointe par l'enseignant.
   Map<String, Map<String, SonStatut>> _sonsProgress = {};
+
+  /// Referentiels personnalises definis par l'enseignant (ceintures de
+  /// couleur, Montessori, ou autre) : aucun contenu par defaut.
+  List<Referential> _referentials = [];
+
+  /// Suivi de chaque referentiel : referentielId -> idEleve -> itemId -> statut.
+  Map<String, Map<String, Map<String, SonStatut>>> _referentialStatus = {};
 
   String? _docsDirPath;
 
@@ -205,6 +219,28 @@ class AppStateProvider extends ChangeNotifier {
     );
   }
 
+  Map<String, Map<String, Map<String, int>>> _referentialStatusAsMap() {
+    return _referentialStatus.map((referentialId, byChild) => MapEntry(
+          referentialId,
+          byChild.map((childId, items) => MapEntry(
+                childId,
+                items.map((itemId, statut) => MapEntry(itemId, statut.code)),
+              )),
+        ));
+  }
+
+  Map<String, Map<String, Map<String, SonStatut>>> _decodeReferentialStatus(Object? raw) {
+    if (raw is! Map) return {};
+    return raw.map((referentialId, byChild) => MapEntry(
+          referentialId as String,
+          (byChild as Map).map((childId, items) => MapEntry(
+                childId as String,
+                (items as Map).map(
+                    (itemId, code) => MapEntry(itemId as String, SonStatut.fromCode(code))),
+              )),
+        ));
+  }
+
   ClassSettings get classSettings => _classSettings;
   List<Child> get children => List.unmodifiable(_children);
   List<Space> get spaces => List.unmodifiable(_spaces);
@@ -291,6 +327,60 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
+  bool get reminderEnabled => _reminderEnabled;
+  int get reminderHour => _reminderHour;
+  int get reminderMinute => _reminderMinute;
+
+  /// Nombre d'eleves sans observation aujourd'hui. Sert d'affichage et de
+  /// contenu au rappel local.
+  int get pendingTodayCount {
+    final now = DateTime.now();
+    return _children.where((c) => activityCountForChildOn(c.id, now) == 0).length;
+  }
+
+  /// Active ou desactive le rappel. Demande la permission systeme a
+  /// l'activation ; renvoie faux si elle est refusee, sans rien persister
+  /// dans ce cas.
+  Future<bool> setReminderEnabled(bool enabled) async {
+    if (enabled) {
+      final granted = await ReminderService.requestPermission();
+      if (!granted) return false;
+    } else {
+      await ReminderService.cancelReminder();
+    }
+    _reminderEnabled = enabled;
+    _write(_db.setSetting('reminder_enabled', enabled.toString()));
+    _notify();
+    unawaited(_scheduleReminderIfEnabled());
+    return true;
+  }
+
+  void setReminderTime(int hour, int minute) {
+    _reminderHour = hour;
+    _reminderMinute = minute;
+    _write(_db.setSetting('reminder_hour', hour.toString()));
+    _write(_db.setSetting('reminder_minute', minute.toString()));
+    _notify();
+    unawaited(_scheduleReminderIfEnabled());
+  }
+
+  /// A appeler quand l'app revient au premier plan : un nouveau jour a pu
+  /// commencer depuis la derniere programmation.
+  Future<void> refreshReminder() => _scheduleReminderIfEnabled();
+
+  Future<void> _scheduleReminderIfEnabled() async {
+    if (!_reminderEnabled) return;
+    try {
+      await ReminderService.scheduleTodayReminder(
+        hour: _reminderHour,
+        minute: _reminderMinute,
+        pendingCount: pendingTodayCount,
+      );
+    } catch (e) {
+      debugPrint('Programmation du rappel impossible : $e');
+    }
+  }
+
   /// Statut d'un son pour un eleve. Non renseigne = non acquis.
   SonStatut sonStatut(String childId, String son) =>
       _sonsProgress[childId]?[son] ?? SonStatut.nonAcquis;
@@ -298,6 +388,11 @@ class AppStateProvider extends ChangeNotifier {
   /// Tous les sons pointes d'un eleve (les autres sont non acquis).
   Map<String, SonStatut> sonsOf(String childId) =>
       Map.unmodifiable(_sonsProgress[childId] ?? const {});
+
+  /// Historique complet des changements de statut d'un eleve, du plus ancien
+  /// au plus recent. Vide pour tout ce qui date d'avant cette fonctionnalite.
+  Future<List<SonHistoryEntry>> sonHistory(String childId) =>
+      _db.readSonHistory(childId);
 
   /// Fait progresser un son : non acquis -> en cours -> acquis.
   void cycleSonStatut(String childId, String son) => _setSon(childId, son, sonStatut(childId, son).suivant);
@@ -315,15 +410,88 @@ class AppStateProvider extends ChangeNotifier {
       sons[son] = next;
     }
     _write(_db.setSon(childId, son, next));
+    _write(_db.recordSonHistory(childId, son, next, DateTime.now()));
     _notify();
   }
 
   /// Remet tous les sons d'un eleve a non acquis.
   void resetSons(String childId) {
-    if (_sonsProgress.remove(childId) == null) return;
+    final previous = _sonsProgress.remove(childId);
+    if (previous == null) return;
     _write(_db.clearSons(childId));
+    // Le graphique de progression doit voir la chute, pas juste un trou.
+    final at = DateTime.now();
+    for (final son in previous.keys) {
+      _write(_db.recordSonHistory(childId, son, SonStatut.nonAcquis, at));
+    }
     _notify();
   }
+
+  // ─── Referentiels personnalises ───
+
+  List<Referential> get referentials => List.unmodifiable(_referentials);
+
+  void addOrUpdateReferential(Referential referential) {
+    final index = _referentials.indexWhere((r) => r.id == referential.id);
+    if (index >= 0) {
+      _referentials[index] = referential;
+    } else {
+      _referentials.add(referential);
+    }
+    _write(_db.saveReferential(referential));
+    _notify();
+  }
+
+  void deleteReferential(String id) {
+    _referentials.removeWhere((r) => r.id == id);
+    _referentialStatus.remove(id);
+    _write(_db.deleteReferentialCascade(id));
+    _notify();
+  }
+
+  /// Statut d'un item pour un eleve, au sein d'un referentiel donne.
+  SonStatut referentialItemStatut(String referentialId, String childId, String itemId) =>
+      _referentialStatus[referentialId]?[childId]?[itemId] ?? SonStatut.nonAcquis;
+
+  void cycleReferentialItemStatut(String referentialId, String childId, String itemId) =>
+      _setReferentialItem(referentialId, childId, itemId,
+          referentialItemStatut(referentialId, childId, itemId).suivant);
+
+  void reculeReferentialItemStatut(String referentialId, String childId, String itemId) =>
+      _setReferentialItem(referentialId, childId, itemId,
+          referentialItemStatut(referentialId, childId, itemId).precedent);
+
+  void _setReferentialItem(String referentialId, String childId, String itemId, SonStatut next) {
+    final byChild = _referentialStatus.putIfAbsent(referentialId, () => {});
+    final items = byChild.putIfAbsent(childId, () => {});
+    if (next == SonStatut.nonAcquis) {
+      items.remove(itemId);
+      if (items.isEmpty) byChild.remove(childId);
+    } else {
+      items[itemId] = next;
+    }
+    _write(_db.setReferentialItemStatus(childId, referentialId, itemId, next));
+    _write(_db.recordReferentialHistory(childId, referentialId, itemId, next, DateTime.now()));
+    _notify();
+  }
+
+  /// Remet a zero le statut d'un eleve pour un referentiel donne.
+  void resetReferentialStatus(String referentialId, String childId) {
+    final previous = _referentialStatus[referentialId]?.remove(childId);
+    if (previous == null) return;
+    _write(_db.clearReferentialStatusForChild(childId, referentialId));
+    // Le graphique de progression doit voir la chute, pas juste un trou.
+    final at = DateTime.now();
+    for (final itemId in previous.keys) {
+      _write(_db.recordReferentialHistory(childId, referentialId, itemId, SonStatut.nonAcquis, at));
+    }
+    _notify();
+  }
+
+  /// Historique complet d'un eleve pour un referentiel donne, du plus ancien
+  /// au plus recent. Vide pour tout ce qui date d'avant cette fonctionnalite.
+  Future<List<ReferentialHistoryEntry>> referentialHistory(String referentialId, String childId) =>
+      _db.readReferentialHistory(childId, referentialId);
 
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
@@ -386,6 +554,8 @@ class AppStateProvider extends ChangeNotifier {
         _activityTypes = types;
         _activities = activities;
         _sonsProgress = await _db.readSons();
+        _referentials = await _db.readReferentials();
+        _referentialStatus = await _db.readAllReferentialStatuses();
 
         final settingsJson = settings['class_settings'];
         if (settingsJson != null) {
@@ -420,6 +590,9 @@ class AppStateProvider extends ChangeNotifier {
           }
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
+        _reminderEnabled = settings['reminder_enabled'] == 'true';
+        _reminderHour = int.tryParse(settings['reminder_hour'] ?? '') ?? _reminderHour;
+        _reminderMinute = int.tryParse(settings['reminder_minute'] ?? '') ?? _reminderMinute;
         switch (settings['theme_mode']) {
           case 'light':
             _themeMode = ThemeMode.light;
@@ -438,6 +611,7 @@ class AppStateProvider extends ChangeNotifier {
       // l'affichage de l'application.
       unawaited(_maybeAutoBackup(settings['last_auto_backup']));
       unawaited(purgeOrphanPhotos());
+      unawaited(_scheduleReminderIfEnabled());
     } catch (e) {
       debugPrint('Erreur au chargement des donnees : $e');
       // L'application doit demarrer plutot que rester bloquee sur l'ecran
@@ -509,6 +683,8 @@ class AppStateProvider extends ChangeNotifier {
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
         'sections': _sections,
         'sons_progress': _sonsProgressAsMap(),
+        'referentials': _referentials.map((r) => r.toMap()).toList(),
+        'referential_status': _referentialStatusAsMap(),
       }));
 
       final backups = dir
@@ -572,11 +748,39 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
       );
+      await _restoreReferentialsFrom(data);
       _notify();
       return true;
     } catch (e) {
       debugPrint('Echec de la restauration automatique : $e');
       return false;
+    }
+  }
+
+  /// Relit et repersiste les referentiels personnalises depuis une sauvegarde
+  /// (auto ou ZIP). Separe de [AppDatabase.replaceAll] : ce dernier sert
+  /// aussi a la RAZ selective, qui ne doit pas toucher aux referentiels.
+  Future<void> _restoreReferentialsFrom(Map<String, dynamic> data) async {
+    final referentialsData = data['referentials'];
+    _referentials = referentialsData is List
+        ? referentialsData
+            .map((r) => Referential.fromMap(Map<String, dynamic>.from(r)))
+            .toList()
+        : [];
+    _referentialStatus = _decodeReferentialStatus(data['referential_status']);
+
+    await _db.clearTable('referentials');
+    await _db.clearAllReferentialStatuses();
+    for (final r in _referentials) {
+      await _db.saveReferential(r);
+    }
+    for (final referentialEntry in _referentialStatus.entries) {
+      for (final childEntry in referentialEntry.value.entries) {
+        for (final itemEntry in childEntry.value.entries) {
+          await _db.setReferentialItemStatus(
+              childEntry.key, referentialEntry.key, itemEntry.key, itemEntry.value);
+        }
+      }
     }
   }
 
@@ -674,10 +878,16 @@ class AppStateProvider extends ChangeNotifier {
     await _db.clearTable('children');
     await _db.clearTable('activities');
     await _db.clearAllSons();
+    await _db.clearAllReferentialStatuses();
 
     _children = [];
     _activities = [];
     _sonsProgress = {};
+    // Les referentiels eux-memes (comme les ateliers) se reutilisent d'une
+    // annee sur l'autre : seul le statut de chaque eleve est efface.
+    for (final byChild in _referentialStatus.values) {
+      byChild.clear();
+    }
     _classSettings = _classSettings.copyWith(schoolYear: nouvelleAnnee);
     await _db.setSetting('class_settings', _classSettings.toJson());
 
@@ -688,7 +898,8 @@ class AppStateProvider extends ChangeNotifier {
     return archive;
   }
 
-  /// Supprime les photos du disque qui ne sont plus referencees.
+  /// Supprime les photos et notes vocales du disque qui ne sont plus
+  /// referencees.
   ///
   /// Supprimer une observation ou un atelier laissait jusqu'ici ses fichiers
   /// en place : le stockage ne faisait que croitre.
@@ -700,12 +911,14 @@ class AppStateProvider extends ChangeNotifier {
           if (c.imagePath != null && c.imagePath!.isNotEmpty) c.imagePath!,
         for (final a in _activityTypes) ...a.allPhotoPaths,
         for (final l in _activities) ...l.photoPaths,
+        for (final l in _activities)
+          if (l.audioPath != null && l.audioPath!.isNotEmpty) l.audioPath!,
         if (_classSettings.logoPath != null && _classSettings.logoPath!.isNotEmpty)
           _classSettings.logoPath!,
       }.map(_normalizeRelPath).toSet();
 
       var removed = 0;
-      for (final subDir in ['profiles', 'workshops', 'activities', 'ateliers', 'settings']) {
+      for (final subDir in ['profiles', 'workshops', 'activities', 'ateliers', 'settings', 'audio']) {
         final dir = Directory('$_docsDirPath/$subDir');
         if (!await dir.exists()) continue;
         for (final file in dir.listSync().whereType<File>()) {
@@ -880,6 +1093,16 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
+  /// Chemin relatif pret pour un nouvel enregistrement audio (le sous-dossier
+  /// est cree si besoin). Le fichier lui-meme n'existe pas encore : c'est
+  /// l'enregistreur qui l'ecrit, a l'adresse donnee par [getAbsolutePath].
+  Future<String> prepareAudioPath() async {
+    _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+    final dir = Directory('$_docsDirPath/audio');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return 'audio/${DateTime.now().millisecondsSinceEpoch}.m4a';
+  }
+
   // Returns the absolute file path inside the current app documents container
   String? getAbsolutePath(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) return null;
@@ -913,12 +1136,14 @@ class AppStateProvider extends ChangeNotifier {
       'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
       'sections': _sections,
       'sons_progress': _sonsProgressAsMap(),
+      'referentials': _referentials.map((r) => r.toMap()).toList(),
+      'referential_status': _referentialStatusAsMap(),
     };
     final jsonBytes = utf8.encode(json.encode(backupData));
     archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
 
-    // 2. Photos
-    for (final subDir in ['profiles', 'workshops', 'activities']) {
+    // 2. Photos et notes vocales
+    for (final subDir in ['profiles', 'workshops', 'activities', 'audio']) {
       final dir = Directory('$_docsDirPath/$subDir');
       if (!await dir.exists()) continue;
       for (final file in dir.listSync().whereType<File>()) {
@@ -1037,6 +1262,7 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
       );
+      await _restoreReferentialsFrom(data);
       _notify();
       return 'success';
     } catch (e) {
@@ -1060,6 +1286,7 @@ class AppStateProvider extends ChangeNotifier {
     }
     _write(_db.saveChild(child));
     _notify();
+    unawaited(_scheduleReminderIfEnabled());
   }
 
   /// Supprime un eleve et renvoie de quoi revenir en arriere.
@@ -1070,15 +1297,23 @@ class AppStateProvider extends ChangeNotifier {
     final child = _children.firstWhere((c) => c.id == id,
         orElse: () => Child(id: id, firstname: '', colorHex: '#718096', avatarText: '?'));
     final sons = Map<String, SonStatut>.from(_sonsProgress[id] ?? const {});
+    final referentialStatus = <String, Map<String, SonStatut>>{
+      for (final entry in _referentialStatus.entries)
+        if (entry.value.containsKey(id)) entry.key: Map<String, SonStatut>.from(entry.value[id]!),
+    };
 
     _children.removeWhere((c) => c.id == id);
     _sonsProgress.remove(id);
+    for (final byChild in _referentialStatus.values) {
+      byChild.remove(id);
+    }
     _write(_db.deleteChildCascade(id));
     _notify();
-    return DeletedChild(child: child, sons: sons);
+    unawaited(_scheduleReminderIfEnabled());
+    return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus);
   }
 
-  /// Retablit un eleve supprime, avec son suivi des sons.
+  /// Retablit un eleve supprime, avec son suivi des sons et des referentiels.
   void restoreChild(DeletedChild deleted) {
     _children.add(deleted.child);
     if (deleted.sons.isNotEmpty) {
@@ -1088,7 +1323,15 @@ class AppStateProvider extends ChangeNotifier {
     deleted.sons.forEach((son, statut) {
       _write(_db.setSon(deleted.child.id, son, statut));
     });
+    deleted.referentialStatus.forEach((referentialId, items) {
+      _referentialStatus.putIfAbsent(referentialId, () => {})[deleted.child.id] =
+          Map<String, SonStatut>.from(items);
+      items.forEach((itemId, statut) {
+        _write(_db.setReferentialItemStatus(deleted.child.id, referentialId, itemId, statut));
+      });
+    });
     _notify();
+    unawaited(_scheduleReminderIfEnabled());
   }
 
   // ─── SPACES CRUD ───
@@ -1138,6 +1381,7 @@ class AppStateProvider extends ChangeNotifier {
     _activities.insert(0, activity);
     _write(_db.saveActivity(activity));
     _notify();
+    unawaited(_scheduleReminderIfEnabled());
   }
 
   void updateActivityLog(ActivityLog updatedActivity) {
@@ -1336,5 +1580,13 @@ class DeletedChild {
   final Child child;
   final Map<String, SonStatut> sons;
 
-  const DeletedChild({required this.child, required this.sons});
+  /// referentielId -> itemId -> statut, pour les seuls referentiels ou cet
+  /// eleve avait un statut enregistre.
+  final Map<String, Map<String, SonStatut>> referentialStatus;
+
+  const DeletedChild({
+    required this.child,
+    required this.sons,
+    this.referentialStatus = const {},
+  });
 }

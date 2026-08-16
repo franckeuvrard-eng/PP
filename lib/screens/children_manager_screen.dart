@@ -31,16 +31,35 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
 
   Widget _buildChildAvatar(Child child, AppStateProvider provider) {
     final absolutePath = provider.getAbsolutePath(child.imagePath);
-    if (absolutePath != null && File(absolutePath).existsSync()) {
-      return CircleAvatar(
-        radius: 24,
-        backgroundImage: FileImage(File(absolutePath)),
-      );
-    }
-    return CircleAvatar(
-      radius: 24,
-      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
-      child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    final avatar = (absolutePath != null && File(absolutePath).existsSync())
+        ? CircleAvatar(
+            radius: 24,
+            backgroundImage: FileImage(File(absolutePath)),
+          )
+        : CircleAvatar(
+            radius: 24,
+            backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+            child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          );
+    if (child.imageAuthorized) return avatar;
+    // Autorisation photo non renseignee : le rappel visuel evite d'avoir a
+    // ouvrir chaque fiche pour savoir qui demander aux familles.
+    return Stack(
+      children: [
+        avatar,
+        Positioned(
+          bottom: -2,
+          right: -2,
+          child: Tooltip(
+            message: 'Autorisation photo non accordée',
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: const Icon(Icons.no_photography, size: 14, color: Colors.red),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -914,6 +933,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   String? _relativeImagePath;
   String? _selectedImagePath;
   DateTime? _birthdate;
+  late bool _imageAuthorized;
 
   @override
   void initState() {
@@ -930,6 +950,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _relativeImagePath = child?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
     _birthdate = child?.birthdate != null ? DateTime.tryParse(child!.birthdate!) : null;
+    _imageAuthorized = child?.imageAuthorized ?? false;
   }
 
   Future<void> _pickBirthdate() async {
@@ -986,31 +1007,69 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Avatar / Photo Selection
+            // Avatar / Photo Selection — verrouille tant que l'autorisation
+            // droit a l'image n'est pas cochee.
             Center(
               child: Column(
                 children: [
                   GestureDetector(
-                    onTap: () => _pickPhoto(ImageSource.gallery),
+                    onTap: _imageAuthorized ? () => _pickPhoto(ImageSource.gallery) : null,
                     child: CircleAvatar(
                       radius: 42,
                       backgroundColor: Colors.grey[200],
-                      backgroundImage: _hasValidImage
+                      backgroundImage: (_imageAuthorized && _hasValidImage)
                           ? FileImage(File(_selectedImagePath!.replaceFirst('file://', '')))
                           : null,
-                      child: !_hasValidImage
-                          ? const Icon(Icons.add_a_photo, size: 28, color: Colors.grey)
+                      child: !(_imageAuthorized && _hasValidImage)
+                          ? Icon(
+                              _imageAuthorized ? Icons.add_a_photo : Icons.no_photography,
+                              size: 28,
+                              color: Colors.grey,
+                            )
                           : null,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextButton.icon(
-                    icon: const Icon(Icons.photo_camera, size: 14),
-                    label: const Text('Appareil photo', style: TextStyle(fontSize: 12)),
-                    onPressed: () => _pickPhoto(ImageSource.camera),
-                  ),
+                  if (_imageAuthorized)
+                    TextButton.icon(
+                      icon: const Icon(Icons.photo_camera, size: 14),
+                      label: const Text('Appareil photo', style: TextStyle(fontSize: 12)),
+                      onPressed: () => _pickPhoto(ImageSource.camera),
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Autorisation photo requise avant d\'ajouter une image',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                 ],
               ),
+            ),
+            const SizedBox(height: 12),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: const Color(0xFF4E9F3D),
+              title: const Text('Autorisation droit à l\'image',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text(
+                'À cocher une fois l\'autorisation photo donnée par les parents. '
+                'Sans elle, aucune photo ne peut être ajoutée pour cet élève.',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: _imageAuthorized,
+              onChanged: (val) => setState(() {
+                _imageAuthorized = val ?? false;
+                if (!_imageAuthorized) {
+                  // Le retrait de l'autorisation efface aussi la photo deja
+                  // en place : la garder contredirait le blocage.
+                  _relativeImagePath = null;
+                  _selectedImagePath = null;
+                }
+              }),
             ),
             const SizedBox(height: 12),
             TextField(controller: _firstnameController, decoration: const InputDecoration(labelText: 'Prénom *')),
@@ -1089,6 +1148,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                     colorHex: child?.colorHex ?? '#4E9F3D',
                     avatarText: _firstnameController.text.trim()[0].toUpperCase(),
                     imagePath: _relativeImagePath,
+                    imageAuthorized: _imageAuthorized,
                   );
                   provider.addOrUpdateChild(newChild);
                   if (mounted) {

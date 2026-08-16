@@ -37,6 +37,10 @@ dependencies:
   sqflite_common_ffi: ^2.3.3
   flutter_localizations:
     sdk: flutter
+  flutter_local_notifications: ^17.2.1+2
+  timezone: ^0.9.4
+  record: ^5.1.2
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:

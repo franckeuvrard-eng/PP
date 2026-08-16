@@ -31,7 +31,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>A petit pas utilise la caméra pour scanner les QR Codes des élèves et des ateliers en classe, ainsi que pour prendre des photos des activités.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>A petit pas a besoin d'accéder au microphone pour la prise de vidéo avec la caméra.</string>
+	<string>A petit pas a besoin d'accéder au microphone pour la prise de vidéo avec la caméra et pour enregistrer des notes vocales sur les observations.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>A petit pas utilise la galerie photo pour sélectionner des illustrations d'ateliers et de travaux d'élèves.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

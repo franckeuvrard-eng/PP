@@ -247,7 +247,7 @@ class MainNavigationFrame extends StatefulWidget {
   State<MainNavigationFrame> createState() => _MainNavigationFrameState();
 }
 
-class _MainNavigationFrameState extends State<MainNavigationFrame> {
+class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
@@ -257,6 +257,28 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> {
     QrGeneratorScreen(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Un nouveau jour, ou de nouvelles observations saisies pendant que
+    // l'app etait en arriere-plan, peuvent avoir change le compte d'eleves
+    // en attente : on reprogramme le rappel du jour au retour au premier plan.
+    if (state == AppLifecycleState.resumed) {
+      Provider.of<AppStateProvider>(context, listen: false).refreshReminder();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

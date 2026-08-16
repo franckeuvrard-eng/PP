@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:petitpas/data/sons_data.dart';
 import 'package:petitpas/models/activity.dart';
 import 'package:petitpas/models/child.dart';
+import 'package:petitpas/models/referential.dart';
 import 'package:petitpas/providers/app_provider.dart';
 import 'package:petitpas/services/app_database.dart';
 
@@ -113,6 +115,133 @@ void main() {
       final db = AppDatabase(fileName: nomBase);
       expect(await db.readArchives(), isEmpty);
       expect(await db.readChildren(), isEmpty);
+    });
+
+    test('sons_history (v3) survit a une migration depuis v1', () async {
+      final nom = nomBase;
+      final chemin = await cheminBase(nom);
+      await databaseFactory.deleteDatabase(chemin);
+
+      final v1 = await databaseFactory.openDatabase(
+        chemin,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) async {
+            for (final table in ['children', 'spaces', 'activity_types', 'activities']) {
+              await db.execute(
+                'CREATE TABLE $table (id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+              );
+            }
+            await db.execute(
+              'CREATE TABLE sons (child_id TEXT NOT NULL, son TEXT NOT NULL, '
+              'statut INTEGER NOT NULL, PRIMARY KEY (child_id, son))',
+            );
+            await db.execute(
+              'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+            );
+          },
+        ),
+      );
+      await v1.close();
+
+      // Reouverture par le code de production : la migration v3 doit avoir
+      // cree sons_history, utilisable immediatement.
+      final db = AppDatabase(fileName: nom);
+      await db.recordSonHistory('child_1', 'a', SonStatut.acquis, DateTime(2026, 3, 1));
+      final historique = await db.readSonHistory('child_1');
+
+      expect(historique, hasLength(1));
+      expect(historique.single.son, 'a');
+      expect(historique.single.statut, SonStatut.acquis);
+    });
+
+    test('referentiels personnalises (v4) survivent a une migration depuis v1', () async {
+      final nom = nomBase;
+      final chemin = await cheminBase(nom);
+      await databaseFactory.deleteDatabase(chemin);
+
+      final v1 = await databaseFactory.openDatabase(
+        chemin,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) async {
+            for (final table in ['children', 'spaces', 'activity_types', 'activities']) {
+              await db.execute(
+                'CREATE TABLE $table (id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+              );
+            }
+            await db.execute(
+              'CREATE TABLE sons (child_id TEXT NOT NULL, son TEXT NOT NULL, '
+              'statut INTEGER NOT NULL, PRIMARY KEY (child_id, son))',
+            );
+            await db.execute(
+              'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+            );
+          },
+        ),
+      );
+      await v1.close();
+
+      // Reouverture par le code de production : la migration v4 doit avoir
+      // cree referentials et referential_status, utilisables immediatement.
+      final db = AppDatabase(fileName: nom);
+      const referential = Referential(
+        id: 'ref_1',
+        name: 'Ceintures de couleur',
+        groups: [
+          ReferentialGroup(id: 'grp_1', title: 'Ceinture blanche', items: [
+            ReferentialItem(id: 'item_1', label: 'Compter jusqu\'à 5'),
+          ]),
+        ],
+      );
+      await db.saveReferential(referential);
+      await db.setReferentialItemStatus('child_1', 'ref_1', 'item_1', SonStatut.acquis);
+
+      final referentiels = await db.readReferentials();
+      final statuses = await db.readAllReferentialStatuses();
+
+      expect(referentiels, hasLength(1));
+      expect(referentiels.single.name, 'Ceintures de couleur');
+      expect(referentiels.single.allItems.single.label, 'Compter jusqu\'à 5');
+      expect(statuses['ref_1']?['child_1']?['item_1'], SonStatut.acquis);
+    });
+
+    test('historique des referentiels (v5) survit a une migration depuis v1', () async {
+      final nom = nomBase;
+      final chemin = await cheminBase(nom);
+      await databaseFactory.deleteDatabase(chemin);
+
+      final v1 = await databaseFactory.openDatabase(
+        chemin,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, _) async {
+            for (final table in ['children', 'spaces', 'activity_types', 'activities']) {
+              await db.execute(
+                'CREATE TABLE $table (id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+              );
+            }
+            await db.execute(
+              'CREATE TABLE sons (child_id TEXT NOT NULL, son TEXT NOT NULL, '
+              'statut INTEGER NOT NULL, PRIMARY KEY (child_id, son))',
+            );
+            await db.execute(
+              'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+            );
+          },
+        ),
+      );
+      await v1.close();
+
+      // Reouverture par le code de production : la migration v5 doit avoir
+      // cree referential_status_history, utilisable immediatement.
+      final db = AppDatabase(fileName: nom);
+      await db.recordReferentialHistory('child_1', 'ref_1', 'item_1', SonStatut.acquis, DateTime(2026, 3, 1));
+      final historique = await db.readReferentialHistory('child_1', 'ref_1');
+
+      expect(historique, hasLength(1));
+      expect(historique.single.itemId, 'item_1');
+      expect(historique.single.statut, SonStatut.acquis);
     });
   });
 

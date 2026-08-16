@@ -9,6 +9,7 @@ import '../models/space.dart';
 import '../utils/app_icons.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
+import '../widgets/voice_note_play_button.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
   const HomeDashboardScreen({super.key});
@@ -257,6 +258,12 @@ class HomeDashboardScreen extends StatelessWidget {
                                         style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                                       ),
                                     ),
+                                  ],
+
+                                  // Voice note
+                                  if (act.audioPath != null && act.audioPath!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    VoiceNotePlayButton(provider: provider, audioPath: act.audioPath!),
                                   ],
 
                                   // Attached Photo Gallery Carousel

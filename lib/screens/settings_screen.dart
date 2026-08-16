@@ -12,6 +12,7 @@ import '../data/eduscol_data.dart';
 import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
 import 'privacy_policy_screen.dart';
+import 'referentials_manager_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -144,6 +145,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           const SizedBox(height: 16),
 
           _buildStatusesCard(context, provider),
+          const SizedBox(height: 16),
+
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.checklist_rtl, color: Color(0xFF4E9F3D)),
+              title: const Text('Référentiels personnalisés', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: Text(
+                provider.referentials.isEmpty
+                    ? 'Ceintures de couleur, Montessori... créez vos propres suivis.'
+                    : '${provider.referentials.length} référentiel(s) défini(s)',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReferentialsManagerScreen()),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Level Selector Chips
@@ -1093,6 +1114,72 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
           // Fin d'annee scolaire : archive puis repart a vide
           _SchoolYearCard(provider: provider),
+          const SizedBox(height: 16),
+
+          // Rappel local des eleves non evalues
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.notifications_active_outlined, color: Color(0xFF4E9F3D)),
+                      SizedBox(width: 8),
+                      Text('Rappel élèves non évalués', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      provider.reminderEnabled
+                          ? 'Rappel actif à ${provider.reminderHour.toString().padLeft(2, '0')}h${provider.reminderMinute.toString().padLeft(2, '0')}'
+                          : 'Notification désactivée',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Une notification locale liste les élèves sans observation, si besoin.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    value: provider.reminderEnabled,
+                    activeColor: const Color(0xFF4E9F3D),
+                    onChanged: (val) async {
+                      final ok = await provider.setReminderEnabled(val);
+                      if (!ok && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Autorisation refusée : activez les notifications dans Réglages iOS.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  if (provider.reminderEnabled)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.schedule, size: 18),
+                        label: const Text('Changer l\'heure du rappel'),
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay(hour: provider.reminderHour, minute: provider.reminderMinute),
+                            helpText: 'Heure du rappel',
+                          );
+                          if (picked != null) {
+                            provider.setReminderTime(picked.hour, picked.minute);
+                          }
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Confidentialite / RGPD

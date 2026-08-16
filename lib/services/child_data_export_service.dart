@@ -80,10 +80,12 @@ class ChildDataExportService {
                   pw.SizedBox(height: 4),
                   _field('Prénom', child.firstname),
                   _field('Nom', child.lastname),
-                  _field('Date de naissance', child.birthdate),
+                  _field('Date de naissance', _formatBirthdate(child.birthdate)),
                   _field('Groupe / Section', child.group),
                   _field('Email des parents', child.email),
                   _field('Notes', child.notes),
+                  _field('Autorisation droit à l\'image',
+                      child.imageAuthorized ? 'Accordée' : 'Non accordée'),
                 ],
               ),
             ),
@@ -158,6 +160,13 @@ class ChildDataExportService {
       ],
     ));
     return doc.save();
+  }
+
+  static String? _formatBirthdate(String? iso) {
+    if (iso == null || iso.isEmpty) return null;
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return iso;
+    return DateFormat('dd/MM/yyyy').format(parsed);
   }
 
   static pw.Widget _field(String label, String? value) {

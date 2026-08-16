@@ -10,8 +10,12 @@ import '../models/activity.dart';
 import '../models/space.dart';
 import '../utils/app_icons.dart';
 import '../data/sons_data.dart';
+import '../models/referential.dart';
 import '../services/child_data_export_service.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
+import 'referential_progress_screen.dart';
+import 'sons_progress_screen.dart';
+import '../widgets/voice_note_play_button.dart';
 import 'edit_activity_log_screen.dart';
 
 class ChildProfileScreen extends StatelessWidget {
@@ -113,7 +117,7 @@ class ChildProfileScreen extends StatelessWidget {
             context,
             icon: Icons.cake,
             label: 'Date de naissance',
-            value: child.birthdate ?? 'Non renseignée',
+            value: _formatBirthdate(child.birthdate),
             isDark: isDark,
           ),
           _buildInfoCard(
@@ -128,6 +132,13 @@ class ChildProfileScreen extends StatelessWidget {
             icon: Icons.notes,
             label: 'Notes',
             value: (child.notes != null && child.notes!.isNotEmpty) ? child.notes! : 'Aucune note',
+            isDark: isDark,
+          ),
+          _buildInfoCard(
+            context,
+            icon: child.imageAuthorized ? Icons.image : Icons.no_photography,
+            label: 'Autorisation droit à l\'image',
+            value: child.imageAuthorized ? 'Accordée' : 'Non accordée — modifiable via le crayon',
             isDark: isDark,
           ),
 
@@ -162,21 +173,47 @@ class ChildProfileScreen extends StatelessWidget {
     );
   }
 
+  /// Date stockee au format ISO (aaaa-mm-jj) affichee en jj/mm/aaaa. Une
+  /// valeur illisible est affichee telle quelle plutot que masquee.
+  String _formatBirthdate(String? iso) {
+    if (iso == null || iso.isEmpty) return 'Non renseignée';
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return iso;
+    return DateFormat('dd/MM/yyyy').format(parsed);
+  }
+
   Widget _buildLargeAvatar(Child child, AppStateProvider provider) {
     final absolutePath = provider.getAbsolutePath(child.imagePath);
-    if (absolutePath != null && File(absolutePath).existsSync()) {
-      return CircleAvatar(
-        radius: 56,
-        backgroundImage: FileImage(File(absolutePath)),
-      );
-    }
-    return CircleAvatar(
-      radius: 56,
-      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
-      child: Text(
-        child.avatarText,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
-      ),
+    final avatar = (absolutePath != null && File(absolutePath).existsSync())
+        ? CircleAvatar(
+            radius: 56,
+            backgroundImage: FileImage(File(absolutePath)),
+          )
+        : CircleAvatar(
+            radius: 56,
+            backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+            child: Text(
+              child.avatarText,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+            ),
+          );
+    if (child.imageAuthorized) return avatar;
+    return Stack(
+      children: [
+        avatar,
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Tooltip(
+            message: 'Autorisation photo non accordée',
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: const Icon(Icons.no_photography, size: 18, color: Colors.red),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -240,6 +277,18 @@ class ChildProfileScreen extends StatelessWidget {
             _sonLegende(SonStatut.enCours, '$enCours en cours'),
             _sonLegende(SonStatut.nonAcquis, '${tous.length - acquis - enCours} non acquis'),
           ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => SonsProgressScreen(child: child)),
+            ),
+            icon: const Icon(Icons.show_chart, size: 18),
+            label: const Text('Voir la progression dans le temps'),
+          ),
         ),
         const SizedBox(height: 4),
         const Text(
@@ -330,6 +379,132 @@ class ChildProfileScreen extends StatelessWidget {
             );
             if (confirme == true) provider.resetSons(child.id);
           },
+          icon: const Icon(Icons.restart_alt),
+          label: const Text('Tout remettre à non acquis'),
+        ),
+
+        for (final referential in provider.referentials) ...[
+          const Divider(height: 40),
+          _buildReferentialSection(context, provider, child, referential),
+        ],
+      ],
+    );
+  }
+
+  // ────────────── REFERENTIELS PERSONNALISES ──────────────
+
+  Widget _buildReferentialSection(
+    BuildContext context,
+    AppStateProvider provider,
+    Child child,
+    Referential referential,
+  ) {
+    final allItems = referential.allItems;
+    final acquis = allItems
+        .where((i) => provider.referentialItemStatut(referential.id, child.id, i.id) == SonStatut.acquis)
+        .length;
+    final enCours = allItems
+        .where((i) => provider.referentialItemStatut(referential.id, child.id, i.id) == SonStatut.enCours)
+        .length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(referential.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _sonLegende(SonStatut.acquis, '$acquis acquis'),
+            _sonLegende(SonStatut.enCours, '$enCours en cours'),
+            _sonLegende(SonStatut.nonAcquis, '${allItems.length - acquis - enCours} non acquis'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReferentialProgressScreen(child: child, referential: referential),
+              ),
+            ),
+            icon: const Icon(Icons.show_chart, size: 18),
+            label: const Text('Voir la progression dans le temps'),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Appuyez sur un item pour le faire progresser. Appui long pour revenir en arrière.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        if (referential.groups.isEmpty)
+          const Text('Aucun groupe défini pour ce référentiel.', style: TextStyle(fontSize: 13, color: Colors.grey))
+        else
+          ...referential.groups.map((group) => Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(group.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: group.items.map((item) {
+                        final statut = provider.referentialItemStatut(referential.id, child.id, item.id);
+                        final couleur = _sonColor(statut);
+                        return InkWell(
+                          onTap: () => provider.cycleReferentialItemStatut(referential.id, child.id, item.id),
+                          onLongPress: () {
+                            HapticFeedback.selectionClick();
+                            provider.reculeReferentialItemStatut(referential.id, child.id, item.id);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: couleur.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: couleur, width: 2),
+                            ),
+                            child: Text(
+                              item.label,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: couleur),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              )),
+        OutlinedButton.icon(
+          onPressed: allItems.isEmpty
+              ? null
+              : () async {
+                  final confirme = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text('Réinitialiser "${referential.name}" ?'),
+                      content: Text(
+                          'Tous les items repasseront à « non acquis » pour ${child.firstname}.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                          child: const Text('Réinitialiser'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirme == true) provider.resetReferentialStatus(referential.id, child.id);
+                },
           icon: const Icon(Icons.restart_alt),
           label: const Text('Tout remettre à non acquis'),
         ),
@@ -537,6 +712,10 @@ class ChildProfileScreen extends StatelessWidget {
                           '📝 ${log.note!}',
                           style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                         ),
+                      ],
+                      if (log.audioPath != null && log.audioPath!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        VoiceNotePlayButton(provider: provider, audioPath: log.audioPath!),
                       ],
                     ],
                   ),

@@ -10,6 +10,7 @@ import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
+import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../models/space.dart';
 import '../utils/platform_support.dart';
@@ -33,7 +34,7 @@ class AppDatabase {
   /// Version du schema. **Toute evolution passe par [_migrate]**, jamais par une
   /// retouche de [_createV1] : les installations deja deployees ne rejouent que
   /// les migrations manquantes.
-  static const _schemaVersion = 2;
+  static const _schemaVersion = 5;
 
   /// Tables « entite » : cle primaire texte + JSON.
   ///
@@ -118,6 +119,48 @@ class AppDatabase {
           'CREATE TABLE IF NOT EXISTS archives '
           '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
         );
+      case 3:
+        // Historique des changements de statut des sons, pour le graphique
+        // de progression. Distincte de `sons` (etat courant uniquement) :
+        // append-only, jamais purgee par un simple changement de statut.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS sons_history '
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, child_id TEXT NOT NULL, '
+          'son TEXT NOT NULL, statut INTEGER NOT NULL, changed_at TEXT NOT NULL)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_sons_history_child '
+          'ON sons_history (child_id)',
+        );
+      case 4:
+        // Referentiels personnalises (ceintures de couleur, Montessori, ou
+        // tout autre systeme saisi par l'enseignant) et le statut de chaque
+        // item pour chaque eleve. Hors de _entityTables comme `archives` :
+        // ce n'est pas une entite generique, elle a ses propres methodes.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS referentials '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS referential_status '
+          '(child_id TEXT NOT NULL, referential_id TEXT NOT NULL, '
+          'item_id TEXT NOT NULL, statut INTEGER NOT NULL, '
+          'PRIMARY KEY (child_id, referential_id, item_id))',
+        );
+      case 5:
+        // Historique des referentiels personnalises, meme principe que
+        // sons_history : append-only, pour le graphique de progression et le
+        // radar de chaque referentiel.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS referential_status_history '
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, child_id TEXT NOT NULL, '
+          'referential_id TEXT NOT NULL, item_id TEXT NOT NULL, '
+          'statut INTEGER NOT NULL, changed_at TEXT NOT NULL)',
+        );
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_referential_history_child '
+          'ON referential_status_history (child_id, referential_id)',
+        );
       default:
         throw StateError('Migration manquante vers la version $version');
     }
@@ -184,13 +227,16 @@ class AppDatabase {
     await db.delete(table);
   }
 
-  /// Supprime en une transaction les observations d'un eleve et son suivi des
-  /// sons : sans cela un plantage entre les deux laisserait des orphelins.
+  /// Supprime en une transaction la fiche d'un eleve et son suivi des sons
+  /// courant. Comme pour les observations, l'historique des sons
+  /// ([sons_history]) n'est volontairement pas efface : c'est une trace,
+  /// pas un etat courant.
   Future<void> deleteChildCascade(String childId) async {
     final db = await _database;
     await db.transaction((txn) async {
       await txn.delete('children', where: 'id = ?', whereArgs: [childId]);
       await txn.delete('sons', where: 'child_id = ?', whereArgs: [childId]);
+      await txn.delete('referential_status', where: 'child_id = ?', whereArgs: [childId]);
     });
   }
 
@@ -229,9 +275,169 @@ class AppDatabase {
     await db.delete('sons', where: 'child_id = ?', whereArgs: [childId]);
   }
 
+  /// Ajoute un point a l'historique d'un son. Append-only : n'ecrase jamais
+  /// les points precedents, contrairement a [setSon].
+  Future<void> recordSonHistory(
+    String childId,
+    String son,
+    SonStatut statut,
+    DateTime at,
+  ) async {
+    final db = await _database;
+    await db.insert('sons_history', {
+      'child_id': childId,
+      'son': son,
+      'statut': statut.code,
+      'changed_at': at.toIso8601String(),
+    });
+  }
+
+  /// Historique complet d'un eleve, du plus ancien au plus recent.
+  Future<List<SonHistoryEntry>> readSonHistory(String childId) async {
+    final db = await _database;
+    final rows = await db.query(
+      'sons_history',
+      where: 'child_id = ?',
+      whereArgs: [childId],
+      orderBy: 'changed_at ASC',
+    );
+    return rows
+        .map((r) => SonHistoryEntry(
+              son: r['son'] as String,
+              statut: SonStatut.fromCode(r['statut']),
+              changedAt: DateTime.parse(r['changed_at'] as String),
+            ))
+        .toList();
+  }
+
   Future<void> clearAllSons() async {
     final db = await _database;
     await db.delete('sons');
+  }
+
+  // ─────────────── Referentiels personnalises ───────────────
+
+  Future<List<Referential>> readReferentials() async =>
+      (await _readAll('referentials')).map(Referential.fromMap).toList();
+
+  Future<void> saveReferential(Referential r) => _upsert('referentials', r.id, r.toMap());
+
+  /// Supprime le referentiel, le statut de tous les eleves qui s'y rapporte,
+  /// et son historique : contrairement a la suppression d'un eleve, il n'y a
+  /// ici plus rien a retracer une fois le referentiel lui-meme parti.
+  Future<void> deleteReferentialCascade(String referentialId) async {
+    final db = await _database;
+    await db.transaction((txn) async {
+      await txn.delete('referentials', where: 'id = ?', whereArgs: [referentialId]);
+      await txn.delete('referential_status',
+          where: 'referential_id = ?', whereArgs: [referentialId]);
+      await txn.delete('referential_status_history',
+          where: 'referential_id = ?', whereArgs: [referentialId]);
+    });
+  }
+
+  /// Statuts de tous les eleves, pour tous les referentiels : referentialId ->
+  /// childId -> itemId -> statut. Charge en une fois au demarrage, comme
+  /// [readSons] : les volumes en jeu ne justifient pas une lecture paresseuse.
+  Future<Map<String, Map<String, Map<String, SonStatut>>>> readAllReferentialStatuses() async {
+    final db = await _database;
+    final rows = await db.query('referential_status');
+    final result = <String, Map<String, Map<String, SonStatut>>>{};
+    for (final row in rows) {
+      final referentialId = row['referential_id'] as String;
+      final childId = row['child_id'] as String;
+      final itemId = row['item_id'] as String;
+      result
+          .putIfAbsent(referentialId, () => {})
+          .putIfAbsent(childId, () => {})[itemId] = SonStatut.fromCode(row['statut']);
+    }
+    return result;
+  }
+
+  Future<void> setReferentialItemStatus(
+    String childId,
+    String referentialId,
+    String itemId,
+    SonStatut statut,
+  ) async {
+    final db = await _database;
+    if (statut == SonStatut.nonAcquis) {
+      await db.delete(
+        'referential_status',
+        where: 'child_id = ? AND referential_id = ? AND item_id = ?',
+        whereArgs: [childId, referentialId, itemId],
+      );
+      return;
+    }
+    await db.insert(
+      'referential_status',
+      {
+        'child_id': childId,
+        'referential_id': referentialId,
+        'item_id': itemId,
+        'statut': statut.code,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Efface le statut d'un eleve pour un referentiel donne (restauration).
+  Future<void> clearReferentialStatusForChild(String childId, String referentialId) async {
+    final db = await _database;
+    await db.delete(
+      'referential_status',
+      where: 'child_id = ? AND referential_id = ?',
+      whereArgs: [childId, referentialId],
+    );
+  }
+
+  /// Efface le statut de tous les eleves, pour tous les referentiels :
+  /// utilise a la cloture de l'annee scolaire, les referentiels eux-memes
+  /// (comme les ateliers) se reutilisant d'une annee sur l'autre.
+  Future<void> clearAllReferentialStatuses() async {
+    final db = await _database;
+    await db.delete('referential_status');
+  }
+
+  /// Ajoute un point a l'historique d'un item de referentiel. Append-only,
+  /// comme [recordSonHistory].
+  Future<void> recordReferentialHistory(
+    String childId,
+    String referentialId,
+    String itemId,
+    SonStatut statut,
+    DateTime at,
+  ) async {
+    final db = await _database;
+    await db.insert('referential_status_history', {
+      'child_id': childId,
+      'referential_id': referentialId,
+      'item_id': itemId,
+      'statut': statut.code,
+      'changed_at': at.toIso8601String(),
+    });
+  }
+
+  /// Historique d'un eleve pour un referentiel donne, du plus ancien au plus
+  /// recent.
+  Future<List<ReferentialHistoryEntry>> readReferentialHistory(
+    String childId,
+    String referentialId,
+  ) async {
+    final db = await _database;
+    final rows = await db.query(
+      'referential_status_history',
+      where: 'child_id = ? AND referential_id = ?',
+      whereArgs: [childId, referentialId],
+      orderBy: 'changed_at ASC',
+    );
+    return rows
+        .map((r) => ReferentialHistoryEntry(
+              itemId: r['item_id'] as String,
+              statut: SonStatut.fromCode(r['statut']),
+              changedAt: DateTime.parse(r['changed_at'] as String),
+            ))
+        .toList();
   }
 
   // ─────────────── Reglages ───────────────

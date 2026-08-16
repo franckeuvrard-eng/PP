@@ -22,6 +22,9 @@ class ActivityLog {
   /// supprimer une photo ne decale alors pas les commentaires des suivantes.
   final Map<String, String> photoCaptions;
 
+  /// Chemin relatif d'une note vocale unique jointe a l'observation.
+  final String? audioPath;
+
   ActivityLog({
     required this.id,
     required this.childId,
@@ -32,6 +35,7 @@ class ActivityLog {
     this.evaluationStatusId,
     this.legacyStatusLabel,
     this.photoCaptions = const {},
+    this.audioPath,
   });
 
   /// Legende associee a une photo, ou null si aucune.
@@ -52,6 +56,7 @@ class ActivityLog {
     List<String>? photoPaths,
     Object? evaluationStatusId = kUndefined,
     Map<String, String>? photoCaptions,
+    Object? audioPath = kUndefined,
   }) {
     return ActivityLog(
       id: id ?? this.id,
@@ -65,6 +70,7 @@ class ActivityLog {
           : evaluationStatusId as String?,
       legacyStatusLabel: legacyStatusLabel,
       photoCaptions: photoCaptions ?? this.photoCaptions,
+      audioPath: audioPath == kUndefined ? this.audioPath : audioPath as String?,
     );
   }
 
@@ -81,6 +87,7 @@ class ActivityLog {
       // anterieure sans perdre l'evaluation deja saisie.
       if (legacyStatusLabel != null) 'evaluationStatus': legacyStatusLabel,
       'photoCaptions': photoCaptions,
+      'audioPath': audioPath,
     };
   }
 
@@ -95,6 +102,7 @@ class ActivityLog {
       evaluationStatusId: map['evaluationStatusId'],
       legacyStatusLabel: map['evaluationStatus'],
       photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
+      audioPath: map['audioPath'],
     );
   }
 

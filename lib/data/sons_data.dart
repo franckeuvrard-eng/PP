@@ -60,3 +60,18 @@ enum SonStatut {
     return SonStatut.nonAcquis;
   }
 }
+
+/// Un point de l'historique d'un son pour un eleve : son statut a un instant
+/// donne. Sert au graphique de progression, pas a l'etat courant (cf. table
+/// `sons`, qui ne garde que la derniere valeur).
+class SonHistoryEntry {
+  final String son;
+  final SonStatut statut;
+  final DateTime changedAt;
+
+  const SonHistoryEntry({
+    required this.son,
+    required this.statut,
+    required this.changedAt,
+  });
+}

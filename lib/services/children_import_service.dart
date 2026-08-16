@@ -19,6 +19,7 @@ class ChildrenImportService {
     'Date de naissance (jj/mm/aaaa)',
     'Section / Groupe',
     'Email des parents',
+    'Autorisation image (oui/non)',
     'Notes',
   ];
 
@@ -48,6 +49,7 @@ class ChildrenImportService {
         xl.TextCellValue('12/04/2023'),
         xl.TextCellValue(exempleSection),
         xl.TextCellValue('parents.leo@example.com'),
+        xl.TextCellValue('Non'),
         xl.TextCellValue('Exemple à remplacer ou supprimer'),
       ]);
 
@@ -136,6 +138,10 @@ class ChildrenImportService {
         final group = _cellText(row, columns['group']).trim();
         final email = _cellText(row, columns['email']).trim();
         final notes = _cellText(row, columns['notes']).trim();
+        // Toute valeur autre que "oui" (y compris vide ou illisible) laisse
+        // l'autorisation a son defaut prudent : non accordee.
+        final imageAuthorized =
+            _normalize(_cellText(row, columns['imageAuthorized'])).startsWith('oui');
 
         String? birthdate;
         final birthdateText = _dataToText(rawBirthdate).trim();
@@ -163,6 +169,7 @@ class ChildrenImportService {
           colorHex: '#4E9F3D',
           avatarText: firstname[0].toUpperCase(),
           email: email.isEmpty ? null : email,
+          imageAuthorized: imageAuthorized,
         );
         provider.addOrUpdateChild(child);
         added++;
@@ -236,6 +243,8 @@ class ChildrenImportService {
         columns['group'] = col;
       } else if (header.contains('mail')) {
         columns['email'] = col;
+      } else if (header.contains('autorisation')) {
+        columns['imageAuthorized'] = col;
       } else if (header.contains('note') || header.contains('remarque')) {
         columns['notes'] = col;
       } else if (header.contains('nom')) {
