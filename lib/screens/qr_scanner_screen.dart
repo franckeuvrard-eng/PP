@@ -855,7 +855,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
         }
       } else {
         _triggerErrorVibration();
-        _showScanMessage('QR Code non reconnu par PetitPas', isError: true);
+        _showScanMessage('QR Code non reconnu par A petit pas', isError: true);
       }
     }
   }

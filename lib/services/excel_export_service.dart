@@ -66,13 +66,13 @@ class ExcelExportService {
       final bytes = Uint8List.fromList(rawBytes);
       final tempDir = await getApplicationDocumentsDirectory();
       final sanitizedName = '${child.firstname}_${child.lastname ?? ""}'.replaceAll(RegExp(r'[^\w\-]'), '_');
-      final fileName = 'PetitPas_Activites_${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final fileName = 'APetitPas_Activites_${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(bytes);
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Export Excel PetitPas — ${child.firstname}',
+        subject: 'Export Excel A petit pas — ${child.firstname}',
         sharePositionOrigin: sharePositionOrigin,
       );
     } catch (e) {
@@ -146,13 +146,13 @@ class ExcelExportService {
 
       final bytes = Uint8List.fromList(rawBytes);
       final tempDir = await getApplicationDocumentsDirectory();
-      final fileName = 'PetitPas_Bilan_Classe_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+      final fileName = 'APetitPas_Bilan_Classe_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(bytes);
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Bilan Classe PetitPas (Excel)',
+        subject: 'Bilan Classe A petit pas (Excel)',
         sharePositionOrigin: sharePositionOrigin,
       );
     } catch (e) {

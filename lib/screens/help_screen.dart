@@ -112,7 +112,7 @@ class _Intro extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('PetitPas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('A petit pas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             SizedBox(height: 6),
             Text(
               'Suivi des activités en maternelle : on scanne le badge d\'un élève '

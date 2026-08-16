@@ -10,6 +10,7 @@ import '../models/activity.dart';
 import '../models/space.dart';
 import '../utils/app_icons.dart';
 import '../data/sons_data.dart';
+import '../services/child_data_export_service.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
 import 'edit_activity_log_screen.dart';
 
@@ -41,6 +42,15 @@ class ChildProfileScreen extends StatelessWidget {
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.privacy_tip_outlined),
+              tooltip: 'Exporter les données (RGPD)',
+              onPressed: () => ChildDataExportService.exportChild(
+                context: context,
+                provider: provider,
+                child: currentChild,
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.edit),
               tooltip: 'Modifier cet élève',

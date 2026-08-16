@@ -607,7 +607,7 @@ class AppStateProvider extends ChangeNotifier {
     if (file == null) return false;
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'application/zip')],
-      subject: 'Archive PetitPas ${archive.schoolYear}',
+      subject: 'Archive A petit pas ${archive.schoolYear}',
     );
     return true;
   }
@@ -948,8 +948,8 @@ class AppStateProvider extends ChangeNotifier {
       // 4. Share
       await Share.shareXFiles(
         [XFile(zipPath, mimeType: 'application/zip')],
-        subject: 'Sauvegarde PetitPas',
-        text: 'Backup complet PetitPas incluant toutes les données et photos.',
+        subject: 'Sauvegarde A petit pas',
+        text: 'Backup complet A petit pas incluant toutes les données et photos.',
       );
     } catch (e) {
       debugPrint('Export error: $e');

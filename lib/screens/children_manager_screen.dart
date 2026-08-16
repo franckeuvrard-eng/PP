@@ -564,7 +564,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Rapport d\'activités - PetitPas',
+                  pw.Text('Rapport d\'activités - A petit pas',
                       style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                   pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
                       style: const pw.TextStyle(fontSize: 11)),
@@ -913,6 +913,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   late final TextEditingController _emailController;
   String? _relativeImagePath;
   String? _selectedImagePath;
+  DateTime? _birthdate;
 
   @override
   void initState() {
@@ -928,6 +929,19 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _emailController = TextEditingController(text: child?.email ?? '');
     _relativeImagePath = child?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
+    _birthdate = child?.birthdate != null ? DateTime.tryParse(child!.birthdate!) : null;
+  }
+
+  Future<void> _pickBirthdate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthdate ?? DateTime(now.year - 3, now.month, now.day),
+      firstDate: DateTime(now.year - 12),
+      lastDate: now,
+      helpText: 'Date de naissance',
+    );
+    if (picked != null) setState(() => _birthdate = picked);
   }
 
   @override
@@ -1002,6 +1016,26 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             TextField(controller: _firstnameController, decoration: const InputDecoration(labelText: 'Prénom *')),
             const SizedBox(height: 10),
             TextField(controller: _lastnameController, decoration: const InputDecoration(labelText: 'Nom')),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: _pickBirthdate,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Date de naissance',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _birthdate == null
+                      ? const Icon(Icons.calendar_today, size: 18)
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _birthdate = null),
+                        ),
+                ),
+                child: Text(
+                  _birthdate != null ? DateFormat('dd/MM/yyyy').format(_birthdate!) : 'Non renseignée',
+                  style: TextStyle(color: _birthdate != null ? null : Colors.grey[600]),
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
 
             // Sections gerees dans les parametres. Le groupe deja enregistre
@@ -1048,6 +1082,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                     id: child?.id ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
                     firstname: _firstnameController.text.trim(),
                     lastname: _lastnameController.text.trim(),
+                    birthdate: _birthdate != null ? DateFormat('yyyy-MM-dd').format(_birthdate!) : null,
                     group: _groupController.text.trim(),
                     notes: _notesController.text.trim(),
                     email: _emailController.text.trim(),

@@ -67,12 +67,12 @@ class ChildrenImportService {
 
       final bytes = Uint8List.fromList(rawBytes);
       final tempDir = await getApplicationDocumentsDirectory();
-      final file = File('${tempDir.path}/PetitPas_Modele_Import_Eleves.xlsx');
+      final file = File('${tempDir.path}/APetitPas_Modele_Import_Eleves.xlsx');
       await file.writeAsBytes(bytes);
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Modèle d\'import élèves PetitPas',
+        subject: 'Modèle d\'import élèves A petit pas',
       );
     } catch (e) {
       if (context.mounted) {
