@@ -12,7 +12,7 @@ void main() {
       firstname: 'Léo',
       lastname: 'Martin',
       group: 'PS',
-      notes: 'Allergie',
+      notes: 'Remarque',
       colorHex: '#4E9F3D',
       avatarText: 'LM',
       email: 'p@example.com',
@@ -26,7 +26,7 @@ void main() {
       // Le motif qui effacait l'illustration d'un atelier : un champ oublie
       // lors d'une recopie manuelle.
       expect(copie.imagePath, 'profiles/leo.jpg');
-      expect(copie.notes, 'Allergie');
+      expect(copie.notes, 'Remarque');
       expect(copie.email, 'p@example.com');
       expect(copie.lastname, 'Martin');
     });

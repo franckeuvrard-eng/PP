@@ -11,6 +11,7 @@ import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
+import 'privacy_policy_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -1092,6 +1093,19 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
           // Fin d'annee scolaire : archive puis repart a vide
           _SchoolYearCard(provider: provider),
+          const SizedBox(height: 16),
+
+          // Confidentialite / RGPD
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.privacy_tip, color: Color(0xFF4E9F3D)),
+              title: const Text('Politique de confidentialité (RGPD)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Données collectées, stockage local, droits des familles.', style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Selective Reset

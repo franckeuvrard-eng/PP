@@ -12,7 +12,7 @@ const DEFAULT_STATE = {
     schoolYear: "2026-2027"
   },
   children: [
-    { id: "child_1", firstname: "Léo", lastname: "Martin", birthdate: "2023-04-12", group: "Groupe Rouge", notes: "Allergie noisettes", color: "#4E9F3D", avatarText: "LM" },
+    { id: "child_1", firstname: "Léo", lastname: "Martin", birthdate: "2023-04-12", group: "Groupe Rouge", notes: "", color: "#4E9F3D", avatarText: "LM" },
     { id: "child_2", firstname: "Emma", lastname: "Petit", birthdate: "2023-07-22", group: "Groupe Bleu", notes: "Doudou lapin pour la sieste", color: "#FF7043", avatarText: "EP" },
     { id: "child_3", firstname: "Lucas", lastname: "Bernard", birthdate: "2023-02-18", group: "Groupe Rouge", notes: "", color: "#7E57C2", avatarText: "LB" },
     { id: "child_4", firstname: "Chloé", lastname: "Dubois", birthdate: "2023-09-05", group: "Groupe Jaune", notes: "Lunettes de vue", color: "#FFA726", avatarText: "CD" },

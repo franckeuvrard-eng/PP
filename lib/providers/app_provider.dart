@@ -38,7 +38,7 @@ class AppStateProvider extends ChangeNotifier {
   );
 
   List<Child> _children = [
-    Child(id: "child_1", firstname: "Léo", lastname: "Martin", birthdate: "2023-04-12", group: "Groupe Rouge", notes: "Allergie noisettes", colorHex: "#4E9F3D", avatarText: "LM", email: "parents.leo@example.com"),
+    Child(id: "child_1", firstname: "Léo", lastname: "Martin", birthdate: "2023-04-12", group: "Groupe Rouge", notes: "", colorHex: "#4E9F3D", avatarText: "LM", email: "parents.leo@example.com"),
     Child(id: "child_2", firstname: "Emma", lastname: "Petit", birthdate: "2023-07-22", group: "Groupe Bleu", notes: "Doudou lapin pour la sieste", colorHex: "#FF7043", avatarText: "EP", email: "parents.emma@example.com"),
     Child(id: "child_3", firstname: "Lucas", lastname: "Bernard", birthdate: "2023-02-18", group: "Groupe Rouge", notes: "", colorHex: "#7E57C2", avatarText: "LB", email: "parents.lucas@example.com"),
     Child(id: "child_4", firstname: "Chloé", lastname: "Dubois", birthdate: "2023-09-05", group: "Groupe Jaune", notes: "Lunettes de vue", colorHex: "#FFA726", avatarText: "CD", email: "parents.chloe@example.com"),

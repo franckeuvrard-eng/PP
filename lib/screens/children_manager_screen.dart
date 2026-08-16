@@ -985,7 +985,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
             const SizedBox(height: 12),
             TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
             const SizedBox(height: 10),
-            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Allergies, etc.)')),
+            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes')),
             const SizedBox(height: 30),
             SizedBox(
               width: double.infinity,
