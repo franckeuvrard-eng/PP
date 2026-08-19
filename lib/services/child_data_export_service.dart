@@ -31,7 +31,7 @@ class ChildDataExportService {
       fileName: 'APetitPas_RGPD_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
       build: (format) => _buildBytes(child, provider, format),
       shareSubject: 'Export RGPD - ${child.firstname}',
-      shareBody: 'Export des données personnelles conservées par A petit pas pour ${child.firstname}.',
+      shareBody: 'Export des données personnelles conservées par A petits pas pour ${child.firstname}.',
       shareEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
     );
   }

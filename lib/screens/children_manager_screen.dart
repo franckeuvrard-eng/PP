@@ -583,7 +583,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Rapport d\'activités - A petit pas',
+                  pw.Text('Rapport d\'activités - A petits pas',
                       style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                   pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
                       style: const pw.TextStyle(fontSize: 11)),

@@ -9,8 +9,8 @@ import '../models/space.dart';
 import '../models/evaluation_status.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
-import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
+import 'atelier_detail_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'referentials_manager_screen.dart';
 
@@ -339,53 +339,27 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ],
                 ),
                 children: [
-                  // Ateliers in this space
-                  ...ateliersInSpace.map((atelier) => ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
-                      child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
-                    ),
-                    title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // Ateliers in this space : glisser-deposer si l'espace impose
+                  // un ordre de progression, sinon liste condensee simple.
+                  if (space.isProgression)
+                    ReorderableListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onReorder: (oldIndex, newIndex) {
+                        final ordered = provider.ateliersInSpaceOrdered(space.id).map((a) => a.id).toList();
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        final id = ordered.removeAt(oldIndex);
+                        ordered.insert(newIndex, id);
+                        provider.reorderAteliersInSpace(space.id, ordered);
+                      },
                       children: [
-                        if (atelier.domaine.isNotEmpty)
-                          Text('📚 ${atelier.domaine}', style: const TextStyle(fontSize: 12)),
-                        if (atelier.objectifs.isNotEmpty)
-                          Text('🏁 ${atelier.objectifs.length} objectif(s) associé(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        if (atelier.photoPaths.isNotEmpty)
-                          Text('📷 ${atelier.photoPaths.length} photo(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        if (atelier.isObligatory)
-                          Text(
-                            atelier.obligatoryGroups.isEmpty
-                                ? '⭐ Obligatoire · toute la classe'
-                                : '⭐ Obligatoire · ${atelier.obligatoryGroups.join(', ')}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
-                          ),
+                        for (final entry in provider.ateliersInSpaceOrdered(space.id).asMap().entries)
+                          _buildAtelierTile(context, provider, entry.value,
+                              key: ValueKey(entry.value.id), dragIndex: entry.key),
                       ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.picture_as_pdf, size: 18, color: Color(0xFF4E9F3D)),
-                          tooltip: 'Exporter la fiche PDF de cet atelier',
-                          onPressed: () => AtelierPdfService.openPreview(context, provider, atelier),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
-                          onPressed: () => _openActivityTypeDialog(context, provider, activityType: atelier),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                          onPressed: () => provider.deleteActivityType(atelier.id),
-                        ),
-                      ],
-                    ),
-                    isThreeLine: atelier.domaine.isNotEmpty || atelier.objectifs.isNotEmpty,
-                  )),
+                    )
+                  else
+                    ...ateliersInSpace.map((atelier) => _buildAtelierTile(context, provider, atelier)),
                   // Add atelier button inside expansion
                   Padding(
                     padding: const EdgeInsets.all(8),
@@ -410,12 +384,55 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     );
   }
 
+  /// Ligne condensee d'un atelier : le detail (domaine, objectifs, photos,
+  /// obligatoire) est dans AtelierDetailScreen, a un tap. [dragIndex] non nul
+  /// affiche une poignee de glisser-deposer au lieu du chevron (mode
+  /// progression) ; le tap reste dedie a l'ouverture du detail dans les deux cas.
+  Widget _buildAtelierTile(
+    BuildContext context,
+    AppStateProvider provider,
+    ActivityType atelier, {
+    Key? key,
+    int? dragIndex,
+  }) {
+    return ListTile(
+      key: key,
+      dense: true,
+      leading: CircleAvatar(
+        radius: 16,
+        backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
+        child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
+      ),
+      title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      subtitle: atelier.domaine.isEmpty && atelier.objectifs.isEmpty
+          ? null
+          : Text(
+              [
+                if (atelier.domaine.isNotEmpty) '📚 ${atelier.domaine}',
+                if (atelier.objectifs.isNotEmpty) '🏁 ${atelier.objectifs.length} objectif(s)',
+              ].join('  •  '),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+      trailing: dragIndex != null
+          ? ReorderableDragStartListener(
+              index: dragIndex,
+              child: const Icon(Icons.drag_handle, color: Colors.grey),
+            )
+          : const Icon(Icons.chevron_right, color: Colors.grey),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AtelierDetailScreen(atelier: atelier)),
+      ),
+    );
+  }
+
   // ─────────────────── SPACE DIALOG ───────────────────
   void _openSpaceDialog(BuildContext context, AppStateProvider provider, {Space? space}) {
     final nameCtrl = TextEditingController(text: space?.name ?? '');
     final descCtrl = TextEditingController(text: space?.description ?? '');
     String color = space?.colorHex ?? '#4E9F3D';
     String? iconName = space?.iconName;
+    bool isProgression = space?.isProgression ?? false;
 
     final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
 
@@ -489,6 +506,26 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Mode progression (ordre imposé)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      subtitle: const Text(
+                        "Les ateliers de cet espace doivent être faits dans l'ordre : un atelier reste verrouillé tant que les précédents ne sont pas acquis.",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: isProgression,
+                      activeColor: const Color(0xFF4E9F3D),
+                      onChanged: (val) => setSt(() => isProgression = val),
+                    ),
+                    if (isProgression && !provider.evaluationStatuses.any((s) => s.id == 'acquis'))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          "⚠️ Aucun niveau d'évaluation « Acquis » n'existe : aucun atelier ne pourra jamais être débloqué. Ajoutez-en un dans Réglages.",
+                          style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -503,8 +540,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         colorHex: color,
                         description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
                         iconName: iconName,
+                        isProgression: isProgression,
                       );
                       provider.addOrUpdateSpace(newSpace);
+                      if (isProgression) provider.setSpaceProgression(newSpace.id, true);
                       Navigator.pop(context);
                     }
                   },
@@ -2058,6 +2097,16 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     }
 
     final provider = Provider.of<AppStateProvider>(context, listen: false);
+    // Un atelier existant garde sa position tant qu'il reste dans le meme
+    // espace ; un atelier nouveau (ou deplace vers un autre espace) en mode
+    // progression s'ajoute en fin de liste plutot que de garder un rang
+    // hors contexte.
+    final keepsPreviousPosition =
+        widget.activityType != null && widget.activityType!.spaceId == _spaceId;
+    final position = (keepsPreviousPosition ? widget.activityType?.position : null) ??
+        (provider.spaceById(_spaceId)?.isProgression == true
+            ? provider.nextPositionForSpace(_spaceId)
+            : -1);
     final newType = ActivityType(
       id: widget.activityType?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
       name: _nameCtrl.text.trim(),
@@ -2075,6 +2124,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       photoPaths: _photoPaths,
       photoCaptions: _photoCaptions,
       obligatoryGroups: _isObligatory ? _obligatoryGroups : const [],
+      position: position,
     );
 
     provider.saveActivityType(newType);

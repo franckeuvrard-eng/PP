@@ -9,6 +9,7 @@ import '../providers/app_provider.dart';
 import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
+import '../services/atelier_eligibility_service.dart';
 import '../utils/platform_support.dart';
 import '../widgets/voice_note_field.dart';
 
@@ -82,6 +83,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               child: ListView(
                 children: provider.children
                     .where((c) => c.id != _selectedChildId)
+                    .where((c) {
+                      if (_selectedActivityTypeId == null) return true;
+                      final atelier = provider.activityTypeById(_selectedActivityTypeId);
+                      if (atelier == null) return true;
+                      return AtelierEligibilityService.evaluate(provider: provider, child: c, atelier: atelier)
+                          .isAllowed;
+                    })
                     .map((c) => CheckboxListTile(
                           dense: true,
                           value: selection.contains(c.id),
@@ -478,24 +486,68 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             child: Text('${c.firstname} ${c.lastname ?? ""}'),
                           );
                         }).toList(),
-                        onChanged: (val) => setState(() => _selectedChildId = val),
+                        onChanged: (val) {
+                          final previousAtelierId = _selectedActivityTypeId;
+                          setState(() => _selectedChildId = val);
+                          if (previousAtelierId == null) return;
+                          final child = provider.childById(val);
+                          final atelier = provider.activityTypeById(previousAtelierId);
+                          final stillOk = child != null &&
+                              atelier != null &&
+                              AtelierEligibilityService.evaluate(provider: provider, child: child, atelier: atelier)
+                                  .isAllowed;
+                          if (!stillOk) {
+                            setState(() => _selectedActivityTypeId = null);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("L'atelier précédemment choisi n'est plus disponible pour cet élève."),
+                              ),
+                            );
+                          }
+                        },
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _selectedActivityTypeId,
-                        decoration: const InputDecoration(
-                          labelText: 'Atelier sélectionné',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.category),
-                        ),
-                        items: provider.activityTypes.map((a) {
-                          return DropdownMenuItem(
-                            value: a.id,
-                            child: Text(a.name),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _selectedActivityTypeId = val),
-                      ),
+                      Builder(builder: (context) {
+                        final child = provider.childById(_selectedChildId);
+                        final annotated = child == null
+                            ? const <MapEntry<ActivityType, AtelierEligibilityResult>>[]
+                            : AtelierEligibilityService.annotate(provider: provider, child: child)
+                                .where((e) => e.value.isAllowed)
+                                .toList();
+                        return DropdownButtonFormField<String>(
+                          value: _selectedActivityTypeId,
+                          decoration: InputDecoration(
+                            labelText: 'Atelier sélectionné',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.category),
+                            hintText: child == null ? "Sélectionnez d'abord un élève" : null,
+                          ),
+                          items: child == null
+                              ? const []
+                              : annotated.map((entry) {
+                                  final atelier = entry.key;
+                                  final warn =
+                                      entry.value.status == AtelierEligibility.allowedWithWarning;
+                                  return DropdownMenuItem(
+                                    value: atelier.id,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(child: Text(atelier.name, overflow: TextOverflow.ellipsis)),
+                                        if (warn) ...[
+                                          const SizedBox(width: 6),
+                                          const Icon(Icons.warning_amber_rounded,
+                                              size: 14, color: Colors.orange),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                          onChanged: child == null
+                              ? null
+                              : (val) => setState(() => _selectedActivityTypeId = val),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -881,33 +933,66 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
         final childId = rawValue.replaceFirst('PETITPAS:CHILD:', '');
         final childIndex = widget.children.indexWhere((c) => c.id == childId);
         if (childIndex >= 0) {
+          final newChild = widget.children[childIndex];
           HapticFeedback.mediumImpact();
           setState(() {
             _scannedChildId = childId;
+            // Un atelier deja scanne peut ne plus convenir au nouvel eleve :
+            // on revalide plutot que de garder une association incoherente.
+            if (_scannedActivityTypeId != null) {
+              final atelier =
+                  widget.activityTypes.where((a) => a.id == _scannedActivityTypeId).firstOrNull;
+              final provider = context.read<AppStateProvider>();
+              final stillOk = atelier != null &&
+                  AtelierEligibilityService.evaluate(provider: provider, child: newChild, atelier: atelier)
+                      .isAllowed;
+              if (!stillOk) _scannedActivityTypeId = null;
+            }
           });
-          _showScanMessage('Élève détecté : ${widget.children[childIndex].firstname}', isError: false);
+          _showScanMessage('Élève détecté : ${newChild.firstname}', isError: false);
           _checkAndAutoClose();
         } else {
           _triggerErrorVibration();
           _showScanMessage('Élève inconnu dans la base', isError: true);
         }
       } else if (rawValue.startsWith('PETITPAS:ACT:')) {
+        if (_scannedChildId == null) {
+          _triggerErrorVibration();
+          _showScanMessage('Scannez d\'abord le badge de l\'élève', isError: true);
+          continue;
+        }
         final actId = rawValue.replaceFirst('PETITPAS:ACT:', '');
         final actIndex = widget.activityTypes.indexWhere((a) => a.id == actId);
         if (actIndex >= 0) {
-          HapticFeedback.mediumImpact();
-          setState(() {
-            _scannedActivityTypeId = actId;
-          });
-          _showScanMessage('Atelier détecté : ${widget.activityTypes[actIndex].name}', isError: false);
-          _checkAndAutoClose();
+          final atelier = widget.activityTypes[actIndex];
+          final child = widget.children.where((c) => c.id == _scannedChildId).firstOrNull;
+          final provider = context.read<AppStateProvider>();
+          final eligibility = child == null
+              ? const AtelierEligibilityResult(status: AtelierEligibility.allowed)
+              : AtelierEligibilityService.evaluate(provider: provider, child: child, atelier: atelier);
+          if (!eligibility.isAllowed) {
+            _triggerErrorVibration();
+            _showScanMessage(eligibility.message, isError: true);
+          } else {
+            HapticFeedback.mediumImpact();
+            setState(() {
+              _scannedActivityTypeId = actId;
+            });
+            _showScanMessage(
+              eligibility.status == AtelierEligibility.allowedWithWarning
+                  ? '${atelier.name} : ${eligibility.message}'
+                  : 'Atelier détecté : ${atelier.name}',
+              isError: false,
+            );
+            _checkAndAutoClose();
+          }
         } else {
           _triggerErrorVibration();
           _showScanMessage('Atelier inconnu dans la base', isError: true);
         }
       } else {
         _triggerErrorVibration();
-        _showScanMessage('QR Code non reconnu par A petit pas', isError: true);
+        _showScanMessage('QR Code non reconnu par A petits pas', isError: true);
       }
     }
   }

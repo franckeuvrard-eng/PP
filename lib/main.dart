@@ -29,7 +29,7 @@ class PetitPasApp extends StatelessWidget {
     final appProvider = Provider.of<AppStateProvider>(context);
 
     return MaterialApp(
-      title: 'A petit pas - Suivi Maternelle',
+      title: 'A petits pas - Suivi Maternelle',
       debugShowCheckedModeBanner: false,
       themeMode: appProvider.themeMode,
       theme: ThemeData(
@@ -300,7 +300,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('A petit pas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('A petits pas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 Text(
                   appProvider.classSettings.name,
                   style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),

@@ -9,6 +9,7 @@ import '../models/space.dart';
 import '../utils/app_icons.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
+import 'reports_screen.dart';
 import '../widgets/voice_note_play_button.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -77,6 +78,22 @@ class HomeDashboardScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 12),
+
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF4E9F3D),
+                child: Icon(Icons.description, color: Colors.white),
+              ),
+              title: const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Ateliers obligatoires, fiches PDF, exports RGPD et Excel.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+            ),
           ),
 
           const SizedBox(height: 20),

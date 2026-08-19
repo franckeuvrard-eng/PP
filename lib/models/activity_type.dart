@@ -38,6 +38,10 @@ class ActivityType {
   /// Vide alors que [isObligatory] est vrai : obligatoire pour toute la classe.
   final List<String> obligatoryGroups;
 
+  /// Rang de l'atelier dans son espace quand celui-ci est en mode
+  /// progression (voir [Space.isProgression]). -1 : jamais positionne.
+  final int position;
+
   ActivityType({
     required this.id,
     required this.name,
@@ -53,6 +57,7 @@ class ActivityType {
     this.photoPaths = const [],
     this.photoCaptions = const {},
     this.obligatoryGroups = const [],
+    this.position = -1,
   });
 
   /// Legende associee a une photo, ou null si aucune.
@@ -95,6 +100,7 @@ class ActivityType {
     List<String>? photoPaths,
     Map<String, String>? photoCaptions,
     List<String>? obligatoryGroups,
+    int? position,
   }) {
     return ActivityType(
       id: id ?? this.id,
@@ -111,6 +117,7 @@ class ActivityType {
       photoPaths: photoPaths ?? this.photoPaths,
       photoCaptions: photoCaptions ?? this.photoCaptions,
       obligatoryGroups: obligatoryGroups ?? this.obligatoryGroups,
+      position: position ?? this.position,
     );
   }
 
@@ -132,6 +139,7 @@ class ActivityType {
       'photoPaths': photoPaths,
       'photoCaptions': photoCaptions,
       'obligatoryGroups': obligatoryGroups,
+      'position': position,
     };
   }
 
@@ -151,6 +159,7 @@ class ActivityType {
       photoPaths: List<String>.from(map['photoPaths'] ?? []),
       photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
       obligatoryGroups: List<String>.from(map['obligatoryGroups'] ?? []),
+      position: map['position'] ?? -1,
     );
   }
 

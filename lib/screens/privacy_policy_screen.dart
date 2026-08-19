@@ -39,7 +39,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   SizedBox(height: 6),
                   Text(
-                    'A petit pas est un outil de suivi pédagogique utilisé en classe. '
+                    'A petits pas est un outil de suivi pédagogique utilisé en classe. '
                     'L\'application ne communique avec aucun serveur et l\'éditeur '
                     'n\'a accès à aucune des données saisies.',
                     style: TextStyle(fontSize: 13, height: 1.35),
@@ -104,7 +104,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               'Si la sauvegarde iCloud/iTunes de l\'appareil est activée dans les '
                   'réglages du système iOS, elle peut inclure ces fichiers comme '
                   'pour toute autre application : ce comportement est géré par iOS, '
-                  'pas par A petit pas.',
+                  'pas par A petits pas.',
             ],
           ),
           const _PolicySection(

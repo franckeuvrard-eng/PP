@@ -74,7 +74,7 @@ class ChildrenImportService {
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Modèle d\'import élèves A petit pas',
+        subject: 'Modèle d\'import élèves A petits pas',
       );
     } catch (e) {
       if (context.mounted) {

@@ -12,6 +12,7 @@ import '../utils/app_icons.dart';
 import '../data/sons_data.dart';
 import '../models/referential.dart';
 import '../services/child_data_export_service.dart';
+import 'ateliers_progress_screen.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
 import 'referential_progress_screen.dart';
 import 'sons_progress_screen.dart';
@@ -263,6 +264,24 @@ class ChildProfileScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
+        const Text('Ateliers',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text('Ateliers de la section de l\'élève, acquis / en cours / non acquis / non faits',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AteliersProgressScreen(child: child)),
+            ),
+            icon: const Icon(Icons.show_chart, size: 18),
+            label: const Text('Voir le suivi des ateliers'),
+          ),
+        ),
+        const Divider(height: 32),
+
         const Text('Analyse des sons',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const Text('Langage · conscience phonémique & signes graphiques',

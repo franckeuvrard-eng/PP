@@ -103,7 +103,7 @@ class AtelierPdfService {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Fiche atelier - A petit pas',
+                  pw.Text('Fiche atelier - A petits pas',
                       style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                   pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
                       style: const pw.TextStyle(fontSize: 11)),

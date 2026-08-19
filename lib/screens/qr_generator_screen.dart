@@ -59,7 +59,7 @@ class QrGeneratorScreen extends StatelessWidget {
           return [
             pw.Header(
               level: 0,
-              child: pw.Text('Badges QR Code Élèves - A petit pas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              child: pw.Text('Badges QR Code Élèves - A petits pas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             ),
             pw.SizedBox(height: 20),
             pw.GridView(
@@ -124,7 +124,7 @@ class QrGeneratorScreen extends StatelessWidget {
           return [
             pw.Header(
               level: 0,
-              child: pw.Text('Fiches QR Code Ateliers - A petit pas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              child: pw.Text('Fiches QR Code Ateliers - A petits pas', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             ),
             pw.SizedBox(height: 20),
             pw.GridView(

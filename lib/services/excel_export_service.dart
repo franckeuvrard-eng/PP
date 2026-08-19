@@ -72,7 +72,7 @@ class ExcelExportService {
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Export Excel A petit pas — ${child.firstname}',
+        subject: 'Export Excel A petits pas — ${child.firstname}',
         sharePositionOrigin: sharePositionOrigin,
       );
     } catch (e) {
@@ -152,7 +152,7 @@ class ExcelExportService {
 
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-        subject: 'Bilan Classe A petit pas (Excel)',
+        subject: 'Bilan Classe A petits pas (Excel)',
         sharePositionOrigin: sharePositionOrigin,
       );
     } catch (e) {

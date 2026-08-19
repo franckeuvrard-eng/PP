@@ -811,7 +811,7 @@ class AppStateProvider extends ChangeNotifier {
     if (file == null) return false;
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'application/zip')],
-      subject: 'Archive A petit pas ${archive.schoolYear}',
+      subject: 'Archive A petits pas ${archive.schoolYear}',
     );
     return true;
   }
@@ -1173,8 +1173,8 @@ class AppStateProvider extends ChangeNotifier {
       // 4. Share
       await Share.shareXFiles(
         [XFile(zipPath, mimeType: 'application/zip')],
-        subject: 'Sauvegarde A petit pas',
-        text: 'Backup complet A petit pas incluant toutes les données et photos.',
+        subject: 'Sauvegarde A petits pas',
+        text: 'Backup complet A petits pas incluant toutes les données et photos.',
       );
     } catch (e) {
       debugPrint('Export error: $e');
@@ -1374,6 +1374,59 @@ class AppStateProvider extends ChangeNotifier {
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
     _write(_db.deleteActivityType(id));
+    _notify();
+  }
+
+  /// Ateliers d'un espace, tries par position (mode progression).
+  List<ActivityType> ateliersInSpaceOrdered(String spaceId) {
+    final list = _activityTypes.where((a) => a.spaceId == spaceId).toList();
+    list.sort((a, b) => a.position.compareTo(b.position));
+    return list;
+  }
+
+  /// Position libre suivante dans un espace : permet a un atelier nouvellement
+  /// cree de s'ajouter en fin de liste plutot qu'en tete (-1).
+  int nextPositionForSpace(String spaceId) {
+    final positions = _activityTypes.where((a) => a.spaceId == spaceId).map((a) => a.position);
+    if (positions.isEmpty) return 0;
+    final maxPos = positions.reduce((a, b) => a > b ? a : b);
+    return maxPos + 1;
+  }
+
+  /// Active/desactive le mode progression d'un espace. A l'activation, les
+  /// ateliers encore sans position (-1) recoivent un rang sequentiel selon
+  /// leur ordre courant, pour donner un point de depart stable au tri manuel.
+  void setSpaceProgression(String spaceId, bool value) {
+    final space = _spaceById[spaceId];
+    if (space == null) return;
+    if (value) {
+      final unpositioned = _activityTypes.where((a) => a.spaceId == spaceId && a.position < 0).toList();
+      var next = nextPositionForSpace(spaceId);
+      if (next < 0) next = 0;
+      for (final atelier in unpositioned) {
+        final index = _activityTypes.indexWhere((a) => a.id == atelier.id);
+        final updated = atelier.copyWith(position: next);
+        _activityTypes[index] = updated;
+        _write(_db.saveActivityType(updated));
+        next++;
+      }
+    }
+    final updatedSpace = space.copyWith(isProgression: value);
+    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
+    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
+    _write(_db.saveSpace(updatedSpace));
+    _notify();
+  }
+
+  /// Reordonne les ateliers d'un espace suite a un glisser-deposer.
+  void reorderAteliersInSpace(String spaceId, List<String> orderedActivityTypeIds) {
+    for (var i = 0; i < orderedActivityTypeIds.length; i++) {
+      final index = _activityTypes.indexWhere((a) => a.id == orderedActivityTypeIds[i]);
+      if (index < 0) continue;
+      final updated = _activityTypes[index].copyWith(position: i);
+      _activityTypes[index] = updated;
+      _write(_db.saveActivityType(updated));
+    }
     _notify();
   }
 
