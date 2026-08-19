@@ -12,12 +12,12 @@ import '../utils/app_icons.dart';
 import '../data/sons_data.dart';
 import '../models/referential.dart';
 import '../services/child_data_export_service.dart';
+import 'atelier_history_screen.dart';
 import 'ateliers_progress_screen.dart';
 import 'children_manager_screen.dart' show ChildFormDialog;
 import 'referential_progress_screen.dart';
 import 'sons_progress_screen.dart';
 import '../widgets/voice_note_play_button.dart';
-import 'edit_activity_log_screen.dart';
 
 class ChildProfileScreen extends StatelessWidget {
   final Child child;
@@ -568,181 +568,169 @@ class ChildProfileScreen extends StatelessWidget {
       );
     }
 
-    // Group activities by date
-    final Map<String, List<ActivityLog>> groupedLogs = {};
+    // Regroupe par atelier plutot que par date : un eleve qui refait un
+    // atelier plusieurs fois n'apparait qu'une fois dans ce fil, avec son
+    // dernier statut ; l'historique complet (dates, notes, photos de chaque
+    // occurrence) reste accessible en detail via AtelierHistoryScreen.
+    final Map<String, List<ActivityLog>> byAtelier = {};
     for (final log in childLogs) {
-      final dateKey = DateFormat('dd/MM/yyyy').format(log.timestamp);
-      groupedLogs.putIfAbsent(dateKey, () => []);
-      groupedLogs[dateKey]!.add(log);
+      (byAtelier[log.activityTypeId] ??= []).add(log);
     }
+    // childLogs est deja trie du plus recent au plus ancien : l'ordre des
+    // groupes (et le "premier" de chaque groupe) en herite naturellement.
+    final atelierIds = byAtelier.keys.toList()
+      ..sort((a, b) => byAtelier[b]!.first.timestamp.compareTo(byAtelier[a]!.first.timestamp));
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: groupedLogs.length,
+      itemCount: atelierIds.length,
       itemBuilder: (context, index) {
-        final dateKey = groupedLogs.keys.elementAt(index);
-        final logs = groupedLogs[dateKey]!;
+        final logs = byAtelier[atelierIds[index]]!;
+        final log = logs.first; // occurrence la plus recente
+        final actType = provider.activityTypes.firstWhere(
+          (a) => a.id == log.activityTypeId,
+          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
+        );
+        final space = provider.spaces.firstWhere(
+          (s) => s.id == actType.spaceId,
+          orElse: () => Space(id: '', name: 'Espace inconnu', colorHex: '#718096'),
+        );
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                dateKey,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white70 : const Color(0xFF718096),
-                ),
-              ),
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => AtelierHistoryScreen(child: child, atelier: actType)),
             ),
-            ...logs.map((log) {
-              final actType = provider.activityTypes.firstWhere(
-                (a) => a.id == log.activityTypeId,
-                orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
-              );
-              final space = provider.spaces.firstWhere(
-                (s) => s.id == actType.spaceId,
-                orElse: () => Space(id: '', name: 'Espace inconnu', colorHex: '#718096'),
-              );
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
-                                  child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
-                                      size: 16, color: Colors.white),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    actType.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                      Expanded(
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                              child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
+                                  size: 16, color: Colors.white),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            tooltip: 'Éditer l\'observation',
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EditActivityLogScreen(
-                                    activityLog: log,
-                                    actType: actType,
-                                    child: child,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4E9F3D).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '📍 ${space.name}',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
-                            ),
-                          ),
-                          if (actType.isObligatoryForGroup(child.group))
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                '⭐ Obligatoire',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                actType.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          Text(
-                            '• ${DateFormat('HH:mm').format(log.timestamp)}',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0)),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                      if (actType.domaine.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          '📚 Domaine : ${actType.domaine}',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.indigo.shade800),
-                        ),
-                      ],
-                      if (actType.objectifs.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '🏁 Objectifs : ${actType.objectifs.join(' • ')}',
-                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade700),
-                        ),
-                      ],
-                      if (provider.statusLabel(log) != null) ...[
-                        const SizedBox(height: 6),
-                        Builder(builder: (context) {
-                          final status = provider.statusById(log.evaluationStatusId);
-                          final couleur = status == null
-                              ? null
-                              : Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: couleur?.withOpacity(0.15) ??
-                                  (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              provider.statusLabel(log)!,
-                              style: TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.bold, color: couleur),
-                            ),
-                          );
-                        }),
-                      ],
-                      if (log.note != null && log.note!.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          '📝 ${log.note!}',
-                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-                        ),
-                      ],
-                      if (log.audioPath != null && log.audioPath!.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        VoiceNotePlayButton(provider: provider, audioPath: log.audioPath!),
-                      ],
+                      const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
                     ],
                   ),
-                ),
-              );
-            }),
-            const Divider(),
-          ],
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '📍 ${space.name}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                        ),
+                      ),
+                      if (actType.isObligatoryForGroup(child.group))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            '⭐ Obligatoire',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
+                        ),
+                      if (logs.length > 1)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${logs.length} observations',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.grey.shade700),
+                          ),
+                        ),
+                      Text(
+                        '• ${DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)}',
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : const Color(0xFFA0AEC0)),
+                      ),
+                    ],
+                  ),
+                  if (actType.domaine.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '📚 Domaine : ${actType.domaine}',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.indigo.shade800),
+                    ),
+                  ],
+                  if (actType.objectifs.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '🏁 Objectifs : ${actType.objectifs.join(' • ')}',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade700),
+                    ),
+                  ],
+                  if (provider.statusLabel(log) != null) ...[
+                    const SizedBox(height: 6),
+                    Builder(builder: (context) {
+                      final status = provider.statusById(log.evaluationStatusId);
+                      final couleur = status == null
+                          ? null
+                          : Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: couleur?.withOpacity(0.15) ??
+                              (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          provider.statusLabel(log)!,
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold, color: couleur),
+                        ),
+                      );
+                    }),
+                  ],
+                  if (log.note != null && log.note!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '📝 ${log.note!}',
+                      style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                  if (log.audioPath != null && log.audioPath!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    VoiceNotePlayButton(provider: provider, audioPath: log.audioPath!),
+                  ],
+                ],
+              ),
+            ),
+          ),
         );
       },
     );

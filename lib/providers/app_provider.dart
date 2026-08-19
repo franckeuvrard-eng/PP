@@ -1395,8 +1395,11 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Active/desactive le mode progression d'un espace. A l'activation, les
   /// ateliers encore sans position (-1) recoivent un rang sequentiel selon
-  /// leur ordre courant, pour donner un point de depart stable au tri manuel.
-  void setSpaceProgression(String spaceId, bool value) {
+  /// leur ordre courant, pour donner un point de depart stable au tri manuel,
+  /// et le niveau minimum pour debloquer le suivant est fixe si aucun ne
+  /// l'etait deja (par defaut le dernier niveau configure, generalement le
+  /// plus abouti).
+  void setSpaceProgression(String spaceId, bool value, {String? minStatusId}) {
     final space = _spaceById[spaceId];
     if (space == null) return;
     if (value) {
@@ -1411,7 +1414,24 @@ class AppStateProvider extends ChangeNotifier {
         next++;
       }
     }
-    final updatedSpace = space.copyWith(isProgression: value);
+    final resolvedMinStatusId = value
+        ? (minStatusId ??
+            space.progressionMinStatusId ??
+            (_evaluationStatuses.isNotEmpty ? _evaluationStatuses.last.id : null))
+        : space.progressionMinStatusId;
+    final updatedSpace = space.copyWith(isProgression: value, progressionMinStatusId: resolvedMinStatusId);
+    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
+    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
+    _write(_db.saveSpace(updatedSpace));
+    _notify();
+  }
+
+  /// Change le niveau minimum a atteindre pour debloquer l'atelier suivant
+  /// dans un espace en mode progression.
+  void setSpaceProgressionMinStatus(String spaceId, String? statusId) {
+    final space = _spaceById[spaceId];
+    if (space == null) return;
+    final updatedSpace = space.copyWith(progressionMinStatusId: statusId);
     final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
     if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
     _write(_db.saveSpace(updatedSpace));

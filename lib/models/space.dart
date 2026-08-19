@@ -11,8 +11,13 @@ class Space {
 
   /// Vrai si les ateliers de cet espace doivent etre faits dans l'ordre
   /// (voir [ActivityType.position]) : un atelier reste verrouille tant que
-  /// les precedents ne sont pas acquis par l'eleve.
+  /// les precedents n'ont pas atteint [progressionMinStatusId] chez l'eleve.
   final bool isProgression;
+
+  /// Identifiant du niveau d'evaluation minimum (voir EvaluationStatus) a
+  /// atteindre sur un atelier pour debloquer le suivant. Null tant que le
+  /// mode progression n'a jamais ete configure sur cet espace.
+  final String? progressionMinStatusId;
 
   Space({
     required this.id,
@@ -21,6 +26,7 @@ class Space {
     this.description,
     this.iconName,
     this.isProgression = false,
+    this.progressionMinStatusId,
   });
 
   /// Copie modifiee. Les champs non fournis restent inchanges ; passer
@@ -32,6 +38,7 @@ class Space {
     Object? description = kUndefined,
     Object? iconName = kUndefined,
     bool? isProgression,
+    Object? progressionMinStatusId = kUndefined,
   }) {
     return Space(
       id: id ?? this.id,
@@ -40,6 +47,9 @@ class Space {
       description: description == kUndefined ? this.description : description as String?,
       iconName: iconName == kUndefined ? this.iconName : iconName as String?,
       isProgression: isProgression ?? this.isProgression,
+      progressionMinStatusId: progressionMinStatusId == kUndefined
+          ? this.progressionMinStatusId
+          : progressionMinStatusId as String?,
     );
   }
 
@@ -51,6 +61,7 @@ class Space {
       'description': description,
       'iconName': iconName,
       'isProgression': isProgression,
+      'progressionMinStatusId': progressionMinStatusId,
     };
   }
 
@@ -62,6 +73,7 @@ class Space {
       description: map['description'],
       iconName: map['iconName'],
       isProgression: map['isProgression'] ?? false,
+      progressionMinStatusId: map['progressionMinStatusId'],
     );
   }
 

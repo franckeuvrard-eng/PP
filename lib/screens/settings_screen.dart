@@ -9,6 +9,7 @@ import '../models/space.dart';
 import '../models/evaluation_status.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
+import '../services/children_import_service.dart';
 import '../utils/app_icons.dart';
 import 'atelier_detail_screen.dart';
 import 'privacy_policy_screen.dart';
@@ -167,6 +168,18 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
 
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.upload_file, color: Color(0xFF4E9F3D)),
+              title: const Text('Importer des élèves (Excel)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Modèle vierge à remplir, puis import en masse.', style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openImportExcelSheet(context, provider),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Level Selector Chips
           const Text('Niveau de Maternelle :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
@@ -258,6 +271,43 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openImportExcelSheet(BuildContext context, AppStateProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Importer des élèves depuis Excel',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('Télécharger le modèle Excel'),
+              subtitle: const Text('Une matrice vierge à remplir hors de l\'application.'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ChildrenImportService.shareTemplate(context: context, provider: provider);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload_file),
+              title: const Text('Importer un fichier rempli'),
+              subtitle: const Text('Crée un élève par ligne du fichier.'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ChildrenImportService.pickAndImport(context: context, provider: provider);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -433,6 +483,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     String color = space?.colorHex ?? '#4E9F3D';
     String? iconName = space?.iconName;
     bool isProgression = space?.isProgression ?? false;
+    String? progressionMinStatusId = space?.progressionMinStatusId ??
+        (provider.evaluationStatuses.isNotEmpty ? provider.evaluationStatuses.last.id : null);
 
     final colors = ['#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5', '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'];
 
@@ -511,21 +563,38 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Mode progression (ordre imposé)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       subtitle: const Text(
-                        "Les ateliers de cet espace doivent être faits dans l'ordre : un atelier reste verrouillé tant que les précédents ne sont pas acquis.",
+                        "Les ateliers de cet espace doivent être faits dans l'ordre : un atelier reste verrouillé tant que les précédents n'ont pas atteint le statut minimum choisi.",
                         style: TextStyle(fontSize: 12),
                       ),
                       value: isProgression,
                       activeColor: const Color(0xFF4E9F3D),
                       onChanged: (val) => setSt(() => isProgression = val),
                     ),
-                    if (isProgression && !provider.evaluationStatuses.any((s) => s.id == 'acquis'))
+                    if (isProgression && provider.evaluationStatuses.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 4),
                         child: Text(
-                          "⚠️ Aucun niveau d'évaluation « Acquis » n'existe : aucun atelier ne pourra jamais être débloqué. Ajoutez-en un dans Réglages.",
+                          "⚠️ Aucun niveau d'évaluation n'existe : aucun atelier ne pourra jamais être débloqué. Créez-en au moins un dans Réglages.",
                           style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
                         ),
                       ),
+                    if (isProgression && provider.evaluationStatuses.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: provider.evaluationStatuses.any((s) => s.id == progressionMinStatusId)
+                            ? progressionMinStatusId
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Statut minimum pour débloquer le suivant',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: provider.evaluationStatuses.map((s) {
+                          return DropdownMenuItem(value: s.id, child: Text(s.label));
+                        }).toList(),
+                        onChanged: (val) => setSt(() => progressionMinStatusId = val),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -541,9 +610,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
                         iconName: iconName,
                         isProgression: isProgression,
+                        progressionMinStatusId: isProgression ? progressionMinStatusId : space?.progressionMinStatusId,
                       );
                       provider.addOrUpdateSpace(newSpace);
-                      if (isProgression) provider.setSpaceProgression(newSpace.id, true);
+                      if (isProgression) {
+                        provider.setSpaceProgression(newSpace.id, true, minStatusId: progressionMinStatusId);
+                      }
                       Navigator.pop(context);
                     }
                   },

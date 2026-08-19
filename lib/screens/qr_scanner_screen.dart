@@ -601,10 +601,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     value: provider.evaluationStatuses.any((s) => s.id == _selectedEvaluationStatusId)
                         ? _selectedEvaluationStatusId
                         : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Statut de l\'évaluation',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.star_border),
+                    decoration: InputDecoration(
+                      labelText: 'Statut de l\'évaluation *',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.star_border),
+                      helperText: _selectedEvaluationStatusId == null ? 'Requis pour enregistrer' : null,
+                      helperStyle: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
                     ),
                     items: provider.evaluationStatuses.map((status) {
                       return DropdownMenuItem(
@@ -693,7 +695,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 const SizedBox(height: 16),
 
                 ElevatedButton.icon(
-                  onPressed: (_selectedChildId != null && _selectedActivityTypeId != null)
+                  onPressed: (_selectedChildId != null &&
+                          _selectedActivityTypeId != null &&
+                          (provider.evaluationStatuses.isEmpty || _selectedEvaluationStatusId != null))
                       ? () async {
                           // Copy all picked photos permanently to Documents
                           final List<String> savedRelativePaths = [];

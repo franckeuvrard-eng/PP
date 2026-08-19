@@ -312,8 +312,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ],
 
             // ─── Child Detailed Progress ───
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Wrap plutot que Row : sur un ecran etroit, "Progression
+            // Detaillee par Eleve" + le bouton depassaient la largeur et se
+            // recouvraient (RenderFlex overflow), rendant l'un des deux
+            // illisible. Le bouton passe simplement a la ligne si besoin.
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
               children: [
                 const Text('Progression Détaillée par Élève', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 TextButton.icon(

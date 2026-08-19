@@ -40,7 +40,8 @@ class AtelierEligibilityResult {
 ///  - la section de l'eleve doit correspondre au ciblage de l'atelier
 ///    (champ [ActivityType.obligatoryGroups] / [ActivityType.isObligatory]) ;
 ///  - si l'espace de l'atelier est en mode progression, les ateliers
-///    precedents (par [ActivityType.position]) doivent deja etre acquis.
+///    precedents (par [ActivityType.position]) doivent deja avoir atteint
+///    le niveau minimum choisi pour cet espace (Space.progressionMinStatusId).
 ///
 /// Reutilise a l'identique par le scan, la saisie manuelle et le suivi par
 /// atelier : c'est la seule source de verite pour cette regle.
@@ -99,7 +100,7 @@ class AtelierEligibilityService {
 
     final missing = <ActivityType>[];
     for (final prior in priorAteliers) {
-      if (!_isAcquiredByChild(provider, child.id, prior.id)) {
+      if (!_meetsThreshold(provider, child.id, prior.id, space.progressionMinStatusId)) {
         missing.add(prior);
       }
     }
@@ -113,14 +114,32 @@ class AtelierEligibilityService {
     );
   }
 
-  static bool _isAcquiredByChild(AppStateProvider provider, String childId, String activityTypeId) {
+  /// Vrai si le dernier statut observe sur cet atelier est au moins aussi
+  /// avance que [minStatusId], au sens de l'ordre dans lequel les niveaux
+  /// d'evaluation sont configures (voir AppStateProvider.evaluationStatuses,
+  /// generalement du moins au plus abouti). Sans seuil configure, retombe sur
+  /// le dernier niveau de la liste.
+  static bool _meetsThreshold(
+    AppStateProvider provider,
+    String childId,
+    String activityTypeId,
+    String? minStatusId,
+  ) {
+    final statuses = provider.evaluationStatuses;
+    if (statuses.isEmpty) return false;
+    final threshold = minStatusId ?? statuses.last.id;
+    final thresholdIndex = statuses.indexWhere((s) => s.id == threshold);
+    if (thresholdIndex < 0) return false;
+
     final logs = provider
         .activitiesForChild(childId)
         .where((l) => l.activityTypeId == activityTypeId)
         .toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     if (logs.isEmpty) return false;
-    return logs.first.evaluationStatusId == 'acquis';
+
+    final latestIndex = statuses.indexWhere((s) => s.id == logs.first.evaluationStatusId);
+    return latestIndex >= thresholdIndex;
   }
 
   /// Annote une liste d'ateliers candidats (par defaut tous ceux de la

@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_pdf_service.dart';
+import '../services/child_activity_report_service.dart';
 import '../services/child_data_export_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/mandatory_ateliers_pdf_service.dart';
+import '../utils/pdf_viewer.dart';
 import '../widgets/child_multi_select_dialog.dart';
 
 /// Point d'entree unique pour tous les rapports/exports : jusqu'ici
-/// disperses sur plusieurs ecrans (fiche atelier, export RGPD, bilan
-/// classe), ce qui les rendait difficiles a retrouver. Les emplacements
-/// d'origine restent fonctionnels, cet ecran ne fait que les centraliser
-/// et ajoute le nouveau rapport en masse "ateliers obligatoires".
+/// disperses sur plusieurs ecrans (fiche atelier, export RGPD, rapport de
+/// classe, import Excel), ce qui les rendait difficiles a retrouver. Les
+/// exports par eleve restent aussi accessibles depuis la fiche eleve ;
+/// le rapport de classe et l'import Excel, eux, ont demenage ici (et dans
+/// Reglages pour l'import) plutot que de rester dupliques.
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
 
@@ -91,6 +95,127 @@ class ReportsScreen extends StatelessWidget {
     }
   }
 
+  void _chooseClassReport(BuildContext context, AppStateProvider provider) {
+    DateTimeRange? customRange;
+    bool onlyLatestPerAtelier = false;
+
+    void generate(DateTime? from, DateTime? to) {
+      openPdfViewer(
+        context,
+        title: 'Rapport de classe',
+        fileName: 'Rapport_classe.pdf',
+        build: (format) => ChildActivityReportService.generateClassReportBytes(
+          provider: provider,
+          format: format,
+          from: from,
+          to: to,
+          onlyLatestPerAtelier: onlyLatestPerAtelier,
+        ),
+        shareSubject: 'Rapport de classe - ${provider.classSettings.name}',
+        shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de la classe.',
+      );
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Rapport PDF de la classe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.all_inclusive),
+                  title: const Text('Toute la période'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    generate(null, null);
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_month),
+                  title: const Text('Ce mois-ci'),
+                  onTap: () {
+                    final now = DateTime.now();
+                    Navigator.pop(sheetContext);
+                    generate(DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 1));
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.view_week),
+                  title: const Text('Semaine en cours'),
+                  onTap: () {
+                    final now = DateTime.now();
+                    final monday = now.subtract(Duration(days: now.weekday - 1));
+                    Navigator.pop(sheetContext);
+                    generate(
+                      DateTime(monday.year, monday.month, monday.day),
+                      DateTime(monday.year, monday.month, monday.day).add(const Duration(days: 7)),
+                    );
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.tune),
+                  title: Text(
+                    customRange != null
+                        ? '${DateFormat('dd/MM').format(customRange!.start)} → ${DateFormat('dd/MM').format(customRange!.end)}'
+                        : 'Période personnalisée…',
+                  ),
+                  onTap: () async {
+                    final picked = await showDateRangePicker(
+                      context: sheetContext,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      locale: const Locale('fr', 'FR'),
+                    );
+                    if (picked != null) setSheetState(() => customRange = picked);
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Occurrence la plus récente seulement', style: TextStyle(fontSize: 13)),
+                  subtitle: const Text(
+                    "Sinon, toutes les fois où chaque atelier a été refait apparaissent.",
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: onlyLatestPerAtelier,
+                  activeColor: const Color(0xFF4E9F3D),
+                  onChanged: (val) => setSheetState(() => onlyLatestPerAtelier = val),
+                ),
+                if (customRange != null) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        generate(customRange!.start, customRange!.end.add(const Duration(days: 1)));
+                      },
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text('Générer le PDF'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E9F3D), foregroundColor: Colors.white),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
@@ -165,6 +290,20 @@ class ReportsScreen extends StatelessWidget {
                 children: provider.children,
                 logs: provider.activities,
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF26A69A),
+                child: Icon(Icons.groups, color: Colors.white),
+              ),
+              title: const Text('Rapport PDF de la classe'),
+              subtitle: Text('Historique détaillé de tous les élèves (${provider.children.length}), atelier par atelier.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: provider.children.isEmpty ? null : () => _chooseClassReport(context, provider),
             ),
           ),
         ],

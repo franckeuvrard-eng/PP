@@ -173,7 +173,10 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
             ),
             const SizedBox(height: 20),
 
-            const Text('Statut d\'évaluation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              'Statut d\'évaluation${provider.evaluationStatuses.isNotEmpty ? ' *' : ''}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -189,14 +192,20 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                     color: isSelected ? couleur : Theme.of(context).colorScheme.onSurface,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
+                  // Un statut ne peut qu'etre remplace par un autre, pas retire :
+                  // une observation doit toujours en porter un.
                   onSelected: (selected) {
-                    setState(() {
-                      _evaluationStatusId = selected ? status.id : null;
-                    });
+                    if (!selected) return;
+                    setState(() => _evaluationStatusId = status.id);
                   },
                 );
               }).toList(),
             ),
+            if (_evaluationStatusId == null && provider.evaluationStatuses.isNotEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('Requis pour enregistrer', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
             const SizedBox(height: 24),
 
             TextField(
@@ -220,7 +229,8 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: () {
+                onPressed: (provider.evaluationStatuses.isEmpty || _evaluationStatusId != null)
+                    ? () {
                   // copyWith plutot qu'une reconstruction champ par champ :
                   // c'est ainsi que les legendes de photos etaient perdues.
                   final updated = widget.activityLog.copyWith(
@@ -233,7 +243,8 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Observation mise à jour ✅'), backgroundColor: Color(0xFF4E9F3D)),
                   );
-                },
+                }
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4E9F3D),
                   foregroundColor: Colors.white,

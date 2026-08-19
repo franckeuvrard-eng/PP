@@ -66,38 +66,16 @@ class MandatoryAteliersPdfService {
               else
                 for (final spaceId in spaceIds) ...[
                   pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 12, bottom: 4),
+                    padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
                     child: pw.Text(pdfSafe(provider.spaceById(spaceId)?.name ?? 'Sans espace'),
                         style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                   ),
-                  pw.Table(
-                    border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-                    columnWidths: const {0: pw.FlexColumnWidth(3), 1: pw.FlexColumnWidth(1.4)},
-                    children: [
-                      for (final atelier in bySpace[spaceId]!)
-                        pw.TableRow(
-                          children: [
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              child: pw.Text(pdfSafe(atelier.name), style: const pw.TextStyle(fontSize: 10)),
-                            ),
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              child: pw.Text(
-                                pdfSafe(
-                                  AtelierStatusResolver.resolve(
-                                    provider: provider,
-                                    childId: child.id,
-                                    activityTypeId: atelier.id,
-                                  ).label,
-                                ),
-                                style: const pw.TextStyle(fontSize: 10),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+                  for (final atelier in bySpace[spaceId]!)
+                    _atelierPlanBlock(
+                      provider: provider,
+                      child: child,
+                      atelier: atelier,
+                    ),
                 ],
             ];
           },
@@ -106,6 +84,85 @@ class MandatoryAteliersPdfService {
     }
 
     return doc.save();
+  }
+
+  /// Bloc "plan de travail" d'un atelier pour un eleve : grande case a
+  /// cocher (cochee des que le statut le plus recent est "acquis") suivie
+  /// de tout le detail de l'atelier (domaine, description, objectifs) et de
+  /// son statut courant, pour que l'eleve/la famille sache exactement quoi
+  /// faire et ou il en est.
+  static pw.Widget _atelierPlanBlock({
+    required AppStateProvider provider,
+    required Child child,
+    required ActivityType atelier,
+  }) {
+    final snapshot = AtelierStatusResolver.resolve(
+      provider: provider,
+      childId: child.id,
+      activityTypeId: atelier.id,
+    );
+    final acquis = snapshot.statusId == 'acquis';
+    final statusColor = PdfColor.fromInt(int.parse(snapshot.colorHex.replaceFirst('#', '0xff')));
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 10),
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey400, width: 0.7),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+      ),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: 24,
+            height: 24,
+            margin: const pw.EdgeInsets.only(top: 1, right: 10),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: acquis ? PdfColors.green700 : PdfColors.grey600, width: 1.5),
+              color: acquis ? PdfColors.green700 : PdfColors.white,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+            ),
+            child: acquis
+                ? pw.Center(
+                    child: pw.Text('X',
+                        style: pw.TextStyle(color: PdfColors.white, fontSize: 15, fontWeight: pw.FontWeight.bold)),
+                  )
+                : null,
+          ),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(pdfSafe(atelier.name), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                if (atelier.domaine.isNotEmpty)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 2),
+                    child: pw.Text('Domaine : ${pdfSafe(atelier.domaine)}',
+                        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                  ),
+                if (atelier.description != null && atelier.description!.trim().isNotEmpty)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 3),
+                    child: pw.Text(pdfSafe(atelier.description!.trim()), style: const pw.TextStyle(fontSize: 9)),
+                  ),
+                if (atelier.objectifs.isNotEmpty) ...[
+                  pw.SizedBox(height: 3),
+                  ...atelier.objectifs.map(
+                    (o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 9)),
+                  ),
+                ],
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Statut actuel : ${pdfSafe(snapshot.label)}',
+                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: statusColor),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Ouvre l'apercu imprimable / partageable du rapport, pour un ou plusieurs
