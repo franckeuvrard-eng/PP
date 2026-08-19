@@ -7,7 +7,20 @@ class AtelierStatusSnapshot {
   final String colorHex;
   final bool hasAnyLog;
 
-  const AtelierStatusSnapshot({required this.label, required this.colorHex, required this.hasAnyLog});
+  /// Identifiant du niveau d'evaluation le plus recent **dans la periode**,
+  /// ou null si aucune observation n'y figure (qu'il y en ait eu avant ou
+  /// jamais). Sert a regrouper « a faire » sans dependre du libelle, qui est
+  /// personnalisable.
+  final String? statusId;
+
+  bool get hasLogInPeriod => statusId != null;
+
+  const AtelierStatusSnapshot({
+    required this.label,
+    required this.colorHex,
+    required this.hasAnyLog,
+    this.statusId,
+  });
 }
 
 /// Resout le statut affichable d'un atelier pour un eleve : dernier
@@ -44,6 +57,7 @@ class AtelierStatusResolver {
       label: provider.statusLabel(latest) ?? 'Sans statut',
       colorHex: status?.colorHex ?? '#9E9E9E',
       hasAnyLog: true,
+      statusId: latest.evaluationStatusId ?? 'sans_statut',
     );
   }
 }

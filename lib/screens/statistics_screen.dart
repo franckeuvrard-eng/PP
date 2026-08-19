@@ -6,8 +6,13 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../data/eduscol_data.dart';
+import '../services/atelier_eligibility_service.dart';
+import '../services/atelier_status_resolver.dart';
+import '../services/child_ateliers_breakdown.dart';
 import '../services/excel_export_service.dart';
 import '../utils/app_icons.dart';
+import 'atelier_history_screen.dart';
+import 'ateliers_class_progress_screen.dart';
 
 enum StatsPeriod { all, today, week, month }
 
@@ -20,6 +25,24 @@ class StatisticsScreen extends StatefulWidget {
 
 class _StatisticsScreenState extends State<StatisticsScreen> {
   StatsPeriod _selectedPeriod = StatsPeriod.all;
+
+  /// Traduit le filtre de periode de cet ecran en plage de dates, pour que
+  /// le detail par atelier compte sur la meme periode que le reste de la
+  /// page plutot que de redefinir son propre selecteur.
+  DateTimeRange? _periodAsRange() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case StatsPeriod.today:
+        return DateTimeRange(start: DateTime(now.year, now.month, now.day), end: now);
+      case StatsPeriod.week:
+        return DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
+      case StatsPeriod.month:
+        return DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
+      case StatsPeriod.all:
+      default:
+        return null;
+    }
+  }
 
   List<ActivityLog> _filterLogs(List<ActivityLog> logs) {
     final now = DateTime.now();
@@ -53,9 +76,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
     // Stats calculations
     final Map<String, int> childActivityCounts = {for (var c in children) c.id: 0};
-    final Map<String, Map<String, int>> childStatusCounts = {
-      for (var c in children) c.id: {for (var s in statuses) s.id: 0}
-    };
 
     final Map<String, int> typeActivityCounts = {for (var t in types) t.id: 0};
     final Map<String, int> domainCounts = {};
@@ -68,10 +88,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         childActivityCounts[act.childId] = childActivityCounts[act.childId]! + 1;
       }
       final statusId = act.evaluationStatusId;
-      if (statusId != null && childStatusCounts.containsKey(act.childId)) {
-        final cMap = childStatusCounts[act.childId]!;
-        cMap[statusId] = (cMap[statusId] ?? 0) + 1;
-      }
 
       // Type & Domain stats
       if (typeActivityCounts.containsKey(act.activityTypeId)) {
@@ -296,7 +312,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             ],
 
             // ─── Child Detailed Progress ───
-            const Text('Progression Détaillée par Élève', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Progression Détaillée par Élève', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AteliersClassProgressScreen()),
+                  ),
+                  icon: const Icon(Icons.grid_on, size: 16),
+                  label: const Text('Détail par atelier'),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -311,10 +340,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 separatorBuilder: (context, index) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final child = sortedChildren[index];
-                  final totalCount = childActivityCounts[child.id] ?? 0;
-                  final sMap = childStatusCounts[child.id] ?? {};
-                  // Identifiant stable : plus besoin de deviner depuis le texte.
-                  final acquisCount = sMap['acquis'] ?? 0;
+                  // Repartition par atelier de la section de l'eleve, sur la
+                  // meme periode que le reste de cet ecran : c'est elle qui
+                  // pilote le compteur et la liste depliee, pas seulement le
+                  // compte brut d'observations toutes ateliers confondues.
+                  final breakdown = ChildAteliersBreakdown.compute(
+                    provider: provider,
+                    child: child,
+                    period: _periodAsRange(),
+                  );
 
                   return ExpansionTile(
                     leading: CircleAvatar(
@@ -322,40 +356,70 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                     title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('$totalCount activité(s) enregistrée(s)', style: const TextStyle(fontSize: 12)),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          if (breakdown.aFaire.isNotEmpty) _miniCounter('${breakdown.aFaire.length} à faire', Colors.grey),
+                          for (final st in statuses)
+                            if ((breakdown.statusCounts[st.id] ?? 0) > 0)
+                              _miniCounter(
+                                '${breakdown.statusCounts[st.id]} ${st.label}',
+                                Color(int.parse(st.colorHex.replaceFirst('#', '0xff'))),
+                              ),
+                          // Observation enregistree sans niveau d'evaluation choisi :
+                          // rare, mais sinon son compte disparaissait du resume.
+                          if ((breakdown.statusCounts['sans_statut'] ?? 0) > 0)
+                            _miniCounter('${breakdown.statusCounts['sans_statut']} sans statut', Colors.blueGrey),
+                          if (breakdown.totalCount == 0)
+                            const Text('Aucun atelier configuré pour sa section', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4E9F3D).withOpacity(0.15),
+                        color: (breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text('$acquisCount Acquis', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D), fontSize: 12)),
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Détail des évaluations :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: statuses.map((st) {
-                                final cnt = sMap[st.id] ?? 0;
-                                final col = Color(int.parse(st.colorHex.replaceFirst('#', '0xff')));
-                                return Chip(
-                                  backgroundColor: col.withOpacity(0.1),
-                                  side: BorderSide(color: col.withOpacity(0.3)),
-                                  label: Text('${st.label} : $cnt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: col)),
-                                  visualDensity: VisualDensity.compact,
-                                );
-                              }).toList(),
-                            ),
-                          ],
+                      child: Text(
+                        breakdown.aFaire.isEmpty ? 'Tout fait' : '${breakdown.aFaire.length} à faire',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange.shade800,
                         ),
                       ),
+                    ),
+                    children: [
+                      if (breakdown.totalCount == 0)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Text('Aucun atelier ne cible la section de cet élève pour le moment.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (breakdown.aFaire.isNotEmpty) ...[
+                                const Text('⏳ À faire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.orange)),
+                                ...breakdown.aFaire.map((e) => _childAtelierTile(context, child, e.key, e.value, null)),
+                                const SizedBox(height: 8),
+                              ],
+                              if (breakdown.realise.isNotEmpty) ...[
+                                const Text('✅ Réalisé', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4E9F3D))),
+                                ...breakdown.realise.map(
+                                  (e) => _childAtelierTile(context, child, e.key, e.value, breakdown.snapshots[e.key.id]),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -519,6 +583,63 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _miniCounter(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+      child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+    );
+  }
+
+  /// Ligne d'un atelier dans le detail deplie d'un eleve. [snapshot] est
+  /// null pour un atelier verrouille par la progression (aucun statut a
+  /// afficher dans ce cas).
+  Widget _childAtelierTile(
+    BuildContext context,
+    Child child,
+    ActivityType atelier,
+    AtelierEligibilityResult eligibility,
+    AtelierStatusSnapshot? snapshot,
+  ) {
+    if (eligibility.status == AtelierEligibility.blockedProgression) {
+      return ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.lock_outline, size: 18, color: Colors.grey),
+        title: Text(atelier.name, style: const TextStyle(fontSize: 13)),
+        subtitle: Text(eligibility.message, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      );
+    }
+
+    final label = snapshot?.label ?? '';
+    final color = snapshot != null ? Color(int.parse(snapshot.colorHex.replaceFirst('#', '0xff'))) : Colors.grey;
+
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        radius: 12,
+        backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
+        child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 12, color: Colors.white),
+      ),
+      title: Text(atelier.name, style: const TextStyle(fontSize: 13)),
+      subtitle: eligibility.status == AtelierEligibility.allowedWithWarning
+          ? Text(eligibility.message, style: const TextStyle(fontSize: 11, color: Colors.orange))
+          : null,
+      trailing: label.isEmpty
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+              child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+            ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AtelierHistoryScreen(child: child, atelier: atelier)),
+      ),
     );
   }
 
