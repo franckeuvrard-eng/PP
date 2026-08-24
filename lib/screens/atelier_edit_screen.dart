@@ -5,8 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/activity_type.dart';
 import '../data/eduscol_data.dart';
-import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
+import '../widgets/color_swatch_picker.dart';
+import '../widgets/icon_swatch_picker.dart';
 
 /// Formulaire plein écran de création / édition d'un atelier, accessible
 /// depuis l'onglet « Espaces & Ateliers » des Réglages.
@@ -44,10 +45,11 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   final ScrollController _objectivesScrollCtrl = ScrollController();
   String _objectiveQuery = '';
 
-  final List<String> _colors = [
-    '#FF7043', '#4E9F3D', '#7E57C2', '#FFA726', '#42A5F5',
-    '#8D6E63', '#E91E63', '#00BCD4', '#673AB7', '#FF5722'
-  ];
+  /// Sections repliees par defaut sur un atelier neuf (pour reduire le
+  /// defilement) mais depliees d'emblee si elles contiennent deja des
+  /// donnees, pour ne rien cacher a l'edition.
+  late final bool _domainSectionHasContent;
+  late final bool _visualSectionHasContent;
 
   @override
   void initState() {
@@ -60,7 +62,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _customDomaineCtrl = TextEditingController();
     _customObjectiveCtrl = TextEditingController();
 
-    _spaceId = widget.preselectedSpaceId ?? act?.spaceId ?? (provider.spaces.isNotEmpty ? provider.spaces.first.id : '');
+    _spaceId = widget.preselectedSpaceId ??
+        act?.spaceId ??
+        (provider.spaces.isNotEmpty ? provider.spaces.first.id : '');
     _color = act?.colorHex ?? '#4E9F3D';
     _isObligatory = act?.isObligatory ?? false;
 
@@ -82,6 +86,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _photoPaths = List<String>.from(act?.photoPaths ?? []);
     _photoCaptions = Map<String, String>.from(act?.photoCaptions ?? {});
     _imagePath = act?.imagePath;
+
+    _domainSectionHasContent =
+        act != null && (act.domaine.isNotEmpty || act.objectifs.isNotEmpty);
+    _visualSectionHasContent = act != null &&
+        ((act.description?.trim().isNotEmpty ?? false) ||
+            act.photoPaths.isNotEmpty ||
+            act.iconName != null);
   }
 
   Future<void> _editPhotoCaption(String relPath) async {
@@ -154,7 +165,8 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       imageQuality: AppStateProvider.photoQuality,
                     );
                     for (final img in images) {
-                      final relPath = await provider.saveXFileToDocs(img, 'ateliers');
+                      final relPath =
+                          await provider.saveXFileToDocs(img, 'ateliers');
                       if (mounted) setState(() => _photoPaths.add(relPath));
                     }
                   } catch (e) {
@@ -199,20 +211,25 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     final query = _objectiveQuery.trim().toLowerCase();
     final availableEduscolObjectives = EduscolData.objectives.where((obj) {
       final matchDomain = obj.domainId == _selectedDomainId;
-      final matchLevel = _selectedLevelFilter == 'Tous' || obj.level == _selectedLevelFilter;
-      final matchQuery = query.isEmpty || obj.text.toLowerCase().contains(query);
+      final matchLevel =
+          _selectedLevelFilter == 'Tous' || obj.level == _selectedLevelFilter;
+      final matchQuery =
+          query.isEmpty || obj.text.toLowerCase().contains(query);
       return matchDomain && matchLevel && matchQuery;
     }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.activityType == null ? 'Nouveau type d\'atelier' : 'Modifier l\'atelier'),
+        title: Text(widget.activityType == null
+            ? 'Nouveau type d\'atelier'
+            : 'Modifier l\'atelier'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ElevatedButton.icon(
               icon: const Icon(Icons.check, size: 18),
-              label: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: const Text('Enregistrer',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4E9F3D),
                 foregroundColor: Colors.white,
@@ -229,13 +246,16 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
           children: [
             // Section 1: Informations de base
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('📌 Informations Générales', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('📌 Informations Générales',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _nameCtrl,
@@ -248,13 +268,18 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: provider.spaces.any((s) => s.id == _spaceId) ? _spaceId : null,
+                      value: provider.spaces.any((s) => s.id == _spaceId)
+                          ? _spaceId
+                          : null,
                       decoration: const InputDecoration(
                         labelText: 'Espace de la classe *',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.space_dashboard),
                       ),
-                      items: provider.spaces.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                      items: provider.spaces
+                          .map((s) => DropdownMenuItem(
+                              value: s.id, child: Text(s.name)))
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) setState(() => _spaceId = val);
                       },
@@ -266,7 +291,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         children: [
                           Icon(Icons.stars, color: Colors.orange),
                           SizedBox(width: 8),
-                          Text('Atelier Obligatoire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('Atelier Obligatoire',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14)),
                         ],
                       ),
                       subtitle: const Text(
@@ -279,13 +306,16 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ),
                     if (_isObligatory) ...[
                       const SizedBox(height: 4),
-                      const Text('Sections concernées :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text('Sections concernées :',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
                       const SizedBox(height: 4),
                       Text(
                         _obligatoryGroups.isEmpty
                             ? 'Aucune section sélectionnée : obligatoire pour toute la classe.'
                             : 'Obligatoire uniquement pour ${_obligatoryGroups.length} section(s).',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
                       Builder(
@@ -294,7 +324,10 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                           if (groups.isEmpty) {
                             return const Text(
                               'Aucune section définie. Ajoutez-en dans Paramètres > Ma classe.',
-                              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey),
                             );
                           }
                           return Wrap(
@@ -303,9 +336,11 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                             children: groups.map((g) {
                               final isSelected = _obligatoryGroups.contains(g);
                               return FilterChip(
-                                label: Text(g, style: const TextStyle(fontSize: 13)),
+                                label: Text(g,
+                                    style: const TextStyle(fontSize: 13)),
                                 selected: isSelected,
-                                selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                                selectedColor:
+                                    const Color(0xFF4E9F3D).withOpacity(0.2),
                                 checkmarkColor: const Color(0xFF4E9F3D),
                                 onSelected: (sel) {
                                   setState(() {
@@ -330,138 +365,176 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
 
             // Section 2: Domaine & Objectifs Éduscol
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('📚 Domaine & Objectifs Éduscol (Cycle 1)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: (_selectedDomainId == 'custom' || _selectedDomainId == 'none' || EduscolData.domains.any((d) => d.id == _selectedDomainId)) ? _selectedDomainId : 'none',
-                      decoration: const InputDecoration(
-                        labelText: 'Domaine d\'apprentissage Éduscol (Optionnel)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.school),
-                      ),
-                      isExpanded: true,
-                      items: [
-                        const DropdownMenuItem(
-                          value: 'none',
-                          child: Text('-- Aucun domaine sélectionné --', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                        ),
-                        ...EduscolData.domains.map((d) => DropdownMenuItem(
-                          value: d.id,
-                          child: Text(d.title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                        )),
-                        const DropdownMenuItem(
-                          value: 'custom',
-                          child: Text('➕ Autre (Saisie personnalisée)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _selectedDomainId = val);
-                        }
-                      },
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: ExpansionTile(
+                initiallyExpanded: _domainSectionHasContent,
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                expandedAlignment: Alignment.centerLeft,
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: const Text('📚 Domaine & Objectifs Éduscol (Cycle 1)',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: (_selectedDomainId == 'custom' ||
+                            _selectedDomainId == 'none' ||
+                            EduscolData.domains
+                                .any((d) => d.id == _selectedDomainId))
+                        ? _selectedDomainId
+                        : 'none',
+                    decoration: const InputDecoration(
+                      labelText: 'Domaine d\'apprentissage Éduscol (Optionnel)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.school),
                     ),
-
-                    if (_selectedDomainId == 'custom') ...[
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _customDomaineCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Nom du domaine personnalisé',
-                          border: OutlineInputBorder(),
-                        ),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'none',
+                        child: Text('-- Aucun domaine sélectionné --',
+                            style: TextStyle(fontSize: 13, color: Colors.grey)),
+                      ),
+                      ...EduscolData.domains.map((d) => DropdownMenuItem(
+                            value: d.id,
+                            child: Text(d.title,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13)),
+                          )),
+                      const DropdownMenuItem(
+                        value: 'custom',
+                        child: Text('➕ Autre (Saisie personnalisée)',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold)),
                       ),
                     ],
-                    const SizedBox(height: 16),
-
-                    if (_selectedDomainId != 'custom' && _selectedDomainId != 'none') ...[
-                      // Le libelle sur sa propre ligne et un Wrap plutot qu'un
-                      // defilement horizontal : sur telephone, partager la Row
-                      // avec le titre ne laissait qu'une bande etroite.
-                      const Text('🎯 Tranche d\'âge / Niveau :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
-                          final isSelected = _selectedLevelFilter == lvl;
-                          return ChoiceChip(
-                            label: Text(
-                              lvl == 'PS' ? 'PS (2-4 ans)' : lvl == 'MS' ? 'MS (4-5 ans)' : lvl == 'GS' ? 'GS (5-6 ans)' : 'Tous',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                            ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFF4E9F3D),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            onSelected: (sel) {
-                              if (sel) setState(() => _selectedLevelFilter = lvl);
-                            },
-                          );
-                        }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedDomainId = val);
+                      }
+                    },
+                  ),
+                  if (_selectedDomainId == 'custom') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _customDomaineCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom du domaine personnalisé',
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(height: 8),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (_selectedDomainId != 'custom' &&
+                      _selectedDomainId != 'none') ...[
+                    // Le libelle sur sa propre ligne et un Wrap plutot qu'un
+                    // defilement horizontal : sur telephone, partager la Row
+                    // avec le titre ne laissait qu'une bande etroite.
+                    const Text('🎯 Tranche d\'âge / Niveau :',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
+                        final isSelected = _selectedLevelFilter == lvl;
+                        return ChoiceChip(
+                          label: Text(
+                            lvl == 'PS'
+                                ? 'PS (2-4 ans)'
+                                : lvl == 'MS'
+                                    ? 'MS (4-5 ans)'
+                                    : lvl == 'GS'
+                                        ? 'GS (5-6 ans)'
+                                        : 'Tous',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFF4E9F3D),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          onSelected: (sel) {
+                            if (sel) setState(() => _selectedLevelFilter = lvl);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
 
-                      TextField(
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: 'Rechercher un objectif...',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          suffixIcon: _objectiveQuery.isEmpty
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () => setState(() => _objectiveQuery = ''),
-                                ),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onChanged: (val) => setState(() => _objectiveQuery = val),
+                    TextField(
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Rechercher un objectif...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _objectiveQuery.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () =>
+                                    setState(() => _objectiveQuery = ''),
+                              ),
+                        border: const OutlineInputBorder(),
                       ),
-                      const SizedBox(height: 8),
+                      onChanged: (val) => setState(() => _objectiveQuery = val),
+                    ),
+                    const SizedBox(height: 8),
 
-                      Container(
-                        // Liste plus haute et barre de defilement toujours
-                        // visible : a 220 px sans ascenseur, on ne voyait pas
-                        // ou l'on se situait dans le referentiel.
-                        constraints: const BoxConstraints(maxHeight: 380),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(context).dividerColor),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: availableEduscolObjectives.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('Aucun objectif ne correspond à ce filtre.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              )
-                            : Scrollbar(
-                                controller: _objectivesScrollCtrl,
-                                thumbVisibility: true,
-                                child: ListView.separated(
+                    Container(
+                      // Liste plus haute et barre de defilement toujours
+                      // visible : a 220 px sans ascenseur, on ne voyait pas
+                      // ou l'on se situait dans le referentiel.
+                      constraints: const BoxConstraints(maxHeight: 380),
+                      decoration: BoxDecoration(
+                        border:
+                            Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: availableEduscolObjectives.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                  'Aucun objectif ne correspond à ce filtre.',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey)),
+                            )
+                          : Scrollbar(
+                              controller: _objectivesScrollCtrl,
+                              thumbVisibility: true,
+                              child: ListView.separated(
                                 controller: _objectivesScrollCtrl,
                                 shrinkWrap: true,
                                 padding: const EdgeInsets.only(right: 8),
                                 itemCount: availableEduscolObjectives.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
                                 itemBuilder: (context, idx) {
                                   final obj = availableEduscolObjectives[idx];
-                                  final isChecked = _selectedObjectives.contains(obj.text);
+                                  final isChecked =
+                                      _selectedObjectives.contains(obj.text);
                                   return CheckboxListTile(
                                     dense: true,
-                                    title: Text(obj.text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                                    subtitle: Text('Niveau Éduscol : ${obj.level}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                    title: Text(obj.text,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
+                                    subtitle: Text(
+                                        'Niveau Éduscol : ${obj.level}',
+                                        style: const TextStyle(
+                                            fontSize: 12, color: Colors.grey)),
                                     value: isChecked,
                                     activeColor: const Color(0xFF4E9F3D),
                                     onChanged: (val) {
                                       setState(() {
                                         if (val == true) {
-                                          if (!_selectedObjectives.contains(obj.text)) {
+                                          if (!_selectedObjectives
+                                              .contains(obj.text)) {
                                             _selectedObjectives.add(obj.text);
                                           }
                                         } else {
@@ -473,247 +546,246 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                 },
                               ),
                             ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    const Text('🏁 Objectifs retenus pour cet atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    if (_selectedObjectives.isEmpty)
-                      const Text('Aucun objectif sélectionné.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey))
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _selectedObjectives.map((objText) {
-                          return Chip(
-                            label: Text(objText, style: const TextStyle(fontSize: 12)),
-                            deleteIcon: const Icon(Icons.close, size: 16),
-                            onDeleted: () {
-                              setState(() {
-                                _selectedObjectives.remove(objText);
-                              });
-                            },
-                            backgroundColor: const Color(0xFF4E9F3D).withOpacity(0.15),
-                          );
-                        }).toList(),
-                      ),
+                    ),
                     const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _customObjectiveCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Ajouter un objectif sur-mesure',
-                              hintText: 'Ex: Utiliser des ciseaux à bouts ronds',
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                            ),
+                  ],
+                  const Text('🏁 Objectifs retenus pour cet atelier :',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  if (_selectedObjectives.isEmpty)
+                    const Text('Aucun objectif sélectionné.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey))
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _selectedObjectives.map((objText) {
+                        return Chip(
+                          label: Text(objText,
+                              style: const TextStyle(fontSize: 12)),
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedObjectives.remove(objText);
+                            });
+                          },
+                          backgroundColor:
+                              const Color(0xFF4E9F3D).withOpacity(0.15),
+                        );
+                      }).toList(),
+                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _customObjectiveCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Ajouter un objectif sur-mesure',
+                            hintText: 'Ex: Utiliser des ciseaux à bouts ronds',
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () {
-                            final txt = _customObjectiveCtrl.text.trim();
-                            if (txt.isNotEmpty) {
-                              setState(() {
-                                if (!_selectedObjectives.contains(txt)) {
-                                  _selectedObjectives.add(txt);
-                                }
-                                _customObjectiveCtrl.clear();
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.add_circle, color: Color(0xFF4E9F3D), size: 36),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          final txt = _customObjectiveCtrl.text.trim();
+                          if (txt.isNotEmpty) {
+                            setState(() {
+                              if (!_selectedObjectives.contains(txt)) {
+                                _selectedObjectives.add(txt);
+                              }
+                              _customObjectiveCtrl.clear();
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.add_circle,
+                            color: Color(0xFF4E9F3D), size: 36),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
 
             // Section 3: Description & Couleur
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🎨 Description & Identité Visuelle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _descCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Description de l\'activité (optionnel)',
-                        border: OutlineInputBorder(),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: ExpansionTile(
+                initiallyExpanded: _visualSectionHasContent,
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                expandedAlignment: Alignment.centerLeft,
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: const Text('🎨 Description & Identité Visuelle',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                children: [
+                  TextField(
+                    controller: _descCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Description de l\'activité (optionnel)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Couleur de l\'atelier :',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  ColorSwatchPicker(
+                    selectedHex: _color,
+                    onChanged: (hex) => setState(() => _color = hex),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Icône de l\'atelier :',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  IconSwatchPicker(
+                    iconName: _iconName,
+                    previewColor: hexToColor(_color),
+                    fallback: Icons.category,
+                    onChanged: (val) {
+                      if (!mounted) return;
+                      setState(() => _iconName = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Photos de l\'atelier :',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Couleur de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: _colors.map((c) {
-                        final isSelected = c == _color;
-                        return GestureDetector(
-                          onTap: () => setState(() => _color = c),
+                      Text('${_photoPaths.length} photo(s)',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Elles illustrent l\'atelier et sont reprises dans l\'export PDF.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 132,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        GestureDetector(
+                          onTap: _addAtelierPhotos,
                           child: Container(
-                            width: 36,
-                            height: 36,
+                            width: 88,
+                            height: 88,
                             decoration: BoxDecoration(
-                              color: hexToColor(c),
-                              shape: BoxShape.circle,
-                              border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
-                              boxShadow: isSelected ? [BoxShadow(color: hexToColor(c), blurRadius: 8)] : null,
+                              color:
+                                  Theme.of(context).colorScheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: Theme.of(context).dividerColor),
                             ),
-                            child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    const Text('Icône de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: hexToColor(_color).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            iconForName(_iconName, fallback: Icons.category),
-                            color: hexToColor(_color),
+                            child: Icon(Icons.add_a_photo,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                size: 26),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              final picked = await showAppIconPicker(context, _iconName);
-                              if (picked != null && mounted) {
-                                setState(() => _iconName = picked.isEmpty ? null : picked);
-                              }
-                            },
-                            icon: const Icon(Icons.emoji_symbols),
-                            label: Text(_iconName == null ? 'Choisir une icône' : 'Icône : $_iconName'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text('Photos de l\'atelier :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        ),
-                        Text('${_photoPaths.length} photo(s)', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Elles illustrent l\'atelier et sont reprises dans l\'export PDF.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 132,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          GestureDetector(
-                            onTap: _addAtelierPhotos,
-                            child: Container(
-                              width: 88,
-                              height: 88,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceVariant,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Theme.of(context).dividerColor),
-                              ),
-                              child: Icon(Icons.add_a_photo,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant, size: 26),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ..._photoPaths.asMap().entries.map((entry) {
-                            final relPath = entry.value;
-                            final absPath = provider.getAbsolutePath(relPath);
-                            final caption = _photoCaptions[relPath];
-                            final hasCaption = caption != null && caption.trim().isNotEmpty;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: absPath != null && File(absPath).existsSync()
-                                            ? Image.file(File(absPath), width: 88, height: 88, fit: BoxFit.cover)
-                                            : Container(
-                                                width: 88,
-                                                height: 88,
-                                                color: Theme.of(context).colorScheme.surfaceVariant,
-                                                child: const Icon(Icons.broken_image, size: 24),
-                                              ),
-                                      ),
-                                      Positioned(
-                                        top: 2,
-                                        right: 2,
-                                        child: GestureDetector(
-                                          onTap: () => setState(() {
-                                            _photoPaths.removeAt(entry.key);
-                                            _photoCaptions.remove(relPath);
-                                          }),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(3),
-                                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                            child: const Icon(Icons.close, size: 12, color: Colors.white),
-                                          ),
+                        const SizedBox(width: 8),
+                        ..._photoPaths.asMap().entries.map((entry) {
+                          final relPath = entry.value;
+                          final absPath = provider.getAbsolutePath(relPath);
+                          final caption = _photoCaptions[relPath];
+                          final hasCaption =
+                              caption != null && caption.trim().isNotEmpty;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: absPath != null &&
+                                              File(absPath).existsSync()
+                                          ? Image.file(File(absPath),
+                                              width: 88,
+                                              height: 88,
+                                              fit: BoxFit.cover)
+                                          : Container(
+                                              width: 88,
+                                              height: 88,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceVariant,
+                                              child: const Icon(
+                                                  Icons.broken_image,
+                                                  size: 24),
+                                            ),
+                                    ),
+                                    Positioned(
+                                      top: 2,
+                                      right: 2,
+                                      child: GestureDetector(
+                                        onTap: () => setState(() {
+                                          _photoPaths.removeAt(entry.key);
+                                          _photoCaptions.remove(relPath);
+                                        }),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle),
+                                          child: const Icon(Icons.close,
+                                              size: 12, color: Colors.white),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  SizedBox(
-                                    width: 88,
-                                    child: TextButton.icon(
-                                      onPressed: () => _editPhotoCaption(relPath),
-                                      style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(0, 32),
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      icon: Icon(hasCaption ? Icons.edit_note : Icons.add_comment, size: 14),
-                                      label: Text(
-                                        hasCaption ? caption.trim() : 'Commenter',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(
+                                  width: 88,
+                                  child: TextButton.icon(
+                                    onPressed: () => _editPhotoCaption(relPath),
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(0, 32),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    icon: Icon(
+                                        hasCaption
+                                            ? Icons.edit_note
+                                            : Icons.add_comment,
+                                        size: 14),
+                                    label: Text(
+                                      hasCaption ? caption.trim() : 'Commenter',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             // Le bouton d'enregistrement est celui de la barre du haut :
@@ -728,7 +800,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   void _saveAtelier() {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez saisir un nom d\'atelier.'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Veuillez saisir un nom d\'atelier.'),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -738,7 +812,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     if (_selectedDomainId == 'custom') {
       finalDomaine = _customDomaineCtrl.text.trim();
     } else if (_selectedDomainId != null && _selectedDomainId != 'none') {
-      final dom = EduscolData.domains.firstWhere((d) => d.id == _selectedDomainId, orElse: () => EduscolData.domains.first);
+      final dom = EduscolData.domains.firstWhere(
+          (d) => d.id == _selectedDomainId,
+          orElse: () => EduscolData.domains.first);
       finalDomaine = dom.title;
       finalDomaineId = dom.id;
     }
@@ -750,12 +826,14 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     // hors contexte.
     final keepsPreviousPosition =
         widget.activityType != null && widget.activityType!.spaceId == _spaceId;
-    final position = (keepsPreviousPosition ? widget.activityType?.position : null) ??
-        (provider.spaceById(_spaceId)?.isProgression == true
-            ? provider.nextPositionForSpace(_spaceId)
-            : -1);
+    final position =
+        (keepsPreviousPosition ? widget.activityType?.position : null) ??
+            (provider.spaceById(_spaceId)?.isProgression == true
+                ? provider.nextPositionForSpace(_spaceId)
+                : -1);
     final newType = ActivityType(
-      id: widget.activityType?.id ?? 'act_${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.activityType?.id ??
+          'act_${DateTime.now().millisecondsSinceEpoch}',
       name: _nameCtrl.text.trim(),
       spaceId: _spaceId,
       colorHex: _color,
