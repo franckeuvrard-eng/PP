@@ -44,19 +44,47 @@ class SpacesWorkshopsTab extends StatelessWidget {
           // Spaces list
           ...spaces.map((space) {
             final ateliersInSpace = allAteliers.where((a) => a.spaceId == space.id).toList();
+            final spaceColor = hexToColor(space.colorHex);
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: spaceColor.withOpacity(0.3)),
+              ),
               child: ExpansionTile(
+                tilePadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
                 leading: CircleAvatar(
-                  backgroundColor: hexToColor(space.colorHex),
+                  radius: 24,
+                  backgroundColor: spaceColor,
                   child: Icon(iconForName(space.iconName, fallback: Icons.space_dashboard),
-                      color: Colors.white, size: 20),
+                      color: Colors.white, size: 22),
                 ),
-                title: Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(
-                  '${ateliersInSpace.length} atelier(s)${space.description != null ? ' • ${space.description}' : ''}',
-                  style: const TextStyle(fontSize: 12),
+                title: Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          _badge('${ateliersInSpace.length} atelier(s)', spaceColor),
+                          if (space.isProgression) _badge('🔒 Progression', Colors.deepOrange),
+                        ],
+                      ),
+                      if (space.description != null && space.description!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          space.description!,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -136,6 +164,19 @@ class SpacesWorkshopsTab extends StatelessWidget {
     );
   }
 
+  /// Petite pastille arrondie (nombre d'ateliers, mode progression...) pour
+  /// distinguer les espaces d'un coup d'œil sans avoir à les déplier.
+  Widget _badge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+    );
+  }
+
   /// Ligne condensee d'un atelier : le detail (domaine, objectifs, photos,
   /// obligatoire) est dans AtelierDetailScreen, a un tap. [dragIndex] non nul
   /// affiche une poignee de glisser-deposer au lieu du chevron (mode
@@ -155,7 +196,18 @@ class SpacesWorkshopsTab extends StatelessWidget {
         backgroundColor: hexToColor(atelier.colorHex),
         child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
       ),
-      title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          ),
+          if (atelier.isObligatory)
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.stars, size: 15, color: Colors.orange),
+            ),
+        ],
+      ),
       subtitle: atelier.domaine.isEmpty && atelier.objectifs.isEmpty
           ? null
           : Text(
