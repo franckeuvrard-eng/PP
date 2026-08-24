@@ -9,6 +9,7 @@ import '../models/activity_type.dart';
 import '../models/activity.dart';
 import '../models/space.dart';
 import '../utils/app_icons.dart';
+import '../utils/color_utils.dart';
 import '../data/sons_data.dart';
 import '../models/referential.dart';
 import '../services/child_data_export_service.dart';
@@ -192,7 +193,7 @@ class ChildProfileScreen extends StatelessWidget {
           )
         : CircleAvatar(
             radius: 56,
-            backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+            backgroundColor: hexToColor(child.colorHex),
             child: Text(
               child.avatarText,
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
@@ -616,7 +617,7 @@ class ChildProfileScreen extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                              backgroundColor: hexToColor(actType.colorHex),
                               child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
                                   size: 16, color: Colors.white),
                             ),
@@ -698,9 +699,7 @@ class ChildProfileScreen extends StatelessWidget {
                     const SizedBox(height: 6),
                     Builder(builder: (context) {
                       final status = provider.statusById(log.evaluationStatusId);
-                      final couleur = status == null
-                          ? null
-                          : Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+                      final couleur = status == null ? null : hexToColor(status.colorHex);
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(

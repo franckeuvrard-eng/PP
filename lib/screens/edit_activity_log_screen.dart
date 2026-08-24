@@ -6,6 +6,7 @@ import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/space.dart';
+import '../utils/color_utils.dart';
 import '../widgets/voice_note_field.dart';
 
 class EditActivityLogScreen extends StatefulWidget {
@@ -114,7 +115,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                     Row(
                       children: [
                         CircleAvatar(
-                          backgroundColor: Color(int.parse(widget.child.colorHex.replaceFirst('#', '0xff'))),
+                          backgroundColor: hexToColor(widget.child.colorHex),
                           child: Text(
                             widget.child.firstname.isNotEmpty ? widget.child.firstname[0].toUpperCase() : '?',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -140,7 +141,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Color(int.parse(space.colorHex.replaceFirst('#', '0xff'))).withOpacity(0.15),
+                            color: hexToColor(space.colorHex).withOpacity(0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -148,7 +149,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Color(int.parse(space.colorHex.replaceFirst('#', '0xff'))),
+                              color: hexToColor(space.colorHex),
                             ),
                           ),
                         ),
@@ -183,7 +184,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
               runSpacing: 8,
               children: provider.evaluationStatuses.map((status) {
                 final isSelected = _evaluationStatusId == status.id;
-                final couleur = Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+                final couleur = hexToColor(status.colorHex);
                 return ChoiceChip(
                   label: Text(status.label),
                   selected: isSelected,

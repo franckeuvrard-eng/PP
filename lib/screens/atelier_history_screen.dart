@@ -6,6 +6,7 @@ import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../providers/app_provider.dart';
+import '../utils/color_utils.dart';
 import '../widgets/voice_note_play_button.dart';
 import 'edit_activity_log_screen.dart';
 
@@ -44,7 +45,7 @@ class AtelierHistoryScreen extends StatelessWidget {
 
   Widget _buildLogCard(BuildContext context, AppStateProvider provider, ActivityLog log) {
     final status = provider.statusById(log.evaluationStatusId);
-    final color = status != null ? Color(int.parse(status.colorHex.replaceFirst('#', '0xff'))) : Colors.grey;
+    final color = status != null ? hexToColor(status.colorHex) : Colors.grey;
     final label = provider.statusLabel(log);
 
     return Card(

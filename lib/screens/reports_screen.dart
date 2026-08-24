@@ -37,7 +37,7 @@ class ReportsScreen extends StatelessWidget {
               const SizedBox(height: 12),
               for (final space in provider.spaces) ...[
                 Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D))),
-                ...provider.activityTypes.where((a) => a.spaceId == space.id).map(
+                ...provider.ateliersInSpaceOrdered(space.id).map(
                       (a) => ListTile(
                         dense: true,
                         title: Text(a.name),

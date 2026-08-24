@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../services/child_activity_report_service.dart';
+import '../utils/color_utils.dart';
 import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
 
@@ -31,7 +32,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
           )
         : CircleAvatar(
             radius: 24,
-            backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+            backgroundColor: hexToColor(child.colorHex),
             child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           );
     if (child.imageAuthorized) return avatar;

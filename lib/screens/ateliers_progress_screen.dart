@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/space.dart';
@@ -9,10 +8,10 @@ import '../services/atelier_eligibility_service.dart';
 import '../services/atelier_status_resolver.dart';
 import '../services/child_ateliers_breakdown.dart';
 import '../utils/app_icons.dart';
+import '../utils/color_utils.dart';
+import '../widgets/period_filter_bar.dart';
 import 'atelier_history_screen.dart';
 import 'ateliers_class_progress_screen.dart';
-
-enum _QuickPeriod { toutes, semaine, mois, personnalise }
 
 /// Suivi par atelier d'un eleve : seuls les ateliers pertinents pour sa
 /// section sont montres (meme regle que le scan/la saisie manuelle), avec
@@ -28,40 +27,20 @@ class AteliersProgressScreen extends StatefulWidget {
 
 class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
   DateTimeRange? _period;
-  _QuickPeriod _quick = _QuickPeriod.toutes;
-  final _dateFormat = DateFormat('dd/MM/yyyy');
+  QuickPeriod _quick = QuickPeriod.toutes;
 
-  void _setQuick(_QuickPeriod period) {
-    final now = DateTime.now();
+  void _setQuick(QuickPeriod period) {
     setState(() {
       _quick = period;
-      switch (period) {
-        case _QuickPeriod.toutes:
-          _period = null;
-          break;
-        case _QuickPeriod.semaine:
-          _period = DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
-          break;
-        case _QuickPeriod.mois:
-          _period = DateTimeRange(start: DateTime(now.year, now.month - 1, now.day), end: now);
-          break;
-        case _QuickPeriod.personnalise:
-          break;
-      }
+      _period = quickPeriodRange(period);
     });
   }
 
   Future<void> _pickCustomRange() async {
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(now.year - 3),
-      lastDate: now,
-      initialDateRange: _period,
-    );
+    final picked = await pickCustomPeriodRange(context, _period);
     if (picked == null) return;
     setState(() {
-      _quick = _QuickPeriod.personnalise;
+      _quick = QuickPeriod.personnalise;
       _period = picked;
     });
   }
@@ -93,39 +72,11 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
       body: Column(
         children: [
           // En-tete fixe : reste visible meme quand la liste en dessous defile.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                ChoiceChip(
-                  label: const Text('Toutes dates'),
-                  selected: _quick == _QuickPeriod.toutes,
-                  onSelected: (_) => _setQuick(_QuickPeriod.toutes),
-                ),
-                ChoiceChip(
-                  label: const Text('Cette semaine'),
-                  selected: _quick == _QuickPeriod.semaine,
-                  onSelected: (_) => _setQuick(_QuickPeriod.semaine),
-                ),
-                ChoiceChip(
-                  label: const Text('Ce mois-ci'),
-                  selected: _quick == _QuickPeriod.mois,
-                  onSelected: (_) => _setQuick(_QuickPeriod.mois),
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.date_range, size: 16),
-                  label: Text(
-                    _quick == _QuickPeriod.personnalise && _period != null
-                        ? '${_dateFormat.format(_period!.start)} → ${_dateFormat.format(_period!.end)}'
-                        : 'Personnalisé…',
-                  ),
-                  onPressed: _pickCustomRange,
-                ),
-              ],
-            ),
+          PeriodFilterBar(
+            quick: _quick,
+            period: _period,
+            onQuickSelected: _setQuick,
+            onPickCustomRange: _pickCustomRange,
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -139,7 +90,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
                     _summaryChip(
                       status.label,
                       statusCounts[status.id]!,
-                      Color(int.parse(status.colorHex.replaceFirst('#', '0xff'))),
+                      hexToColor(status.colorHex),
                     ),
                 // Observation enregistree sans niveau d'evaluation choisi :
                 // rare, mais sinon son compte disparaissait du resume.
@@ -238,7 +189,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
     }
 
     final label = snapshot?.label ?? '';
-    final color = snapshot != null ? Color(int.parse(snapshot.colorHex.replaceFirst('#', '0xff'))) : Colors.grey;
+    final color = snapshot != null ? hexToColor(snapshot.colorHex) : Colors.grey;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -246,7 +197,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
         dense: true,
         leading: CircleAvatar(
           radius: 16,
-          backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
+          backgroundColor: hexToColor(atelier.colorHex),
           child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
         ),
         title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),

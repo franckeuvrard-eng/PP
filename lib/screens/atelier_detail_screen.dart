@@ -5,7 +5,8 @@ import '../models/activity_type.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
-import 'settings_screen.dart';
+import '../utils/color_utils.dart';
+import 'atelier_edit_screen.dart';
 
 /// Fiche en lecture seule d'un atelier : la liste des ateliers dans les
 /// réglages ne montre plus que l'essentiel, tout le détail est ici, à un tap.
@@ -42,7 +43,7 @@ class AtelierDetailScreen extends StatelessWidget {
       builder: (context, provider, _) {
         final current = provider.activityTypeById(atelier.id) ?? atelier;
         final space = provider.spaceById(current.spaceId);
-        final color = Color(int.parse(current.colorHex.replaceFirst('#', '0xff')));
+        final color = hexToColor(current.colorHex);
 
         return Scaffold(
           appBar: AppBar(

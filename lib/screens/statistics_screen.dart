@@ -11,6 +11,7 @@ import '../services/atelier_status_resolver.dart';
 import '../services/child_ateliers_breakdown.dart';
 import '../services/excel_export_service.dart';
 import '../utils/app_icons.dart';
+import '../utils/color_utils.dart';
 import 'atelier_history_screen.dart';
 import 'ateliers_class_progress_screen.dart';
 
@@ -222,7 +223,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     final count = evaluationCounts[status.id] ?? 0;
                     final total = filteredActivities.isEmpty ? 1 : filteredActivities.length;
                     final ratio = count / total;
-                    final color = Color(int.parse(status.colorHex.replaceFirst('#', '0xff')));
+                    final color = hexToColor(status.colorHex);
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -357,7 +358,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
                   return ExpansionTile(
                     leading: CircleAvatar(
-                      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+                      backgroundColor: hexToColor(child.colorHex),
                       child: Text(child.avatarText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                     title: Text('${child.firstname} ${child.lastname ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -372,7 +373,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             if ((breakdown.statusCounts[st.id] ?? 0) > 0)
                               _miniCounter(
                                 '${breakdown.statusCounts[st.id]} ${st.label}',
-                                Color(int.parse(st.colorHex.replaceFirst('#', '0xff'))),
+                                hexToColor(st.colorHex),
                               ),
                           // Observation enregistree sans niveau d'evaluation choisi :
                           // rare, mais sinon son compte disparaissait du resume.
@@ -452,7 +453,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   if (count == 0 && filteredActivities.isNotEmpty) return const SizedBox.shrink();
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                      backgroundColor: hexToColor(actType.colorHex),
                       child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
                           color: Colors.white, size: 18),
                     ),
@@ -534,7 +535,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   (d) => d.title == entry.key,
                   orElse: () => EduscolData.domains.first,
                 );
-                final couleur = Color(int.parse(domain.colorHex.replaceFirst('#', '0xff')));
+                final couleur = hexToColor(domain.colorHex);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
@@ -620,14 +621,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
 
     final label = snapshot?.label ?? '';
-    final color = snapshot != null ? Color(int.parse(snapshot.colorHex.replaceFirst('#', '0xff'))) : Colors.grey;
+    final color = snapshot != null ? hexToColor(snapshot.colorHex) : Colors.grey;
 
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
         radius: 12,
-        backgroundColor: Color(int.parse(atelier.colorHex.replaceFirst('#', '0xff'))),
+        backgroundColor: hexToColor(atelier.colorHex),
         child: Icon(iconForName(atelier.iconName, fallback: Icons.palette), size: 12, color: Colors.white),
       ),
       title: Text(atelier.name, style: const TextStyle(fontSize: 13)),
@@ -746,7 +747,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ExpansionTile(
                   leading: CircleAvatar(
-                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                    backgroundColor: hexToColor(actType.colorHex),
                     child: Icon(iconForName(actType.iconName, fallback: Icons.stars), color: Colors.white, size: 20),
                   ),
                   title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -814,7 +815,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               children: missingChildren.map((c) {
                                 return Chip(
                                   avatar: CircleAvatar(
-                                    backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
+                                    backgroundColor: hexToColor(c.colorHex),
                                     child: Text(c.avatarText, style: const TextStyle(fontSize: 12, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),
@@ -844,7 +845,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               children: completedChildren.map((c) {
                                 return Chip(
                                   avatar: CircleAvatar(
-                                    backgroundColor: Color(int.parse(c.colorHex.replaceFirst('#', '0xff'))),
+                                    backgroundColor: hexToColor(c.colorHex),
                                     child: Text(c.avatarText, style: const TextStyle(fontSize: 12, color: Colors.white)),
                                   ),
                                   label: Text('${c.firstname} ${c.lastname ?? ""}', style: const TextStyle(fontSize: 12)),

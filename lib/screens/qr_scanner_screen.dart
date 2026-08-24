@@ -10,6 +10,7 @@ import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../services/atelier_eligibility_service.dart';
+import '../utils/color_utils.dart';
 import '../utils/platform_support.dart';
 import '../widgets/voice_note_field.dart';
 
@@ -617,7 +618,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               width: 12,
                               height: 12,
                               decoration: BoxDecoration(
-                                color: Color(int.parse(status.colorHex.replaceFirst('#', '0xff'))),
+                                color: hexToColor(status.colorHex),
                                 shape: BoxShape.circle,
                               ),
                             ),

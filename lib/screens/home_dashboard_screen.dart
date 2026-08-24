@@ -7,6 +7,7 @@ import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
 import '../utils/app_icons.dart';
+import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
 import 'reports_screen.dart';
@@ -25,7 +26,7 @@ class HomeDashboardScreen extends StatelessWidget {
     }
     return CircleAvatar(
       radius: 20,
-      backgroundColor: Color(int.parse(child.colorHex.replaceFirst('#', '0xff'))),
+      backgroundColor: hexToColor(child.colorHex),
       child: Text(
         child.avatarText,
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
@@ -160,7 +161,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                     ),
                                   )
                                 : CircleAvatar(
-                                    backgroundColor: Color(int.parse(actType.colorHex.replaceFirst('#', '0xff'))),
+                                    backgroundColor: hexToColor(actType.colorHex),
                                     child: Icon(iconForName(actType.iconName, fallback: Icons.palette),
                                         color: Colors.white),
                                   ),
