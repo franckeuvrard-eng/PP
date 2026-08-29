@@ -35,6 +35,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   final Set<String> _extraChildIds = {};
   bool _showManualSelection = false;
 
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
   Future<void> _editPhotoCaption(String path) async {
     final ctrl = TextEditingController(text: _photoCaptions[path] ?? '');
     final result = await showDialog<String>(
@@ -59,6 +65,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         ],
       ),
     );
+    ctrl.dispose();
     if (result == null) return;
     setState(() {
       if (result.isEmpty) {

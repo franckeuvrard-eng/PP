@@ -200,7 +200,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                       ),
                                       child: Text(
                                         '✅ $todayCount activité(s) aujourd\'hui',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D)),
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kAccessibleGreenText),
                                       ),
                                     )
                                   : Container(
@@ -553,7 +553,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                       padding: EdgeInsets.symmetric(horizontal: 24),
                       child: Text(
                         'Autorisation photo requise avant d\'ajouter une image',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 11, color: kMutedTextColor),
                         textAlign: TextAlign.center,
                       ),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../data/sons_data.dart';
+import '../utils/color_utils.dart';
 import '../widgets/radar_chart.dart';
 
 enum _ViewMode { chart, radar, table }
@@ -119,8 +120,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: const Color(0xFF4E9F3D),
-        foregroundColor: Colors.white,
       ),
       body: _history == null
           ? const Center(child: CircularProgressIndicator())
@@ -148,7 +147,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(height: 8),
             Text(
               widget.emptyStateMessage,
-              style: const TextStyle(fontSize: 13, color: Colors.grey),
+              style: const TextStyle(fontSize: 13, color: kMutedTextColor),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -172,7 +171,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 child: _viewMode == _ViewMode.radar
                     ? const Text(
                         'Répartition actuelle par groupe',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: kMutedTextColor),
                       )
                     : Wrap(
                         spacing: 12,
@@ -294,7 +293,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(s.label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  Text(s.label, style: const TextStyle(fontSize: 11, color: kMutedTextColor)),
                 ],
               ),
             ),

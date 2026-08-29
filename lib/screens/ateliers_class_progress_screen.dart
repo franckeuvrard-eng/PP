@@ -171,7 +171,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
   Widget _buildCell(AppStateProvider provider, Child child, ActivityType atelier) {
     final eligibility = AtelierEligibilityService.evaluate(provider: provider, child: child, atelier: atelier);
     if (eligibility.status == AtelierEligibility.blockedSection) {
-      return const Center(child: Text('—', style: TextStyle(color: Colors.grey, fontSize: 12)));
+      return const Center(child: Text('—', style: TextStyle(color: kMutedTextColor, fontSize: 12)));
     }
     if (eligibility.status == AtelierEligibility.blockedProgression) {
       return Center(

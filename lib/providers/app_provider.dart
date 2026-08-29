@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/child.dart';
@@ -23,6 +24,19 @@ import '../services/app_database.dart';
 import '../services/reminder_service.dart';
 
 class AppStateProvider extends ChangeNotifier {
+  /// Sous-dossiers de `_docsDirPath` pouvant contenir des photos ou notes
+  /// vocales referencees par les donnees. Liste unique partagee par la
+  /// sauvegarde, la purge des orphelins et la RAZ : les faire diverger a
+  /// deja cause une perte de photos d'ateliers/logo a la restauration.
+  static const List<String> _mediaSubDirs = [
+    'profiles',
+    'workshops',
+    'activities',
+    'ateliers',
+    'settings',
+    'audio',
+  ];
+
   /// Recalcule les index avant de prevenir les ecrans.
   ///
   /// Toutes les mutations passent par ici : c'est la seule garantie que les
@@ -623,6 +637,8 @@ class AppStateProvider extends ChangeNotifier {
       _children = [];
       _activities = [];
       _sonsProgress = {};
+      _spaces = [];
+      _activityTypes = [];
     }
     _isLoaded = true;
     _notify();
@@ -721,24 +737,43 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   /// Restaure une sauvegarde automatique (donnees seules, sans les photos).
+  ///
+  /// Tout est decode dans des variables locales avant la moindre affectation
+  /// aux champs de l'instance : un fichier partiel/corrompu doit echouer sans
+  /// laisser un etat en memoire qui melange l'ancienne et la nouvelle classe.
   Future<bool> restoreAutoBackup(File backup) async {
     try {
       final data = json.decode(await backup.readAsString()) as Map<String, dynamic>;
-      _classSettings = ClassSettings.fromMap(data['class_settings']);
-      _children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
-      _spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
-      _activityTypes =
+      final classSettings = ClassSettings.fromMap(data['class_settings']);
+      final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+      final spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
+      final activityTypes =
           (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
-      _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
-      _evaluationStatuses = _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
-      final sons = data['sons_progress'];
-      _sonsProgress = sons is Map
-          ? sons.map((childId, entries) => MapEntry(
+      final activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
+      final evaluationStatuses =
+          _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
+      final sonsData = data['sons_progress'];
+      final sonsProgress = sonsData is Map
+          ? sonsData.map((childId, entries) => MapEntry(
                 childId as String,
                 (entries as Map).map(
                     (son, code) => MapEntry(son as String, SonStatut.fromCode(code))),
               ))
-          : {};
+          : <String, Map<String, SonStatut>>{};
+      final sections = data['sections'] != null ? List<String>.from(data['sections']) : null;
+
+      _classSettings = classSettings;
+      _children = children;
+      _spaces = spaces;
+      _activityTypes = activityTypes;
+      _activities = activities;
+      _evaluationStatuses = evaluationStatuses;
+      _sonsProgress = sonsProgress;
+      if (sections != null) {
+        _sections = sections;
+        await _db.setSetting('sections', json.encode(_sections));
+      }
+
       await _db.replaceAll(
         classSettings: _classSettings,
         children: _children,
@@ -918,7 +953,7 @@ class AppStateProvider extends ChangeNotifier {
       }.map(_normalizeRelPath).toSet();
 
       var removed = 0;
-      for (final subDir in ['profiles', 'workshops', 'activities', 'ateliers', 'settings', 'audio']) {
+      for (final subDir in _mediaSubDirs) {
         final dir = Directory('$_docsDirPath/$subDir');
         if (!await dir.exists()) continue;
         for (final file in dir.listSync().whereType<File>()) {
@@ -1143,7 +1178,7 @@ class AppStateProvider extends ChangeNotifier {
     archive.addFile(ArchiveFile('backup.json', jsonBytes.length, jsonBytes));
 
     // 2. Photos et notes vocales
-    for (final subDir in ['profiles', 'workshops', 'activities', 'audio']) {
+    for (final subDir in _mediaSubDirs) {
       final dir = Directory('$_docsDirPath/$subDir');
       if (!await dir.exists()) continue;
       for (final file in dir.listSync().whereType<File>()) {
@@ -1217,21 +1252,22 @@ class AppStateProvider extends ChangeNotifier {
       final jsonStr = utf8.decode(jsonFile.content as Uint8List);
       final data = json.decode(jsonStr) as Map<String, dynamic>;
 
-      // Restore JSON data
-      _classSettings = ClassSettings.fromMap(data['class_settings']);
-      _children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
-      if (data['spaces'] != null) {
-        _spaces = (data['spaces'] as List).map((s) => Space.fromMap(s)).toList();
-      }
-      _activityTypes = (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
-      _activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
-      _evaluationStatuses = _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
-      if (data['sections'] != null) {
-        _sections = List<String>.from(data['sections']);
-        _write(_db.setSetting('sections', json.encode(_sections)));
-      }
+      // Tout decoder dans des variables locales d'abord : si un champ attendu
+      // manque (fichier partiel ou trafique a la main), l'exception part avant
+      // qu'on touche a l'etat de l'instance ou au disque.
+      final classSettings = ClassSettings.fromMap(data['class_settings']);
+      final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+      final spaces = data['spaces'] != null
+          ? (data['spaces'] as List).map((s) => Space.fromMap(s)).toList()
+          : _spaces;
+      final activityTypes =
+          (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
+      final activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
+      final evaluationStatuses =
+          _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
+      final sections = data['sections'] != null ? List<String>.from(data['sections']) : null;
       final sonsData = data['sons_progress'];
-      _sonsProgress = sonsData is Map
+      final sonsProgress = sonsData is Map
           ? sonsData.map(
               (childId, sons) => MapEntry(
                 childId as String,
@@ -1240,17 +1276,42 @@ class AppStateProvider extends ChangeNotifier {
                 ),
               ),
             )
-          : {};
+          : <String, Map<String, SonStatut>>{};
 
-      // Restore photo files
+      // Chemins des entrees d'archive verifies avant toute ecriture sur
+      // disque : une entree comme `../../Library/Preferences/x` doit etre
+      // rejetee plutot que d'ecrire hors du dossier documents de l'app
+      // (Zip Slip).
+      final docsDir = Directory(_docsDirPath!).absolute.path;
+      final photoFiles = <String, Uint8List>{};
       for (final file in archive) {
-        if (file.name == 'backup.json') continue;
-        if (file.isFile) {
-          final targetPath = '$_docsDirPath/${file.name}';
-          final targetFile = File(targetPath);
-          await targetFile.parent.create(recursive: true);
-          await targetFile.writeAsBytes(file.content as Uint8List);
+        if (file.name == 'backup.json' || !file.isFile) continue;
+        final targetPath = p.normalize(p.join(docsDir, file.name));
+        if (!p.equals(targetPath, docsDir) &&
+            !p.isWithin(docsDir, targetPath)) {
+          return 'invalid';
         }
+        photoFiles[targetPath] = file.content as Uint8List;
+      }
+
+      // A partir d'ici, plus rien ne peut echouer pour une raison de contenu :
+      // on peut committer l'etat memoire, le disque, puis la base.
+      _classSettings = classSettings;
+      _children = children;
+      _spaces = spaces;
+      _activityTypes = activityTypes;
+      _activities = activities;
+      _evaluationStatuses = evaluationStatuses;
+      _sonsProgress = sonsProgress;
+      if (sections != null) {
+        _sections = sections;
+        await _db.setSetting('sections', json.encode(_sections));
+      }
+
+      for (final entry in photoFiles.entries) {
+        final targetFile = File(entry.key);
+        await targetFile.parent.create(recursive: true);
+        await targetFile.writeAsBytes(entry.value);
       }
 
       await _db.replaceAll(
@@ -1285,6 +1346,25 @@ class AppStateProvider extends ChangeNotifier {
       _children.add(child);
     }
     _write(_db.saveChild(child));
+    _notify();
+    unawaited(_scheduleReminderIfEnabled());
+  }
+
+  /// Ajoute/met a jour plusieurs eleves en une seule notification.
+  ///
+  /// Utilise par l'import Excel : appeler [addOrUpdateChild] par ligne
+  /// declenchait un reindex + rebuild complet de l'app par eleve importe.
+  void addOrUpdateChildren(List<Child> children) {
+    if (children.isEmpty) return;
+    for (final child in children) {
+      final index = _children.indexWhere((c) => c.id == child.id);
+      if (index >= 0) {
+        _children[index] = child;
+      } else {
+        _children.add(child);
+      }
+      _write(_db.saveChild(child));
+    }
     _notify();
     unawaited(_scheduleReminderIfEnabled());
   }
@@ -1574,7 +1654,13 @@ class AppStateProvider extends ChangeNotifier {
 
 
 
-  void resetSelectiveData({
+  /// Reinitialisation selective (RAZ).
+  ///
+  /// Ecrit d'abord une sauvegarde automatique (l'effacement qui suit est
+  /// irreversible dans l'UI), puis attend reellement chaque ecriture au lieu
+  /// de les lancer en tache de fond : l'appelant ne doit annoncer un succes
+  /// que si les donnees ont vraiment ete remplacees en base.
+  Future<bool> resetSelectiveData({
     required bool clearChildren,
     required bool clearActivityTypes,
     required bool clearActivities,
@@ -1582,10 +1668,16 @@ class AppStateProvider extends ChangeNotifier {
     bool clearEvaluationStatuses = false,
     bool clearSpaces = false,
     bool clearPhotos = false,
-  }) {
+  }) async {
+    await _writeAutoBackup();
+
     if (clearChildren) {
       _children = [];
       _sonsProgress = {};
+      for (final byChild in _referentialStatus.values) {
+        byChild.clear();
+      }
+      await _db.clearAllReferentialStatuses();
     }
     if (clearActivityTypes) {
       _activityTypes = [];
@@ -1615,19 +1707,26 @@ class AppStateProvider extends ChangeNotifier {
       );
     }
     if (clearPhotos) {
-      _deleteAllPhotos();
+      await _deleteAllPhotos();
     }
     // Remise a zero : un remplacement global est ici le geste correct.
-    _write(_db.replaceAll(
-      classSettings: _classSettings,
-      children: _children,
-      spaces: _spaces,
-      activityTypes: _activityTypes,
-      activities: _activities,
-      evaluationStatuses: _evaluationStatuses,
-      sons: _sonsProgress,
-    ));
+    try {
+      await _db.replaceAll(
+        classSettings: _classSettings,
+        children: _children,
+        spaces: _spaces,
+        activityTypes: _activityTypes,
+        activities: _activities,
+        evaluationStatuses: _evaluationStatuses,
+        sons: _sonsProgress,
+      );
+    } catch (e) {
+      debugPrint('Echec de la RAZ selective : $e');
+      _notify();
+      return false;
+    }
     _notify();
+    return true;
   }
 
   Future<void> _deleteAllPhotos() async {
@@ -1636,7 +1735,7 @@ class AppStateProvider extends ChangeNotifier {
         final directory = await getApplicationDocumentsDirectory();
         _docsDirPath = directory.path;
       }
-      for (final subDir in ['profiles', 'workshops', 'activities', 'settings']) {
+      for (final subDir in _mediaSubDirs) {
         final dir = Directory('$_docsDirPath/$subDir');
         if (await dir.exists()) {
           await dir.delete(recursive: true);

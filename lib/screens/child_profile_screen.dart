@@ -268,7 +268,7 @@ class ChildProfileScreen extends StatelessWidget {
         const Text('Ateliers',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const Text('Ateliers de la section de l\'élève, acquis / en cours / non acquis / non faits',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+            style: TextStyle(fontSize: 12, color: kMutedTextColor)),
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
@@ -286,7 +286,7 @@ class ChildProfileScreen extends StatelessWidget {
         const Text('Analyse des sons',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const Text('Langage · conscience phonémique & signes graphiques',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+            style: TextStyle(fontSize: 12, color: kMutedTextColor)),
         const SizedBox(height: 12),
 
         Wrap(
@@ -314,7 +314,7 @@ class ChildProfileScreen extends StatelessWidget {
         const Text(
           'Appuyez sur un son pour le faire progresser : non acquis → en cours → acquis. '
           'Appui long pour revenir en arrière.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(fontSize: 12, color: kMutedTextColor),
         ),
         const SizedBox(height: 16),
 
@@ -458,11 +458,11 @@ class ChildProfileScreen extends StatelessWidget {
         const SizedBox(height: 4),
         const Text(
           'Appuyez sur un item pour le faire progresser. Appui long pour revenir en arrière.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(fontSize: 12, color: kMutedTextColor),
         ),
         const SizedBox(height: 16),
         if (referential.groups.isEmpty)
-          const Text('Aucun groupe défini pour ce référentiel.', style: TextStyle(fontSize: 13, color: Colors.grey))
+          const Text('Aucun groupe défini pour ce référentiel.', style: TextStyle(fontSize: 13, color: kMutedTextColor))
         else
           ...referential.groups.map((group) => Padding(
                 padding: const EdgeInsets.only(bottom: 20),

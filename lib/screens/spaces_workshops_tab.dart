@@ -43,7 +43,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text('Définissez les zones / coins de votre classe.',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+              style: TextStyle(fontSize: 12, color: kMutedTextColor)),
           const SizedBox(height: 12),
 
           // Spaces list
@@ -93,7 +93,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
                         Text(
                           space.description!,
                           style:
-                              const TextStyle(fontSize: 12, color: Colors.grey),
+                              const TextStyle(fontSize: 12, color: kMutedTextColor),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -107,11 +107,13 @@ class SpacesWorkshopsTab extends StatelessWidget {
                     IconButton(
                       icon:
                           const Icon(Icons.edit, color: Colors.grey, size: 20),
+                      tooltip: 'Modifier l\'espace',
                       onPressed: () => _openSpaceEditor(context, space: space),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline,
                           color: Colors.red, size: 20),
+                      tooltip: 'Supprimer l\'espace',
                       onPressed: () {
                         showDialog(
                           context: context,
@@ -187,11 +189,35 @@ class SpacesWorkshopsTab extends StatelessWidget {
           }),
 
           if (spaces.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                  child: Text(
-                      'Aucun espace défini. Ajoutez votre premier espace !')),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  Icon(Icons.space_dashboard_outlined, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Aucun espace défini',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Les espaces sont les zones / coins de votre classe (coin lecture, '
+                    'motricité...) : créez-en un pour pouvoir y rattacher des ateliers.',
+                    style: TextStyle(fontSize: 13, color: kMutedTextColor),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openSpaceEditor(context),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Créer mon premier espace'),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4E9F3D),
+                        foregroundColor: Colors.white),
+                  ),
+                ],
+              ),
             ),
         ],
       ),
@@ -255,7 +281,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
                 if (atelier.objectifs.isNotEmpty)
                   '🏁 ${atelier.objectifs.length} objectif(s)',
               ].join('  •  '),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(fontSize: 12, color: kMutedTextColor),
             ),
       trailing: dragIndex != null
           ? ReorderableDragStartListener(

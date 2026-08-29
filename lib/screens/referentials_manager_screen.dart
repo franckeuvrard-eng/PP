@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/referential.dart';
 import '../providers/app_provider.dart';
+import '../utils/color_utils.dart';
 import 'referential_edit_screen.dart';
 
 /// Liste des référentiels personnalisés (ceintures de couleur, Montessori,
@@ -21,8 +22,6 @@ class ReferentialsManagerScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Référentiels personnalisés'),
-        backgroundColor: const Color(0xFF4E9F3D),
-        foregroundColor: Colors.white,
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF4E9F3D),
@@ -50,7 +49,7 @@ class ReferentialsManagerScreen extends StatelessWidget {
                   const Text(
                     'Créez un référentiel (ceintures de couleur, base Montessori, ou '
                     'tout autre suivi) : vous définissez vous-même ses groupes et ses items.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                    style: TextStyle(fontSize: 13, color: kMutedTextColor),
                     textAlign: TextAlign.center,
                   ),
                 ],

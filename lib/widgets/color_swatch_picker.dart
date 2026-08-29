@@ -25,20 +25,29 @@ class ColorSwatchPicker extends StatelessWidget {
         final color = hexToColor(hex);
         return GestureDetector(
           onTap: () => onChanged(hex),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border:
-                  isSelected ? Border.all(color: Colors.white, width: 3) : null,
-              boxShadow:
-                  isSelected ? [BoxShadow(color: color, blurRadius: 8)] : null,
+          // Zone tactile de 44x44 (repere d'accessibilite iOS) autour du
+          // disque visuel de 36x36, sans changer son apparence.
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: isSelected
+                      ? Border.all(color: Colors.white, width: 3)
+                      : null,
+                  boxShadow:
+                      isSelected ? [BoxShadow(color: color, blurRadius: 8)] : null,
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, color: Colors.white, size: 18)
+                    : null,
+              ),
             ),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 18)
-                : null,
           ),
         );
       }).toList(),

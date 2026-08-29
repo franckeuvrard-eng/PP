@@ -40,14 +40,10 @@ class ExcelExportService {
 
       // Data rows
       for (final log in logs) {
-        final actType = provider.activityTypes.firstWhere(
-          (a) => a.id == log.activityTypeId,
-          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: ''),
-        );
-        final space = provider.spaces.firstWhere(
-          (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
-        );
+        final actType = provider.activityTypeById(log.activityTypeId) ??
+            ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
+        final space = provider.spaceById(actType.spaceId) ??
+            Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue('${child.firstname} ${child.lastname ?? ""}'),
@@ -64,7 +60,7 @@ class ExcelExportService {
       if (rawBytes == null) throw Exception('Erreur lors de la génération du fichier Excel.');
 
       final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getApplicationDocumentsDirectory();
+      final tempDir = await getTemporaryDirectory();
       final sanitizedName = '${child.firstname}_${child.lastname ?? ""}'.replaceAll(RegExp(r'[^\w\-]'), '_');
       final fileName = 'APetitPas_Activites_${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final file = File('${tempDir.path}/$fileName');
@@ -119,14 +115,10 @@ class ExcelExportService {
 
       for (final log in logs) {
         final child = childMap[log.childId];
-        final actType = provider.activityTypes.firstWhere(
-          (a) => a.id == log.activityTypeId,
-          orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: ''),
-        );
-        final space = provider.spaces.firstWhere(
-          (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
-        );
+        final actType = provider.activityTypeById(log.activityTypeId) ??
+            ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
+        final space = provider.spaceById(actType.spaceId) ??
+            Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
           xl.TextCellValue(child?.firstname ?? 'Élève inconnu'),
@@ -145,7 +137,7 @@ class ExcelExportService {
       if (rawBytes == null) throw Exception('Erreur lors du traitement du fichier Excel.');
 
       final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getApplicationDocumentsDirectory();
+      final tempDir = await getTemporaryDirectory();
       final fileName = 'APetitPas_Bilan_Classe_${DateTime.now().millisecondsSinceEpoch}.xlsx';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(bytes);

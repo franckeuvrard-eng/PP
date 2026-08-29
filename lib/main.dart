@@ -46,6 +46,23 @@ class PetitPasApp extends StatelessWidget {
         // cardColor doit etre defini explicitement : plusieurs ecrans batissent
         // leurs Container de contenu sur Theme.of(context).cardColor.
         cardColor: Colors.white,
+        // Absent jusqu'ici du theme clair (seul le theme sombre l'avait) :
+        // sert de base commune aux ecrans qui redefinissaient chacun a la
+        // main `shape: RoundedRectangleBorder(borderRadius: circular(16))`
+        // sur leurs Card.
+        cardTheme: CardTheme(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        // Echelle de texte minimale pour les ecrans a venir : evite de
+        // reinventer une taille/graisse de titre de section a chaque fois.
+        textTheme: const TextTheme(
+          titleMedium: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3748)),
+          bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF2D3748)),
+          bodySmall: TextStyle(fontSize: 12, color: Color(0xFF616161)),
+        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -143,11 +160,43 @@ class LockScreen extends StatefulWidget {
   State<LockScreen> createState() => _LockScreenState();
 }
 
-class _LockScreenState extends State<LockScreen> {
+class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
   final LocalAuthentication auth = LocalAuthentication();
   bool _isAuthenticated = false;
   bool _isAuthenticating = false;
   bool _authRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Reverrouille au retour en arriere-plan : sans cela, mettre l'app en
+  /// veille puis la rouvrir affichait directement la classe (noms, photos,
+  /// dates de naissance) sans nouvelle authentification.
+  ///
+  /// Reagit a `paused` (app reellement en arriere-plan) et non a `inactive`,
+  /// qui se declenche aussi brievement pendant la propre invite Face ID/Touch
+  /// ID du systeme : reagir a `inactive` reverrouillerait l'app au moment ou
+  /// elle demande justement a s'authentifier.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.paused) return;
+    if (!_isAuthenticated || _isAuthenticating) return;
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    if (!provider.biometricLockEnabled || !isMobilePlatform) return;
+    setState(() {
+      _isAuthenticated = false;
+      _authRequested = false;
+    });
+  }
 
   /// Declenche la demande d'authentification une fois, et seulement une fois
   /// les preferences chargees : le reglage Face ID n'est connu qu'a ce

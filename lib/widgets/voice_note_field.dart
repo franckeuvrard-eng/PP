@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
@@ -44,6 +46,12 @@ class _VoiceNoteFieldState extends State<VoiceNoteField> {
 
   @override
   void dispose() {
+    // Un enregistrement en cours doit etre arrete avant de disposer le
+    // recorder : sinon le fichier .m4a reste ecrit sur le disque mais
+    // n'est jamais signale via onChanged, et finit purge comme orphelin.
+    if (_isRecording) {
+      unawaited(_recorder.stop());
+    }
     _recorder.dispose();
     _player.dispose();
     super.dispose();
@@ -70,6 +78,7 @@ class _VoiceNoteFieldState extends State<VoiceNoteField> {
 
   Future<void> _stopRecording() async {
     await _recorder.stop();
+    if (!mounted) return;
     setState(() => _isRecording = false);
     if (_pendingRelativePath != null) {
       widget.onChanged(_pendingRelativePath);

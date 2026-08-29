@@ -122,6 +122,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
         ],
       ),
     );
+    ctrl.dispose();
     if (result == null) return;
     setState(() {
       if (result.isEmpty) {
@@ -298,7 +299,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                       subtitle: const Text(
                         'Cet atelier doit être réalisé par les élèves concernés.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: kMutedTextColor),
                       ),
                       value: _isObligatory,
                       activeColor: const Color(0xFF4E9F3D),
@@ -315,7 +316,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                             ? 'Aucune section sélectionnée : obligatoire pour toute la classe.'
                             : 'Obligatoire uniquement pour ${_obligatoryGroups.length} section(s).',
                         style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                            const TextStyle(fontSize: 12, color: kMutedTextColor),
                       ),
                       const SizedBox(height: 8),
                       Builder(
@@ -327,7 +328,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                               style: TextStyle(
                                   fontSize: 12,
                                   fontStyle: FontStyle.italic,
-                                  color: Colors.grey),
+                                  color: kMutedTextColor),
                             );
                           }
                           return Wrap(
@@ -393,7 +394,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       const DropdownMenuItem(
                         value: 'none',
                         child: Text('-- Aucun domaine sélectionné --',
-                            style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            style: TextStyle(fontSize: 13, color: kMutedTextColor)),
                       ),
                       ...EduscolData.domains.map((d) => DropdownMenuItem(
                             value: d.id,
@@ -502,7 +503,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                               child: Text(
                                   'Aucun objectif ne correspond à ce filtre.',
                                   style: TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
+                                      fontSize: 12, color: kMutedTextColor)),
                             )
                           : Scrollbar(
                               controller: _objectivesScrollCtrl,
@@ -527,7 +528,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                     subtitle: Text(
                                         'Niveau Éduscol : ${obj.level}',
                                         style: const TextStyle(
-                                            fontSize: 12, color: Colors.grey)),
+                                            fontSize: 12, color: kMutedTextColor)),
                                     value: isChecked,
                                     activeColor: const Color(0xFF4E9F3D),
                                     onChanged: (val) {
@@ -558,7 +559,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         style: TextStyle(
                             fontSize: 12,
                             fontStyle: FontStyle.italic,
-                            color: Colors.grey))
+                            color: kMutedTextColor))
                   else
                     Wrap(
                       spacing: 8,
@@ -669,13 +670,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                       Text('${_photoPaths.length} photo(s)',
                           style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
+                              fontSize: 12, color: kMutedTextColor)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'Elles illustrent l\'atelier et sont reprises dans l\'export PDF.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: kMutedTextColor),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(

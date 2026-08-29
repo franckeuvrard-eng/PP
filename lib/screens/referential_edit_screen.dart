@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/referential.dart';
 import '../providers/app_provider.dart';
+import '../utils/color_utils.dart';
 
 /// Création ou modification d'un référentiel : son nom, ses groupes et les
 /// items de chaque groupe. Rien n'est pré-rempli : le contenu vient
@@ -57,6 +58,7 @@ class _ReferentialEditScreenState extends State<ReferentialEditScreen> {
         ],
       ),
     );
+    ctrl.dispose();
     if (result == null || result.isEmpty) return;
     setState(() {
       if (group == null) {
@@ -100,6 +102,7 @@ class _ReferentialEditScreenState extends State<ReferentialEditScreen> {
         ],
       ),
     );
+    ctrl.dispose();
     if (result == null || result.isEmpty) return;
     setState(() {
       final groupIndex = _groups.indexWhere((g) => g.id == group.id);
@@ -142,8 +145,6 @@ class _ReferentialEditScreenState extends State<ReferentialEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.referential == null ? 'Nouveau référentiel' : 'Modifier le référentiel'),
-        backgroundColor: const Color(0xFF4E9F3D),
-        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -176,7 +177,7 @@ class _ReferentialEditScreenState extends State<ReferentialEditScreen> {
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'Un groupe régroupe plusieurs items (ex: une couleur de ceinture, un domaine Montessori).',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: kMutedTextColor),
                 ),
               ),
             ..._groups.map((group) => Card(

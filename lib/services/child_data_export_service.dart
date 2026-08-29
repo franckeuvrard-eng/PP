@@ -123,14 +123,10 @@ class ChildDataExportService {
         if (logs.isEmpty)
           pw.Text(pdfSafe('Aucune observation enregistrée.'), style: const pw.TextStyle(fontSize: 10)),
         ...logs.map((log) {
-          final actType = provider.activityTypes.firstWhere(
-            (a) => a.id == log.activityTypeId,
-            orElse: () => ActivityType(id: '', name: 'Atelier supprimé', spaceId: '', colorHex: ''),
-          );
-          final space = provider.spaces.firstWhere(
-            (s) => s.id == actType.spaceId,
-            orElse: () => Space(id: '', name: '', colorHex: ''),
-          );
+          final actType = provider.activityTypeById(log.activityTypeId) ??
+              ActivityType(id: '', name: 'Atelier supprimé', spaceId: '', colorHex: '');
+          final space = provider.spaceById(actType.spaceId) ??
+              Space(id: '', name: '', colorHex: '');
           final captions = log.photoPaths.map((p) => log.captionFor(p)).whereType<String>().toList();
           return pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 8),

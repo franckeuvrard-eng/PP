@@ -47,7 +47,11 @@ class _VoiceNotePlayButtonState extends State<VoiceNotePlayButton> {
         }
       },
       child: Container(
+        // Zone tactile de 44pt (repere d'accessibilite iOS) : la pastille
+        // visuelle reste compacte, seul l'espace tapable est agrandi.
+        constraints: const BoxConstraints(minHeight: 44),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: const Color(0xFF4E9F3D).withOpacity(0.12),
           borderRadius: BorderRadius.circular(8),

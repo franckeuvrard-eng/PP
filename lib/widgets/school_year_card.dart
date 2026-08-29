@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/school_year_archive.dart';
 import '../providers/app_provider.dart';
+import '../utils/color_utils.dart';
 
 /// Carte « Année scolaire » : archive l'année écoulée puis repart à vide.
 ///
@@ -175,7 +176,7 @@ class _SchoolYearCardState extends State<SchoolYearCard> {
               'Année en cours : $annee. À la rentrée, archivez l\'année écoulée '
               '(données et photos) puis repartez sur une classe vide en '
               'conservant vos espaces et ateliers.',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(fontSize: 12, color: kMutedTextColor),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(

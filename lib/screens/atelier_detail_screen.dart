@@ -111,13 +111,13 @@ class AtelierDetailScreen extends StatelessWidget {
                   ),
                 if (current.domaine.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Domaine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const Text('Domaine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   Text('📚 ${current.domaine}'),
                 ],
                 if (current.objectifs.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Objectifs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const Text('Objectifs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   ...current.objectifs.map((o) => Padding(
                         padding: const EdgeInsets.only(bottom: 2),
@@ -126,13 +126,13 @@ class AtelierDetailScreen extends StatelessWidget {
                 ],
                 if (current.description != null && current.description!.trim().isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   Text(current.description!.trim()),
                 ],
                 if (current.allPhotoPaths.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Photos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const Text('Photos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 96,

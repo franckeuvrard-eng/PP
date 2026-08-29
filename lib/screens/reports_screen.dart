@@ -9,6 +9,7 @@ import '../services/child_activity_report_service.dart';
 import '../services/child_data_export_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/mandatory_ateliers_pdf_service.dart';
+import '../utils/color_utils.dart';
 import '../utils/pdf_viewer.dart';
 import '../widgets/child_multi_select_dialog.dart';
 
@@ -36,7 +37,7 @@ class ReportsScreen extends StatelessWidget {
               const Text('Choisir un atelier', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               for (final space in provider.spaces) ...[
-                Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D))),
+                Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold, color: kAccessibleGreenText)),
                 ...provider.ateliersInSpaceOrdered(space.id).map(
                       (a) => ListTile(
                         dense: true,
@@ -227,7 +228,7 @@ class ReportsScreen extends StatelessWidget {
         children: [
           const Text(
             'Générez et partagez les documents pour vos élèves et leurs familles.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: kMutedTextColor),
           ),
           const SizedBox(height: 16),
           Card(

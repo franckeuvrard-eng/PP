@@ -8,6 +8,7 @@ import 'dart:io';
 
 import '../models/child.dart';
 import '../providers/app_provider.dart';
+import '../utils/color_utils.dart';
 
 /// Import d'élèves en masse depuis un fichier Excel : on génère une matrice
 /// vierge, l'enseignant la remplit hors de l'application, puis on la
@@ -68,7 +69,7 @@ class ChildrenImportService {
       if (rawBytes == null) throw Exception('Erreur lors de la génération du modèle.');
 
       final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getApplicationDocumentsDirectory();
+      final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/APetitPas_Modele_Import_Eleves.xlsx');
       await file.writeAsBytes(bytes);
 
@@ -122,7 +123,7 @@ class ChildrenImportService {
           .map((c) => _normalizeName(c.firstname, c.lastname))
           .toSet();
 
-      var added = 0;
+      final newChildren = <Child>[];
       final skippedDuplicates = <String>[];
       final warnings = <String>[];
 
@@ -171,12 +172,23 @@ class ChildrenImportService {
           email: email.isEmpty ? null : email,
           imageAuthorized: imageAuthorized,
         );
-        provider.addOrUpdateChild(child);
-        added++;
+        newChildren.add(child);
+      }
+
+      // Une seule ecriture/notification pour tous les eleves importes plutot
+      // qu'un reindex + rebuild complet par ligne : un import de 30 eleves ne
+      // doit pas provoquer 30 rebuilds de l'application.
+      if (newChildren.isNotEmpty) {
+        provider.addOrUpdateChildren(newChildren);
       }
 
       if (context.mounted) {
-        await _showResultDialog(context, added: added, skippedDuplicates: skippedDuplicates, warnings: warnings);
+        await _showResultDialog(
+          context,
+          added: newChildren.length,
+          skippedDuplicates: skippedDuplicates,
+          warnings: warnings,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -207,7 +219,7 @@ class ChildrenImportService {
                 const SizedBox(height: 10),
                 Text(
                   '${skippedDuplicates.length} déjà présent(s), ignoré(s) : ${skippedDuplicates.join(', ')}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: kMutedTextColor),
                 ),
               ],
               if (warnings.isNotEmpty) ...[
@@ -280,17 +292,27 @@ class ChildrenImportService {
       final day = int.parse(frMatch.group(1)!);
       final month = int.parse(frMatch.group(2)!);
       final year = int.parse(frMatch.group(3)!);
-      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      if (!_isValidDate(year, month, day)) return null;
       return '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
     }
     final isoMatch = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(text);
     if (isoMatch != null) {
-      final year = isoMatch.group(1)!;
-      final month = isoMatch.group(2)!.padLeft(2, '0');
-      final day = isoMatch.group(3)!.padLeft(2, '0');
-      return '$year-$month-$day';
+      final year = int.parse(isoMatch.group(1)!);
+      final month = int.parse(isoMatch.group(2)!);
+      final day = int.parse(isoMatch.group(3)!);
+      if (!_isValidDate(year, month, day)) return null;
+      return '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
     }
     return null;
+  }
+
+  /// `DateTime` accepte un jour hors bornes en debordant sur le mois suivant
+  /// (ex. 31/02 devient le 3 mars) : on verifie qu'il n'y a pas eu de
+  /// debordement plutot que de se fier a un simple `1 <= day <= 31`.
+  static bool _isValidDate(int year, int month, int day) {
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+    final rebuilt = DateTime(year, month, day);
+    return rebuilt.year == year && rebuilt.month == month && rebuilt.day == day;
   }
 
   static String _normalizeName(String firstname, String? lastname) {

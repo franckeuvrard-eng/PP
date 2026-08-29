@@ -112,7 +112,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
                         const SizedBox(height: 16),
                       ],
                       if (realise.isNotEmpty) ...[
-                        _buildSectionHeader('✅ Réalisé', realise.length, const Color(0xFF4E9F3D)),
+                        _buildSectionHeader('✅ Réalisé', realise.length, kAccessibleGreenText),
                         ..._buildGroupedBySpace(provider, realise, snapshots),
                       ],
                     ],
@@ -164,7 +164,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
       padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Text(
         space?.name ?? 'Sans espace',
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF4E9F3D)),
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: kAccessibleGreenText),
       ),
     );
   }
@@ -183,7 +183,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
           dense: true,
           leading: const Icon(Icons.lock_outline, color: Colors.grey),
           title: Text(atelier.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          subtitle: Text(eligibility.message, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          subtitle: Text(eligibility.message, style: const TextStyle(fontSize: 12, color: kMutedTextColor)),
         ),
       );
     }

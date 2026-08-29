@@ -56,11 +56,9 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Modifier l\'observation'),
-        backgroundColor: const Color(0xFF4E9F3D),
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
+            icon: const Icon(Icons.delete_outline),
             tooltip: 'Supprimer',
             onPressed: () {
               showDialog(
@@ -130,7 +128,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             if (widget.child.group != null && widget.child.group!.isNotEmpty)
-                              Text('Groupe : ${widget.child.group}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('Groupe : ${widget.child.group}', style: const TextStyle(fontSize: 12, color: kMutedTextColor)),
                           ],
                         ),
                       ],
@@ -166,7 +164,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                     const SizedBox(height: 8),
                     Text(
                       '📅 ${DateFormat('dd/MM/yyyy à HH:mm').format(widget.activityLog.timestamp)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: const TextStyle(fontSize: 12, color: kMutedTextColor),
                     ),
                   ],
                 ),

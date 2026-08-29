@@ -94,14 +94,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       if (typeActivityCounts.containsKey(act.activityTypeId)) {
         typeActivityCounts[act.activityTypeId] = typeActivityCounts[act.activityTypeId]! + 1;
       }
-      final actType = types.firstWhere(
-        (t) => t.id == act.activityTypeId,
-        orElse: () => ActivityType(id: '', name: '', spaceId: '', colorHex: '#718096'),
-      );
-      final space = provider.spaces.firstWhere(
-        (s) => s.id == actType.spaceId,
-        orElse: () => Space(id: '', name: 'Autre', colorHex: '#718096'),
-      );
+      final actType = provider.activityTypeById(act.activityTypeId) ??
+          ActivityType(id: '', name: '', spaceId: '', colorHex: '#718096');
+      final space = provider.spaceById(actType.spaceId) ??
+          Space(id: '', name: 'Autre', colorHex: '#718096');
       final cat = space.name.isNotEmpty ? space.name : 'Autre';
       domainCounts[cat] = (domainCounts[cat] ?? 0) + 1;
 
@@ -125,13 +121,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tableau de Bord & Statistiques'),
-        backgroundColor: const Color(0xFF4E9F3D),
-        foregroundColor: Colors.white,
         actions: [
           Builder(
             builder: (btnContext) {
               return IconButton(
-                icon: const Icon(Icons.table_chart, color: Colors.white),
+                icon: const Icon(Icons.table_chart),
                 tooltip: 'Exporter la classe (Excel)',
                 onPressed: () {
                   final box = btnContext.findRenderObject() as RenderBox?;
@@ -256,8 +250,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Non évalué / Note libre', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        Text('$unratedCount', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const Text('Non évalué / Note libre', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+                        Text('$unratedCount', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kMutedTextColor)),
                       ],
                     ),
                   ],
@@ -290,7 +284,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                              Text('${entry.value} (${(ratio * 100).toStringAsFixed(1)}%)', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4E9F3D), fontSize: 13)),
+                              Text('${entry.value} (${(ratio * 100).toStringAsFixed(1)}%)', style: const TextStyle(fontWeight: FontWeight.bold, color: kAccessibleGreenText, fontSize: 13)),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -380,7 +374,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           if ((breakdown.statusCounts['sans_statut'] ?? 0) > 0)
                             _miniCounter('${breakdown.statusCounts['sans_statut']} sans statut', Colors.blueGrey),
                           if (breakdown.totalCount == 0)
-                            const Text('Aucun atelier configuré pour sa section', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            const Text('Aucun atelier configuré pour sa section', style: TextStyle(fontSize: 11, color: kMutedTextColor)),
                         ],
                       ),
                     ),
@@ -395,7 +389,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
-                          color: breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange.shade800,
+                          color: breakdown.aFaire.isEmpty ? kAccessibleGreenText : Colors.orange.shade800,
                         ),
                       ),
                     ),
@@ -404,7 +398,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           child: Text('Aucun atelier ne cible la section de cet élève pour le moment.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              style: TextStyle(fontSize: 12, color: kMutedTextColor)),
                         )
                       else
                         Padding(
@@ -418,7 +412,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                 const SizedBox(height: 8),
                               ],
                               if (breakdown.realise.isNotEmpty) ...[
-                                const Text('✅ Réalisé', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4E9F3D))),
+                                const Text('✅ Réalisé', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: kAccessibleGreenText)),
                                 ...breakdown.realise.map(
                                   (e) => _childAtelierTile(context, child, e.key, e.value, breakdown.snapshots[e.key.id]),
                                 ),
@@ -518,7 +512,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           total == 0
               ? 'Aucune observation sur la période.'
               : 'Les domaines à zéro signalent un apprentissage à programmer.',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: const TextStyle(fontSize: 12, color: kMutedTextColor),
         ),
         const SizedBox(height: 12),
         Container(
@@ -578,10 +572,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     children: [
                       const Expanded(
                         child: Text('Ateliers sans domaine renseigné',
-                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor)),
                       ),
                       Text('$sansDomaine',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kMutedTextColor)),
                     ],
                   ),
                 ),
@@ -616,7 +610,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.lock_outline, size: 18, color: Colors.grey),
         title: Text(atelier.name, style: const TextStyle(fontSize: 13)),
-        subtitle: Text(eligibility.message, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        subtitle: Text(eligibility.message, style: const TextStyle(fontSize: 11, color: kMutedTextColor)),
       );
     }
 
@@ -754,16 +748,16 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('📍 Espace : ${space.name}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text('📍 Espace : ${space.name}', style: const TextStyle(fontSize: 12, color: kMutedTextColor)),
                       Text(
                         actType.obligatoryGroups.isEmpty
                             ? '👥 Toute la classe'
                             : '👥 ${actType.obligatoryGroups.join(', ')}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(fontSize: 12, color: kMutedTextColor),
                       ),
                       if (concernedChildren.isEmpty)
                         const Text('Aucun élève dans les sections ciblées.',
-                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                            style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -807,7 +801,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           ),
                           const SizedBox(height: 8),
                           if (missingChildren.isEmpty)
-                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier obligatoire.', style: TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.bold))
+                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier obligatoire.', style: TextStyle(fontSize: 12, color: kAccessibleGreenText, fontWeight: FontWeight.bold))
                           else
                             Wrap(
                               spacing: 6,
@@ -831,13 +825,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               const SizedBox(width: 6),
                               Text(
                                 'Élèves ayant validé (${completedChildren.length}) :',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4E9F3D)),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kAccessibleGreenText),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           if (completedChildren.isEmpty)
-                            const Text('Aucun élève n\'a encore réalisé cet atelier.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey))
+                            const Text('Aucun élève n\'a encore réalisé cet atelier.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor))
                           else
                             Wrap(
                               spacing: 6,

@@ -7,6 +7,7 @@ import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
 import '../services/children_import_service.dart';
 import '../utils/color_utils.dart';
+import '../widgets/color_swatch_picker.dart';
 import '../widgets/school_year_card.dart';
 import 'privacy_policy_screen.dart';
 import 'referentials_manager_screen.dart';
@@ -68,8 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: const Color(0xFF4E9F3D),
-          unselectedLabelColor: Colors.grey,
+          labelColor: kAccessibleGreenText,
+          unselectedLabelColor: kMutedTextColor,
           indicatorColor: const Color(0xFF4E9F3D),
           tabs: const [
             Tab(icon: Icon(Icons.school), text: 'Profil Classe'),
@@ -102,7 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         children: [
           const Text('🏫 Profil & Identité de la Classe', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Ces informations seront affichées sur les livrets et exports PDF.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text('Ces informations seront affichées sur les livrets et exports PDF.', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
           const SizedBox(height: 16),
 
           // Logo / Photo de classe
@@ -132,7 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                         : null,
                   ),
                   const SizedBox(height: 6),
-                  const Text('Changer la photo / logo de classe', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4E9F3D))),
+                  const Text('Changer la photo / logo de classe', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kAccessibleGreenText)),
                 ],
               ),
             ),
@@ -318,7 +319,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         children: [
           const Text('🌙 Apparence & Thème Visuel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Personnalisez le mode d\'affichage de l\'interface.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text('Personnalisez le mode d\'affichage de l\'interface.', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
           const SizedBox(height: 20),
 
           Card(
@@ -384,12 +385,12 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             const SizedBox(height: 4),
             const Text(
               'Utilisées sur les fiches élèves et pour cibler les ateliers obligatoires.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: kMutedTextColor),
             ),
             const SizedBox(height: 10),
             if (provider.sections.isEmpty)
               const Text('Aucune section définie.',
-                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor)),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -438,7 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             const Text(
               'Proposés lors de chaque observation. Les renommer ne modifie pas '
               'les évaluations déjà enregistrées.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: kMutedTextColor),
             ),
             const SizedBox(height: 8),
             ...provider.evaluationStatuses.map((status) {
@@ -509,25 +510,10 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 child: Text('Couleur :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: palette.map((c) {
-                  final selected = c == color;
-                  return GestureDetector(
-                    onTap: () => setSt(() => color = c),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: hexToColor(c),
-                        shape: BoxShape.circle,
-                        border: selected ? Border.all(color: Colors.white, width: 3) : null,
-                      ),
-                      child: selected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
-                    ),
-                  );
-                }).toList(),
+              ColorSwatchPicker(
+                selectedHex: color,
+                palette: palette,
+                onChanged: (c) => setSt(() => color = c),
               ),
             ],
           ),
@@ -553,6 +539,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ),
       ),
     );
+    ctrl.dispose();
     if (result == null) return;
 
     final updated = List<EvaluationStatus>.from(provider.evaluationStatuses);
@@ -633,9 +620,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     provider.setSections(provider.sections.where((s) => s != section).toList());
   }
 
-  Future<String?> _askSectionName(BuildContext context, String title, String initial) {
+  Future<String?> _askSectionName(BuildContext context, String title, String initial) async {
     final ctrl = TextEditingController(text: initial);
-    return showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -657,6 +644,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ],
       ),
     );
+    ctrl.dispose();
+    return result;
   }
 
   Future<void> _showAutoBackups(BuildContext context, AppStateProvider provider) async {
@@ -741,7 +730,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         children: [
           const Text('🛡️ Sauvegarde & Sécurité', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Gérez les sauvegardes globales et les accès.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const Text('Gérez les sauvegardes globales et les accès.', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
           const SizedBox(height: 16),
 
           // Verrouillage a l'ouverture
@@ -768,7 +757,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       provider.biometricLockEnabled
                           ? 'L\'espace enseignant est protégé au démarrage.'
                           : 'L\'application s\'ouvre directement, sans authentification.',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style: const TextStyle(fontSize: 12, color: kMutedTextColor),
                     ),
                     value: provider.biometricLockEnabled,
                     activeColor: const Color(0xFF4E9F3D),
@@ -781,7 +770,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     ),
                   const Text(
                     'La modification prend effet au prochain démarrage de l\'application.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor),
                   ),
                 ],
               ),
@@ -809,7 +798,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     'L\'application enregistre seule vos données une fois par jour et '
                     'conserve les 5 dernières. Les photos n\'y sont pas incluses : '
                     'seul l\'export ZIP ci-dessous est une sauvegarde complète.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: kMutedTextColor),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
@@ -920,7 +909,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                     ),
                     subtitle: const Text(
                       'Une notification locale liste les élèves sans observation, si besoin.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      style: TextStyle(fontSize: 12, color: kMutedTextColor),
                     ),
                     value: provider.reminderEnabled,
                     activeColor: const Color(0xFF4E9F3D),
@@ -1075,8 +1064,9 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete_forever),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  onPressed: () {
-                    provider.resetSelectiveData(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final success = await provider.resetSelectiveData(
                       clearChildren: clearChildren,
                       clearActivityTypes: clearActivityTypes,
                       clearActivities: clearActivities,
@@ -1085,9 +1075,14 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       clearSpaces: clearSpaces,
                       clearPhotos: clearPhotos,
                     );
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Données réinitialisées avec succès ✅'), backgroundColor: Colors.red),
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text(success
+                            ? 'Données réinitialisées avec succès ✅'
+                            : 'Échec de la réinitialisation : rien n\'a été modifié ❌'),
+                        backgroundColor: success ? Colors.red : Colors.orange,
+                      ),
                     );
                   },
                   label: const Text('Confirmer la RAZ'),

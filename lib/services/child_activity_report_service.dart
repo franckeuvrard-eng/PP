@@ -147,6 +147,11 @@ class ChildActivityReportService {
     DateTime? from,
     DateTime? to,
     bool onlyLatestPerAtelier = false,
+    // Borne le nombre de photos reellement chargees/embarquees pour cet
+    // eleve (null = illimite). Le rapport de classe entiere l'utilise pour
+    // ne pas charger en memoire les photos de toute la classe a la fois ;
+    // le rapport individuel n'a pas cette limite.
+    int? maxPhotosPerChild,
   }) {
     // Filter logs by period
     var childLogs = provider.activitiesForChild(child.id).toList();
@@ -176,6 +181,8 @@ class ChildActivityReportService {
     final periodLabel = (from != null && to != null)
         ? '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}'
         : 'Toute la période';
+
+    var remainingPhotoBudget = maxPhotosPerChild;
 
     return [
             pw.Header(
@@ -248,25 +255,27 @@ class ChildActivityReportService {
               pw.Text('Aucune activité enregistrée pour cette période.', style: const pw.TextStyle(fontSize: 11))
             else
               ...childLogs.map((log) {
-                final actType = provider.activityTypes.firstWhere(
-                  (a) => a.id == log.activityTypeId,
-                  orElse: () =>
-                      ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
-                );
+                final actType = provider.activityTypeById(log.activityTypeId) ??
+                    ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096');
 
                 final space = provider.spaceById(actType.spaceId) ??
                     Space(id: '', name: '', colorHex: '');
 
                 // Chaque photo est accompagnee de sa legende quand elle en a une.
                 final List<({pw.MemoryImage image, String? caption})> activityImages = [];
+                var skippedPhotos = 0;
                 for (final path in log.photoPaths) {
                   final resolvedPath = provider.getAbsolutePath(path);
-                  if (resolvedPath != null && File(resolvedPath).existsSync()) {
-                    activityImages.add((
-                      image: pw.MemoryImage(File(resolvedPath).readAsBytesSync()),
-                      caption: log.captionFor(path),
-                    ));
+                  if (resolvedPath == null || !File(resolvedPath).existsSync()) continue;
+                  if (remainingPhotoBudget != null && remainingPhotoBudget! <= 0) {
+                    skippedPhotos++;
+                    continue;
                   }
+                  activityImages.add((
+                    image: pw.MemoryImage(File(resolvedPath).readAsBytesSync()),
+                    caption: log.captionFor(path),
+                  ));
+                  if (remainingPhotoBudget != null) remainingPhotoBudget = remainingPhotoBudget! - 1;
                 }
 
                 return pw.Container(
@@ -351,6 +360,14 @@ class ChildActivityReportService {
                           }).toList(),
                         ),
                       ],
+                      if (skippedPhotos > 0) ...[
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          '+$skippedPhotos photo${skippedPhotos > 1 ? "s" : ""}, voir la fiche individuelle',
+                          style: pw.TextStyle(
+                              fontSize: 8, fontStyle: pw.FontStyle.italic, color: PdfColors.grey600),
+                        ),
+                      ],
                     ],
                   ),
                 );
@@ -404,6 +421,13 @@ class ChildActivityReportService {
 
     // Un MultiPage par eleve : chacun demarre ainsi sur une page neuve, ce qui
     // permet d'imprimer et de distribuer les rapports separement.
+    //
+    // Le budget de photos par eleve est borne ici (contrairement au rapport
+    // individuel) : sans limite, un rapport classe entiere charge en memoire
+    // les photos de tous les eleves simultanement avant que le document ne
+    // soit rendu, ce qui peut faire planter l'appli sur une classe nombreuse
+    // avec beaucoup d'observations photographiees.
+    const maxPhotosPerChildInClassReport = 4;
     for (final child in children) {
       doc.addPage(
         pw.MultiPage(
@@ -414,6 +438,7 @@ class ChildActivityReportService {
             from: from,
             to: to,
             onlyLatestPerAtelier: onlyLatestPerAtelier,
+            maxPhotosPerChild: maxPhotosPerChildInClassReport,
           ),
         ),
       );
