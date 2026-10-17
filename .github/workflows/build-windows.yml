@@ -40,6 +40,21 @@ jobs:
       - name: Build Windows App
         run: flutter build windows --release
 
+      - name: Bundle sqlite3.dll
+        # sqflite_common_ffi charge sqlite3.dll au demarrage ; Windows ne la
+        # fournit pas (contrairement a macOS). DLL officielle sqlite.org,
+        # epinglee par empreinte SHA-256.
+        shell: pwsh
+        run: |
+          $url = 'https://www.sqlite.org/2025/sqlite-dll-win-x64-3500400.zip'
+          $expected = '56b8751cdbf6dcd8ac9a35508039e456692a402bc5ddf576c2b0eddb0fed8536'
+          Invoke-WebRequest -Uri $url -OutFile sqlite.zip
+          $actual = (Get-FileHash sqlite.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) { throw "Empreinte sqlite inattendue : $actual" }
+          Expand-Archive sqlite.zip -DestinationPath sqlite
+          Copy-Item sqlite\sqlite3.dll build\windows\x64\runner\Release\
+          Get-ChildItem build\windows\x64\runner\Release\sqlite3.dll
+
       - name: Read app version
         id: version
         shell: bash

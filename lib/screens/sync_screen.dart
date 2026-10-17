@@ -33,7 +33,8 @@ class _SyncScreenState extends State<SyncScreen> {
   SyncBrowser? _browser;
   StreamSubscription<List<DiscoveredPeer>>? _peersSub;
   List<DiscoveredPeer> _peers = const [];
-  bool _discoveryFailed = false;
+  // Cause de l'echec de la decouverte, affichee telle quelle (diagnostic).
+  String? _discoveryError;
 
   SyncPairing? _pairing;
   bool _starting = false;
@@ -70,10 +71,10 @@ class _SyncScreenState extends State<SyncScreen> {
         if (mounted) setState(() => _peers = peers);
       });
       await browser.start();
-    } catch (_) {
+    } catch (e) {
       // Bonjour indisponible (reseau qui bloque le multicast, plugin absent) :
       // le QR code et la saisie manuelle restent possibles.
-      if (mounted) setState(() => _discoveryFailed = true);
+      if (mounted) setState(() => _discoveryError = '$e');
     }
   }
 
@@ -102,9 +103,9 @@ class _SyncScreenState extends State<SyncScreen> {
       setState(() => _pairing = pairing);
       try {
         await _advertiser.start(pairing: pairing, deviceId: await _host.syncDeviceId());
-      } catch (_) {
+      } catch (e) {
         // Sans annonce, l'appareil reste joignable par QR code.
-        if (mounted) setState(() => _discoveryFailed = true);
+        if (mounted) setState(() => _discoveryError = '$e');
       }
     } catch (e) {
       if (mounted) setState(() => _error = 'Impossible de démarrer la réception : $e');
@@ -267,14 +268,14 @@ class _SyncScreenState extends State<SyncScreen> {
             ]),
             const SizedBox(height: 8),
             Text(
-              _discoveryFailed
-                  ? 'La recherche automatique ne fonctionne pas sur ce réseau : '
-                      'utilisez le QR code ou la saisie manuelle ci-dessous.'
+              _discoveryError != null
+                  ? 'La recherche automatique ne fonctionne pas ($_discoveryError). '
+                      'Utilisez le QR code ou la saisie manuelle ci-dessous.'
                   : 'Ouvrez aussi cet écran sur l’autre appareil : il apparaît ici tout seul.',
               style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 8),
-            if (_peers.isEmpty && !_discoveryFailed)
+            if (_peers.isEmpty && _discoveryError == null)
               const Row(children: [
                 SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
                 SizedBox(width: 12),
