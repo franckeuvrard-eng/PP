@@ -39,8 +39,6 @@ jobs:
           perl -0pi -e 's/super\.awakeFromNib\(\)/self.minSize = NSSize(width: 900, height: 640)\n    super.awakeFromNib()/' macos/Runner/MainFlutterWindow.swift
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Notes vocales sur les observations.'" macos/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Synchronisation avec l application sur iPhone/iPad.'" macos/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" macos/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices:0 string _petitpas._tcp" macos/Runner/Info.plist
           grep -n "minSize" macos/Runner/MainFlutterWindow.swift
 
       - name: Install dependencies

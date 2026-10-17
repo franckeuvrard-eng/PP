@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,8 @@ import 'package:petitpas/models/activity.dart';
 import 'package:petitpas/models/child.dart';
 import 'package:petitpas/models/referential.dart';
 import 'package:petitpas/providers/app_provider.dart';
+import 'package:petitpas/providers/provider_sync_host.dart';
+import 'package:petitpas/services/sync_service.dart';
 import 'package:petitpas/services/app_database.dart';
 
 /// Tests de la couche de persistance : migration de schema, echec de
@@ -371,6 +374,65 @@ void main() {
       expect(provider.activities, hasLength(observationsAvant));
       expect(provider.classSettings.schoolYear, isNot('2027-2028'));
       expect(await provider.listArchives(), isEmpty);
+    });
+  });
+
+  group('Synchronisation locale', () {
+    test('un eleve, une observation et une photo passent d\'un appareil a l\'autre', () async {
+      // flutter_test bloque le reseau (reponses 400) : on rend la vraie pile.
+      HttpOverrides.global = null;
+
+      final dossierMac = await Directory('${racine.path}/mac').create();
+      final dossierPhone = await Directory('${racine.path}/phone').create();
+      final mac = creerProvider(nom: '${nomBase}_mac', documentsPath: dossierMac.path);
+      final phone = creerProvider(nom: '${nomBase}_phone', documentsPath: dossierPhone.path);
+      await mac.initialize();
+      await phone.initialize();
+      addTearDown(() async {
+        await databaseFactory.deleteDatabase(await cheminBase('${nomBase}_mac'));
+        await databaseFactory.deleteDatabase(await cheminBase('${nomBase}_phone'));
+      });
+
+      phone.addOrUpdateChild(Child(
+        id: 'child_sync',
+        firstname: 'Léa',
+        lastname: 'Durand',
+        birthdate: '2022-01-01',
+        group: 'Groupe Bleu',
+        colorHex: '#4E9F3D',
+        avatarText: 'LD',
+        imagePath: 'profiles/lea.jpg',
+      ));
+      phone.logActivity(ActivityLog(
+        id: 'log_sync',
+        childId: 'child_sync',
+        activityTypeId: phone.activityTypes.first.id,
+        timestamp: DateTime(2026, 3, 12),
+      ));
+      await phone.writeSyncMedia('profiles/lea.jpg', Uint8List.fromList([7, 7, 7]));
+
+      final server = SyncServer(ProviderSyncHost(mac));
+      final started = await server.start();
+      addTearDown(server.stop);
+
+      final summary = await SyncClient(ProviderSyncHost(phone)).sync(SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: ''));
+      expect(summary.mediaUploaded, 1);
+
+      expect(mac.children.any((c) => c.id == 'child_sync'), isTrue);
+      expect(mac.activities.any((a) => a.id == 'log_sync'), isTrue);
+      expect(await mac.readSyncMedia('profiles/lea.jpg'), Uint8List.fromList([7, 7, 7]));
+
+      // Les donnees sont bien en base, pas seulement en memoire.
+      final relu = creerProvider(nom: '${nomBase}_mac', documentsPath: dossierMac.path);
+      await relu.initialize();
+      expect(relu.children.any((c) => c.id == 'child_sync'), isTrue);
+
+      // Une suppression faite sur le Mac se propage a la synchronisation suivante.
+      mac.deleteChild('child_sync');
+      await SyncClient(ProviderSyncHost(phone)).sync(SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: ''));
+      expect(phone.children.any((c) => c.id == 'child_sync'), isFalse);
     });
   });
 }

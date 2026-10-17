@@ -36,10 +36,15 @@ class ReminderService {
   /// l'enseignant active le rappel dans les réglages, pas au démarrage.
   static Future<bool> requestPermission() async {
     await _ensureInitialized();
-    final granted = await _plugin
+    final ios = await _plugin
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
-    return granted ?? false;
+    // Sur Mac, c'est l'implementation macOS qui repond : sans elle le rappel
+    // restait silencieusement desactive.
+    final mac = await _plugin
+        .resolvePlatformSpecificImplementation<MacOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
+    return ios ?? mac ?? false;
   }
 
   /// (Re)programme le rappel du jour à [hour]:[minute] avec le nombre actuel
@@ -67,6 +72,7 @@ class ReminderService {
       scheduled,
       const NotificationDetails(
         iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
+        macOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
       ),
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );

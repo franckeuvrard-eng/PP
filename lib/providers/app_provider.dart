@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -744,52 +745,58 @@ class AppStateProvider extends ChangeNotifier {
   Future<bool> restoreAutoBackup(File backup) async {
     try {
       final data = json.decode(await backup.readAsString()) as Map<String, dynamic>;
-      final classSettings = ClassSettings.fromMap(data['class_settings']);
-      final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
-      final spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
-      final activityTypes =
-          (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
-      final activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
-      final evaluationStatuses =
-          _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
-      final sonsData = data['sons_progress'];
-      final sonsProgress = sonsData is Map
-          ? sonsData.map((childId, entries) => MapEntry(
-                childId as String,
-                (entries as Map).map(
-                    (son, code) => MapEntry(son as String, SonStatut.fromCode(code))),
-              ))
-          : <String, Map<String, SonStatut>>{};
-      final sections = data['sections'] != null ? List<String>.from(data['sections']) : null;
-
-      _classSettings = classSettings;
-      _children = children;
-      _spaces = spaces;
-      _activityTypes = activityTypes;
-      _activities = activities;
-      _evaluationStatuses = evaluationStatuses;
-      _sonsProgress = sonsProgress;
-      if (sections != null) {
-        _sections = sections;
-        await _db.setSetting('sections', json.encode(_sections));
-      }
-
-      await _db.replaceAll(
-        classSettings: _classSettings,
-        children: _children,
-        spaces: _spaces,
-        activityTypes: _activityTypes,
-        activities: _activities,
-        evaluationStatuses: _evaluationStatuses,
-        sons: _sonsProgress,
-      );
-      await _restoreReferentialsFrom(data);
-      _notify();
+      await _applyBackupMap(data);
       return true;
     } catch (e) {
       debugPrint('Echec de la restauration automatique : $e');
       return false;
     }
+  }
+
+  /// Remplace l'etat de l'application par une sauvegarde JSON (sans les
+  /// medias). Partage par la restauration automatique et la synchronisation.
+  Future<void> _applyBackupMap(Map<String, dynamic> data) async {
+    final classSettings = ClassSettings.fromMap(data['class_settings']);
+    final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
+    final spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
+    final activityTypes =
+        (data['activity_types'] as List).map((a) => ActivityType.fromMap(a)).toList();
+    final activities = (data['activities'] as List).map((l) => ActivityLog.fromMap(l)).toList();
+    final evaluationStatuses =
+        _decodeEvaluationStatuses(json.encode(data['evaluation_statuses'] ?? []));
+    final sonsData = data['sons_progress'];
+    final sonsProgress = sonsData is Map
+        ? sonsData.map((childId, entries) => MapEntry(
+              childId as String,
+              (entries as Map).map(
+                  (son, code) => MapEntry(son as String, SonStatut.fromCode(code))),
+            ))
+        : <String, Map<String, SonStatut>>{};
+    final sections = data['sections'] != null ? List<String>.from(data['sections']) : null;
+
+    _classSettings = classSettings;
+    _children = children;
+    _spaces = spaces;
+    _activityTypes = activityTypes;
+    _activities = activities;
+    _evaluationStatuses = evaluationStatuses;
+    _sonsProgress = sonsProgress;
+    if (sections != null) {
+      _sections = sections;
+      await _db.setSetting('sections', json.encode(_sections));
+    }
+
+    await _db.replaceAll(
+      classSettings: _classSettings,
+      children: _children,
+      spaces: _spaces,
+      activityTypes: _activityTypes,
+      activities: _activities,
+      evaluationStatuses: _evaluationStatuses,
+      sons: _sonsProgress,
+    );
+    await _restoreReferentialsFrom(data);
+    _notify();
   }
 
   /// Relit et repersiste les referentiels personnalises depuis une sauvegarde
@@ -1330,6 +1337,78 @@ class AppStateProvider extends ChangeNotifier {
       debugPrint('Import error: $e');
       return 'error';
     }
+  }
+
+  // ───────────────── SYNCHRONISATION LOCALE ─────────────────
+
+  /// Donnees au format « sauvegarde », pour la synchronisation Mac / iPhone.
+  Map<String, dynamic> buildSyncSnapshot() => {
+        'version': 2,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'class_settings': _classSettings.toMap(),
+        'children': _children.map((c) => c.toMap()).toList(),
+        'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
+        'activities': _activities.map((l) => l.toMap()).toList(),
+        'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
+        'sections': _sections,
+        'sons_progress': _sonsProgressAsMap(),
+        'referentials': _referentials.map((r) => r.toMap()).toList(),
+        'referential_status': _referentialStatusAsMap(),
+      };
+
+  /// Applique un jeu de donnees fusionne. Une sauvegarde automatique est faite
+  /// avant, pour pouvoir revenir en arriere depuis les reglages.
+  Future<void> applySyncSnapshot(Map<String, dynamic> data) async {
+    await _writeAutoBackup();
+    await _applyBackupMap(data);
+  }
+
+  Future<String> syncDeviceId() async {
+    final settings = await _db.readSettings();
+    var id = settings['sync_device_id'];
+    if (id == null || id.isEmpty) {
+      id = const Uuid().v4();
+      await _db.setSetting('sync_device_id', id);
+    }
+    return id;
+  }
+
+  Future<Map<String, String>?> loadSyncBase(String peerId) async {
+    final raw = (await _db.readSettings())['sync_base_$peerId'];
+    if (raw == null) return null;
+    return Map<String, String>.from(json.decode(raw) as Map);
+  }
+
+  Future<void> saveSyncBase(String peerId, Map<String, String> fingerprints) =>
+      _db.setSetting('sync_base_$peerId', json.encode(fingerprints));
+
+  Future<String> _mediaRoot() async =>
+      _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+
+  /// Photos et notes vocales presentes, en chemins `dossier/fichier`.
+  Future<List<String>> listSyncMedia() async {
+    final root = await _mediaRoot();
+    final out = <String>[];
+    for (final subDir in _mediaSubDirs) {
+      final dir = Directory('$root/$subDir');
+      if (!await dir.exists()) continue;
+      for (final f in dir.listSync().whereType<File>()) {
+        out.add('$subDir/${f.path.split(RegExp(r'[/\\]')).last}');
+      }
+    }
+    return out;
+  }
+
+  Future<Uint8List?> readSyncMedia(String relativePath) async {
+    final file = File('${await _mediaRoot()}/$relativePath');
+    return await file.exists() ? file.readAsBytes() : null;
+  }
+
+  Future<void> writeSyncMedia(String relativePath, Uint8List bytes) async {
+    final file = File('${await _mediaRoot()}/$relativePath');
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(bytes);
   }
 
   void updateClassSettings(ClassSettings settings) {

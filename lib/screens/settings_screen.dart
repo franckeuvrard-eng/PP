@@ -9,6 +9,7 @@ import '../services/children_import_service.dart';
 import '../utils/color_utils.dart';
 import '../widgets/color_swatch_picker.dart';
 import '../widgets/school_year_card.dart';
+import 'sync_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'referentials_manager_screen.dart';
 import 'spaces_workshops_tab.dart';
@@ -731,6 +732,24 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           const Text('🛡️ Sauvegarde & Sécurité', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           const Text('Gérez les sauvegardes globales et les accès.', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+          const SizedBox(height: 16),
+
+          // Synchronisation locale Mac <-> iPhone
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.sync_alt, color: Color(0xFF4E9F3D)),
+              title: const Text('Synchroniser avec un autre appareil',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text('Mac ⇄ iPhone/iPad, sur le Wi‑Fi de l\'école, sans compte.',
+                  style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SyncScreen()),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Verrouillage a l'ouverture

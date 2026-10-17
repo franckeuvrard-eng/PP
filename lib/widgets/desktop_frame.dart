@@ -2,8 +2,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../utils/platform_support.dart';
-
 /// Largeur a partir de laquelle on bascule sur la mise en page ordinateur
 /// (barre laterale a la place de la barre d'onglets du bas).
 const double kDesktopBreakpoint = 840;
@@ -62,6 +60,7 @@ class DesktopFrame extends StatelessWidget {
   final Widget body;
 
   static const _green = Color(0xFF4E9F3D);
+  static const double _railWidth = 240;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +70,7 @@ class DesktopFrame extends StatelessWidget {
         children: [
           NavigationRail(
             extended: true,
-            minExtendedWidth: 220,
+            minExtendedWidth: _railWidth,
             selectedIndex: currentIndex,
             onDestinationSelected: onSelected,
             backgroundColor: theme.cardColor,
@@ -80,36 +79,46 @@ class DesktopFrame extends StatelessWidget {
             selectedLabelTextStyle: const TextStyle(
                 color: _green, fontWeight: FontWeight.bold, fontSize: 14),
             unselectedLabelTextStyle: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.7), fontSize: 14),
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 14),
+            // Largeur fixe : le rail donne a `leading` une largeur non bornee,
+            // incompatible avec l'Expanded du titre.
             leading: Padding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _green,
-                      borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: _railWidth - 32,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _green,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.child_care,
+                          color: Colors.white, size: 22),
                     ),
-                    child: const Icon(Icons.child_care, color: Colors.white, size: 22),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('A petits pas',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text(
-                          className,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: _green, fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('A petits pas',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text(
+                            className,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: _green,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             trailing: Expanded(
@@ -140,7 +149,8 @@ class DesktopFrame extends StatelessWidget {
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: kDesktopContentMaxWidth),
+                constraints:
+                    const BoxConstraints(maxWidth: kDesktopContentMaxWidth),
                 child: body,
               ),
             ),
