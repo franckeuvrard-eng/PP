@@ -26,7 +26,7 @@ dependencies:
   printing: ^5.11.1
   path_provider: ^2.1.2
   archive: ^3.4.10
-  share_plus: ^9.0.0
+  share_plus: ^10.1.4
   file_picker: ^8.0.0
   excel: ^4.0.4
   local_auth: ^2.2.0
@@ -39,7 +39,7 @@ dependencies:
     sdk: flutter
   flutter_local_notifications: ^17.2.1+2
   timezone: ^0.9.4
-  record: ^5.1.2
+  record: ^7.1.2
   audioplayers: ^6.1.0
   # Decouverte automatique des appareils sur le Wi-Fi (Bonjour / mDNS).
   # 5.x : la 7.x change l API des evenements de decouverte (migration a part).
