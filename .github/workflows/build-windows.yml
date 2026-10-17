@@ -76,24 +76,19 @@ jobs:
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip"
 
       - name: Build installer
-        # Inno Setup 6.7.3 (release officielle GitHub, epinglee par SHA-256) :
-        # installateur classique, raccourcis et desinstallation depuis les
-        # Parametres Windows. Script : windows_config/petitpas.iss.
+        # Inno Setup 6 est preinstalle sur l'image windows-2022 (l'installer
+        # nous-memes restait bloque) : installateur classique, raccourcis et
+        # desinstallation depuis les Parametres Windows. Script :
+        # windows_config/petitpas.iss.
         shell: pwsh
+        timeout-minutes: 10
         run: |
-          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
-          $expected = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
-          Invoke-WebRequest -Uri $url -OutFile innosetup.exe
-          $actual = (Get-FileHash innosetup.exe -Algorithm SHA256).Hash.ToLower()
-          if ($actual -ne $expected) { throw "Empreinte Inno Setup inattendue : $actual" }
-          # /ALLUSERS : sinon l'installateur demande « pour tous / pour moi »
-          # et attend indefiniment. Delai max pour ne jamais bloquer le job.
-          $p = Start-Process innosetup.exe -PassThru -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/ALLUSERS','/DIR=C:\InnoSetup'
-          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "Installation d'Inno Setup bloquee" }
-          if (-not (Test-Path C:\InnoSetup\ISCC.exe)) { throw "ISCC.exe introuvable apres installation" }
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
+            Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) absent de l'image du runner" }
           $release = Resolve-Path build\windows\x64\runner\Release
           $icon = Resolve-Path windows\runner\resources\app_icon.ico
-          & C:\InnoSetup\ISCC.exe "/DAppVersion=${{ steps.version.outputs.app_version }}" "/DSourceDir=$release" "/DIconFile=$icon" "/O$PWD" windows_config\petitpas.iss
+          & $iscc "/DAppVersion=${{ steps.version.outputs.app_version }}" "/DSourceDir=$release" "/DIconFile=$icon" "/O$PWD" windows_config\petitpas.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue ($LASTEXITCODE)" }
           Get-ChildItem PetitPas_*_Setup.exe
 
