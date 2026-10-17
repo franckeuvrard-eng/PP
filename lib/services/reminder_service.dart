@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -13,6 +14,13 @@ class ReminderService {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static const _notificationId = 1001;
   static bool _initialized = false;
+
+  /// Les rappels n'existent que sur iOS et macOS : le plugin de notifications
+  /// n'a pas d'implementation Windows/Linux dans la version utilisee.
+  static bool get isSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
 
   static Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -35,6 +43,7 @@ class ReminderService {
   /// Demande l'autorisation d'envoyer des notifications. À appeler quand
   /// l'enseignant active le rappel dans les réglages, pas au démarrage.
   static Future<bool> requestPermission() async {
+    if (!isSupported) return false;
     await _ensureInitialized();
     final ios = await _plugin
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
@@ -55,6 +64,7 @@ class ReminderService {
     required int minute,
     required int pendingCount,
   }) async {
+    if (!isSupported) return;
     await _ensureInitialized();
     await _plugin.cancel(_notificationId);
     if (pendingCount <= 0) return;
@@ -79,6 +89,7 @@ class ReminderService {
   }
 
   static Future<void> cancelReminder() async {
+    if (!isSupported) return;
     await _ensureInitialized();
     await _plugin.cancel(_notificationId);
   }

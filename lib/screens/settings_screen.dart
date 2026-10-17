@@ -6,6 +6,7 @@ import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
 import '../services/children_import_service.dart';
+import '../services/reminder_service.dart';
 import '../utils/color_utils.dart';
 import '../widgets/color_swatch_picker.dart';
 import '../widgets/school_year_card.dart';
@@ -902,7 +903,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           SchoolYearCard(provider: provider),
           const SizedBox(height: 16),
 
-          // Rappel local des eleves non evalues
+          // Rappel local des eleves non evalues (iOS et macOS seulement)
+          if (ReminderService.isSupported)
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(

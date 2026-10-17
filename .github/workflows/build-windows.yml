@@ -1,0 +1,60 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: [ main, master, 'claude/**' ]
+    paths-ignore: [ 'web_prototype/**' ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Recreate Windows platform files
+        # Le dossier plateforme n'est pas versionne (comme pour iOS et macOS).
+        shell: bash
+        run: |
+          flutter config --enable-windows-desktop
+          flutter create --project-name=petitpas --platforms=windows .
+          rm -f test/widget_test.dart
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: flutter test --reporter expanded
+
+      - name: Build Windows App
+        run: flutter build windows --release
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          V=$(grep -m1 '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d'+' -f1)
+          echo "app_version=${V}" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        # Le dossier Release contient l'.exe ET les DLL / donnees : il faut
+        # tout livrer ensemble, l'.exe seul ne demarre pas.
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PetitPas-v${{ steps.version.outputs.app_version }}-Windows
+          path: PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip
