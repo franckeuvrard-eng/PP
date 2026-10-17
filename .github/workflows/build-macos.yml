@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Select Xcode 15.4
         run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
@@ -79,14 +79,14 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent *.app "$GITHUB_WORKSPACE/PetitPas_v${{ steps.version.outputs.app_version }}_macOS.zip"
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PetitPas-v${{ steps.version.outputs.app_version }}-macOS
           path: PetitPas_v${{ steps.version.outputs.app_version }}_macOS.zip
 
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-diagnostics-macos
           if-no-files-found: warn

@@ -56,6 +56,9 @@ flutter_launcher_icons:
   image_path: "assets/images/app_icon.jpg"
   remove_alpha_channel_ios: true
   background_color_ios: "#4E9F3D"
+  windows:
+    generate: true
+    icon_size: 256
 
 flutter:
   uses-material-design: true
