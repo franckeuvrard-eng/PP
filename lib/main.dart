@@ -227,11 +227,13 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
       });
       authenticated = await auth.authenticate(
         localizedReason: 'Veuillez vous authentifier pour accéder à l\'espace enseignant.',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false,
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: false,
       );
+    } on LocalAuthException catch (e) {
+      // Annulation, pas de code configure, trop d'essais… : l'ecran reste
+      // verrouille et propose de reessayer.
+      debugPrint('Auth error: ${e.code} ${e.description}');
     } on PlatformException catch (e) {
       debugPrint('Auth error: $e');
     } on MissingPluginException catch (e) {
