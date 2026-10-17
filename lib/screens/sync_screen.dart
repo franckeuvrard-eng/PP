@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -6,14 +8,17 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../providers/app_provider.dart';
 import '../providers/provider_sync_host.dart';
+import '../services/sync_discovery.dart';
 import '../services/sync_service.dart';
 import '../utils/platform_support.dart';
 
 /// Synchronisation locale Mac ⇄ iPhone/iPad, sans serveur ni compte.
 ///
-/// Un appareil « reçoit » (affiche un QR code et ecoute sur le reseau local),
-/// l'autre « se connecte » (scanne le QR code ou saisit l'adresse), lit les
-/// donnees de l'autre, fusionne, puis envoie le resultat.
+/// A l'ouverture de l'ecran, l'appareil se met en reception et s'annonce sur
+/// le reseau local (Bonjour) ; il liste les autres appareils qui ont aussi
+/// cet ecran ouvert. Un appui sur l'un d'eux lit ses donnees, fusionne, puis
+/// lui envoie le resultat. Le QR code et la saisie manuelle restent en
+/// secours si la decouverte est bloquee par le reseau.
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key});
 
@@ -24,6 +29,11 @@ class SyncScreen extends StatefulWidget {
 class _SyncScreenState extends State<SyncScreen> {
   late final ProviderSyncHost _host;
   late final SyncServer _server;
+  final _advertiser = SyncAdvertiser();
+  SyncBrowser? _browser;
+  StreamSubscription<List<DiscoveredPeer>>? _peersSub;
+  List<DiscoveredPeer> _peers = const [];
+  bool _discoveryFailed = false;
 
   SyncPairing? _pairing;
   bool _starting = false;
@@ -46,13 +56,35 @@ class _SyncScreenState extends State<SyncScreen> {
       ..onSynced = () {
         if (mounted) setState(() => _lastReceived = DateTime.now());
       };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startServer();
+      _startBrowsing();
+    });
+  }
+
+  Future<void> _startBrowsing() async {
+    try {
+      final browser = SyncBrowser(ownDeviceId: await _host.syncDeviceId());
+      _browser = browser;
+      _peersSub = browser.peers.listen((peers) {
+        if (mounted) setState(() => _peers = peers);
+      });
+      await browser.start();
+    } catch (_) {
+      // Bonjour indisponible (reseau qui bloque le multicast, plugin absent) :
+      // le QR code et la saisie manuelle restent possibles.
+      if (mounted) setState(() => _discoveryFailed = true);
+    }
   }
 
   @override
   void dispose() {
-    // Le serveur ne doit jamais survivre a l'ecran : il expose les donnees
-    // de la classe sur le reseau.
+    // Le serveur et son annonce ne doivent jamais survivre a l'ecran : ils
+    // exposent les donnees de la classe sur le reseau.
+    _advertiser.stop();
     _server.stop();
+    _peersSub?.cancel();
+    _browser?.dispose();
     _addressController.dispose();
     _portController.dispose();
     _codeController.dispose();
@@ -68,6 +100,12 @@ class _SyncScreenState extends State<SyncScreen> {
       final pairing = await _server.start();
       if (!mounted) return;
       setState(() => _pairing = pairing);
+      try {
+        await _advertiser.start(pairing: pairing, deviceId: await _host.syncDeviceId());
+      } catch (_) {
+        // Sans annonce, l'appareil reste joignable par QR code.
+        if (mounted) setState(() => _discoveryFailed = true);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'Impossible de démarrer la réception : $e');
     } finally {
@@ -76,6 +114,7 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   Future<void> _stopServer() async {
+    await _advertiser.stop();
     await _server.stop();
     if (mounted) setState(() => _pairing = null);
   }
@@ -146,6 +185,8 @@ class _SyncScreenState extends State<SyncScreen> {
                 style: TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 16),
+              _buildNearbyCard(),
+              const SizedBox(height: 16),
               _buildReceiveCard(),
               const SizedBox(height: 16),
               _buildConnectCard(),
@@ -211,6 +252,52 @@ class _SyncScreenState extends State<SyncScreen> {
     return parts.join('\n');
   }
 
+  Widget _buildNearbyCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(children: [
+              Icon(Icons.devices, color: Color(0xFF4E9F3D)),
+              SizedBox(width: 8),
+              Text('Appareils à proximité',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ]),
+            const SizedBox(height: 8),
+            Text(
+              _discoveryFailed
+                  ? 'La recherche automatique ne fonctionne pas sur ce réseau : '
+                      'utilisez le QR code ou la saisie manuelle ci-dessous.'
+                  : 'Ouvrez aussi cet écran sur l’autre appareil : il apparaît ici tout seul.',
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            if (_peers.isEmpty && !_discoveryFailed)
+              const Row(children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 12),
+                Text('Recherche…', style: TextStyle(fontSize: 13)),
+              ])
+            else
+              for (final peer in _peers)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.laptop_mac),
+                  title: Text(peer.name),
+                  trailing: FilledButton.icon(
+                    onPressed: _syncing ? null : () => _run(peer.pairing),
+                    icon: const Icon(Icons.sync, size: 18),
+                    label: const Text('Synchroniser'),
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReceiveCard() {
     final pairing = _pairing;
     return Card(
@@ -222,13 +309,13 @@ class _SyncScreenState extends State<SyncScreen> {
             const Row(children: [
               Icon(Icons.qr_code_2, color: Color(0xFF4E9F3D)),
               SizedBox(width: 8),
-              Text('Recevoir sur cet appareil',
+              Text('Si l’appareil n’apparaît pas',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ]),
             const SizedBox(height: 8),
             const Text(
-              'Affichez le code, puis scannez-le depuis l’autre appareil. '
-              'Le code change à chaque démarrage et la réception s’arrête quand vous quittez cet écran.',
+              'Scannez ce code depuis l’autre appareil. '
+              'Le code change à chaque ouverture et cet appareil n’est plus visible quand vous quittez cet écran.',
               style: TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 12),

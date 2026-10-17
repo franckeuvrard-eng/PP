@@ -41,6 +41,9 @@ dependencies:
   timezone: ^0.9.4
   record: ^5.1.2
   audioplayers: ^6.1.0
+  # Decouverte automatique des appareils sur le Wi-Fi (Bonjour / mDNS).
+  # 5.x : la 6.x exige Dart 3.8, le CI est epingle sur Flutter 3.19.
+  bonsoir: ^5.1.11
 
 dev_dependencies:
   flutter_test:

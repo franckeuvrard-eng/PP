@@ -37,6 +37,8 @@ jobs:
           perl -0pi -e 's/super\.awakeFromNib\(\)/self.minSize = NSSize(width: 900, height: 640)\n    super.awakeFromNib()/' macos/Runner/MainFlutterWindow.swift
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Notes vocales sur les observations.'" macos/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Synchronisation avec l application sur iPhone/iPad.'" macos/Runner/Info.plist
+          # Service Bonjour de decouverte automatique (cf. sync_discovery.dart).
+          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" -c "Add :NSBonjourServices:0 string '_petitpas._tcp'" macos/Runner/Info.plist
           grep -n "minSize" macos/Runner/MainFlutterWindow.swift
           # Le plugin record (notes vocales) exige macOS 10.15, le template
           # Flutter 3.19 cible 10.14 : on realigne Podfile et projet Xcode.

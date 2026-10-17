@@ -30,6 +30,10 @@
 	<string>L'application utilise FaceID pour sécuriser l'accès à l'espace enseignant.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>A petits pas se connecte à votre Mac ou iPad sur le Wi-Fi de l'école pour synchroniser les données de la classe.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_petitpas._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>A petits pas utilise la caméra pour scanner les QR Codes des élèves et des ateliers en classe, ainsi que pour prendre des photos des activités.</string>
 	<key>NSMicrophoneUsageDescription</key>
