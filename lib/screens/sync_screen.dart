@@ -12,6 +12,7 @@ import '../services/sync_discovery.dart';
 import '../services/sync_service.dart';
 import '../utils/platform_support.dart';
 import '../widgets/sync_report_view.dart';
+import 'sync_conflicts_screen.dart';
 
 /// Synchronisation locale Mac ⇄ iPhone/iPad, sans serveur ni compte.
 ///
@@ -166,6 +167,17 @@ class _SyncScreenState extends State<SyncScreen> {
         pairing,
         onProgress: (s) {
           if (mounted) setState(() => _step = s);
+        },
+        resolveConflicts: (conflicts, peerName, merged) async {
+          if (!mounted) return null;
+          return Navigator.push<Map<String, Object?>>(
+            context,
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => SyncConflictsScreen(
+                  conflicts: conflicts, peerName: peerName, snapshot: merged),
+            ),
+          );
         },
       );
       if (mounted) {

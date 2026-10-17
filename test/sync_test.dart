@@ -161,6 +161,45 @@ void main() {
       expect((phone.data['children'] as List).map((c) => c['name']), ['Robert']);
     });
 
+    test('conflit : choix champ par champ, ou annulation sans rien modifier', () async {
+      const lea = {'id': 'l', 'firstname': 'Léa', 'birthdate': '2021-03-12', 'notes': ''};
+      final mac = FakeHost('mac', snap([lea]));
+      final phone = FakeHost('phone', snap([lea]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+      await SyncClient(phone).sync(pairing); // etablit la base commune
+
+      // Meme fiche modifiee des deux cotes, sur des champs differents.
+      phone.data = snap([{...lea, 'birthdate': '2021-03-15'}]);
+      mac.data = snap([{...lea, 'notes': 'Allergie'}]);
+
+      List<MergeConflict>? seen;
+      // Annulation : aucun des deux appareils ne change.
+      await expectLater(
+        SyncClient(phone).sync(pairing, resolveConflicts: (c, _, __) async {
+          seen = c;
+          return null;
+        }),
+        throwsA(isA<SyncException>()),
+      );
+      expect(seen!.single.differingFields.toSet(), {'birthdate', 'notes'});
+      expect((mac.data['children'] as List).single['notes'], 'Allergie');
+      expect((phone.data['children'] as List).single['birthdate'], '2021-03-15');
+
+      // Date de naissance de l'iPhone, notes du Mac : les deux sont gardees.
+      final summary = await SyncClient(phone).sync(pairing,
+          resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'notes'})});
+      for (final host in [mac, phone]) {
+        final child = (host.data['children'] as List).single as Map;
+        expect(child['birthdate'], '2021-03-15');
+        expect(child['notes'], 'Allergie');
+      }
+      expect(summary.conflicts, 1);
+    });
+
     test('compte rendu detaille sur les deux appareils', () async {
       const lea = {'id': 'l', 'firstname': 'Léa', 'lastname': 'Martin'};
       const tom = {'id': 't', 'firstname': 'Tom', 'lastname': 'Petit'};

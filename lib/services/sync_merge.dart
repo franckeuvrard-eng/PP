@@ -184,15 +184,22 @@ class SyncMerge {
 
   /// Fusionne [local] et [remote]. [base] vaut null a la premiere
   /// synchronisation avec cet appareil.
+  ///
+  /// [resolutions] : valeur choisie par l'utilisateur pour un conflit, par
+  /// [MergeConflict.id]. Sans choix, la version locale l'emporte. Les conflits
+  /// rencontres sont listes dans [MergeResult.conflicts] : on fusionne une
+  /// premiere fois pour les presenter, puis une seconde avec les choix.
   static MergeResult merge({
     required Map<String, dynamic> local,
     required Map<String, dynamic> remote,
     Map<String, String>? base,
+    Map<String, Object?>? resolutions,
   }) {
     final l = flatten(local);
     final r = flatten(remote);
     final merged = <String, Map<String, Object?>>{};
     final stats = MergeStats();
+    final conflicts = <MergeConflict>[];
 
     for (final cat in {...l.keys, ...r.keys}) {
       final lc = l[cat] ?? const <String, Object?>{};
@@ -210,36 +217,41 @@ class SyncMerge {
         }
         final bh = base?['$cat$_sep$key'];
 
-        // 'L' garde le local, 'R' prend le distant.
-        String winner;
-        if (bh == null) {
-          // Pas de base : union, le local l'emporte en cas de divergence.
-          winner = hasL ? 'L' : 'R';
-          if (hasL && hasR) stats.conflicts++;
-        } else if (lh == bh) {
-          winner = 'R';
-        } else if (rh == bh) {
-          winner = 'L';
+        // Present des deux cotes et modifie des deux cotes (ou sans base
+        // commune) : c'est a l'utilisateur de trancher. Supprime d'un cote et
+        // modifie de l'autre n'en est pas un : la modification gagne.
+        final conflict = hasL && hasR && (bh == null || (lh != bh && rh != bh));
+
+        bool chosenHas;
+        Object? chosen;
+        if (conflict) {
+          final c = MergeConflict(category: cat, key: key, local: lc[key], remote: rc[key]);
+          conflicts.add(c);
+          stats.conflicts++;
+          chosenHas = true;
+          chosen = (resolutions != null && resolutions.containsKey(c.id))
+              ? resolutions[c.id]
+              : lc[key];
         } else {
-          // Modifie des deux cotes (ou supprime d'un cote, modifie de l'autre).
-          if (!hasL) {
+          // 'L' garde le local, 'R' prend le distant.
+          final String winner;
+          if (bh == null) {
+            winner = hasL ? 'L' : 'R'; // Pas de base : union.
+          } else if (lh == bh) {
             winner = 'R';
-          } else if (!hasR) {
+          } else if (rh == bh) {
             winner = 'L';
           } else {
-            winner = 'L';
-            stats.conflicts++;
+            winner = hasL ? 'L' : 'R'; // Supprime d'un cote, modifie de l'autre.
           }
+          chosenHas = winner == 'L' ? hasL : hasR;
+          chosen = chosenHas ? (winner == 'L' ? lc[key] : rc[key]) : null;
         }
+        if (chosenHas) out[key] = chosen;
 
-        final chosenHas = winner == 'L' ? hasL : hasR;
-        if (chosenHas) out[key] = winner == 'L' ? lc[key] : rc[key];
-
-        // Effet sur chaque appareil, pour le compte rendu.
-        final target = chosenHas ? (winner == 'L' ? lc[key] : rc[key]) : null;
-        final targetHash = chosenHas ? hash(target) : null;
-        final conflict = hasL && hasR && winner == 'L' && (bh == null || (lh != bh && rh != bh));
-        // Valeur qui decrit l'element : la nouvelle, ou l'ancienne s'il disparait.
+        // Effet sur chaque appareil, pour le compte rendu. Valeur qui decrit
+        // l'element : la nouvelle, ou l'ancienne s'il disparait.
+        final targetHash = chosenHas ? hash(chosen) : null;
         if (targetHash != lh) {
           final ChangeKind kind;
           if (!hasL) {
@@ -254,7 +266,7 @@ class SyncMerge {
           }
           stats.changes.add(MergeChange(
               category: cat, key: key, kind: kind, onLocal: true,
-              value: chosenHas ? target : lc[key]));
+              value: chosenHas ? chosen : lc[key], conflict: conflict));
         }
         if (targetHash != rh) {
           final ChangeKind kind;
@@ -270,7 +282,7 @@ class SyncMerge {
           }
           stats.changes.add(MergeChange(
               category: cat, key: key, kind: kind, onLocal: false,
-              value: chosenHas ? target : rc[key], conflict: conflict));
+              value: chosenHas ? chosen : rc[key], conflict: conflict));
         }
       }
       merged[cat] = out;
@@ -280,7 +292,53 @@ class SyncMerge {
       snapshot: unflatten(merged, order: local),
       fingerprints: fingerprints(merged),
       stats: stats,
+      conflicts: conflicts,
     );
+  }
+}
+
+/// Element modifie sur les deux appareils depuis leur derniere synchronisation.
+class MergeConflict {
+  const MergeConflict({
+    required this.category,
+    required this.key,
+    required this.local,
+    required this.remote,
+  });
+
+  final String category;
+  final String key;
+  final Object? local;
+  final Object? remote;
+
+  /// Cle des [SyncMerge.merge] `resolutions`.
+  String get id => '$category${SyncMerge._sep}$key';
+
+  /// Champs qui different, quand les deux versions sont des objets ; vide
+  /// sinon (valeur simple : statut d'un son, d'une competence…).
+  List<String> get differingFields {
+    final l = local, r = remote;
+    if (l is! Map || r is! Map) return const [];
+    return [
+      for (final f in {...l.keys, ...r.keys}.map((k) => k.toString()))
+        if (SyncMerge.hash(l[f]) != SyncMerge.hash(r[f])) f,
+    ];
+  }
+
+  /// Version fusionnee : pour chaque champ de [fromRemote], la valeur de
+  /// l'autre appareil, sinon celle d'ici.
+  Object? combine(Set<String> fromRemote) {
+    final l = local, r = remote;
+    if (l is! Map || r is! Map) return fromRemote.isEmpty ? l : r;
+    final out = Map<String, Object?>.from(l);
+    for (final f in fromRemote) {
+      if (r.containsKey(f)) {
+        out[f] = r[f];
+      } else {
+        out.remove(f);
+      }
+    }
+    return out;
   }
 }
 
@@ -371,9 +429,11 @@ class MergeResult {
     required this.snapshot,
     required this.fingerprints,
     required this.stats,
+    this.conflicts = const [],
   });
 
   final Map<String, dynamic> snapshot;
   final Map<String, String> fingerprints;
   final MergeStats stats;
+  final List<MergeConflict> conflicts;
 }

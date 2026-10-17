@@ -1,3 +1,4 @@
+import '../data/sons_data.dart';
 import 'sync_merge.dart';
 
 /// Compte rendu lisible d'une synchronisation, pour un appareil.
@@ -63,6 +64,100 @@ class SyncReport {
     ];
   }
 
+  /// Nom lisible d'un element (« Léa Martin », « Tom · Peinture (17/10) »…).
+  static String describe(
+          String category, String key, Object? value, Map<String, dynamic> snapshot) =>
+      _label(MergeChange(category: category, key: key, kind: ChangeKind.updated,
+          onLocal: true, value: value), _Names(snapshot));
+
+  /// Titre de la categorie (« Élèves », « Observations »…).
+  static String categoryTitle(String category) => _titles[category] ?? category;
+
+  static const _fieldLabels = {
+    'firstname': 'Prénom',
+    'lastname': 'Nom',
+    'birthdate': 'Date de naissance',
+    'group': 'Groupe',
+    'notes': 'Notes',
+    'colorHex': 'Couleur',
+    'avatarText': 'Initiales',
+    'email': 'E-mail',
+    'imagePath': 'Photo',
+    'imageAuthorized': 'Autorisation photo',
+    'childId': 'Élève',
+    'activityTypeId': 'Atelier',
+    'timestamp': 'Date',
+    'note': 'Commentaire',
+    'photoPaths': 'Photos',
+    'photoCaptions': 'Légendes des photos',
+    'evaluationStatusId': 'Statut',
+    'audioPath': 'Note vocale',
+    'name': 'Nom',
+    'spaceId': 'Espace',
+    'description': 'Description',
+    'domaine': 'Domaine',
+    'domaineId': 'Domaine',
+    'objectifs': 'Objectifs',
+    'isObligatory': 'Obligatoire',
+    'obligatoryGroups': 'Groupes concernés',
+    'iconName': 'Icône',
+    'position': 'Ordre',
+    'isProgression': 'Suivi de progression',
+    'progressionMinStatusId': 'Seuil de progression',
+    'label': 'Libellé',
+    'teacher': 'Enseignant(e)',
+    'atsem': 'ATSEM',
+    'schoolName': 'École',
+    'level': 'Niveau',
+    'schoolYear': 'Année scolaire',
+    'logoPath': 'Logo',
+    'groups': 'Contenu',
+  };
+
+  static String fieldLabel(String field) => _fieldLabels[field] ?? field;
+
+  /// Valeur affichable d'un champ ([field] vide : valeur simple, comme le
+  /// statut d'un son ou d'une competence).
+  static String formatValue(
+      String category, String field, Object? v, Map<String, dynamic> snapshot) {
+    if (category == 'sons_progress' || category == 'referential_status') {
+      return SonStatut.fromCode(v).libelle;
+    }
+    if (v == null || (v is String && v.trim().isEmpty)) return '(vide)';
+    if (v is bool) return v ? 'Oui' : 'Non';
+    if (v is List) {
+      if (v.isEmpty) return '(aucun)';
+      if (field == 'photoPaths') return '${v.length} photo(s)';
+      if (v.every((e) => e is String || e is num)) return v.join(', ');
+      return '${v.length} élément(s)';
+    }
+    if (v is Map) return '${v.length} élément(s)';
+    final n = _Names(snapshot);
+    final text = v.toString();
+    switch (field) {
+      case 'childId':
+        return n.child(text);
+      case 'activityTypeId':
+        return n.activityType(text);
+      case 'spaceId':
+        return n.space(text);
+      case 'evaluationStatusId':
+      case 'progressionMinStatusId':
+        return n.status(text);
+      case 'imagePath':
+      case 'logoPath':
+      case 'audioPath':
+        return 'Présente';
+    }
+    final d = RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text) ? DateTime.tryParse(text) : null;
+    if (d != null) {
+      String two(int x) => x.toString().padLeft(2, '0');
+      final day = '${two(d.day)}/${two(d.month)}/${d.year}';
+      return text.length > 10 ? '$day à ${two(d.hour)}:${two(d.minute)}' : day;
+    }
+    return text;
+  }
+
   static int _byKindThenLabel(SyncReportLine a, SyncReportLine b) {
     final k = a.kind.index.compareTo(b.kind.index);
     return k != 0 ? k : a.label.toLowerCase().compareTo(b.label.toLowerCase());
@@ -118,11 +213,19 @@ class _Names {
   _Names(Map<String, dynamic> snapshot)
       : _children = _index(snapshot['children']),
         _types = _index(snapshot['activity_types']),
-        _refs = _index(snapshot['referentials']);
+        _refs = _index(snapshot['referentials']),
+        _spaces = _index(snapshot['spaces']),
+        _statuses = _index(snapshot['evaluation_statuses']);
 
   final Map<String, Map> _children;
   final Map<String, Map> _types;
   final Map<String, Map> _refs;
+  final Map<String, Map> _spaces;
+  final Map<String, Map> _statuses;
+
+  String space(String? id) => SyncReport._str(_spaces[id]?['name'], 'Espace supprimé');
+
+  String status(String? id) => SyncReport._str(_statuses[id]?['label'], 'Statut supprimé');
 
   static Map<String, Map> _index(Object? list) => {
         if (list is List)

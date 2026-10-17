@@ -74,7 +74,7 @@ class SyncReportView extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 12),
                   child: Text(
                     '⚠ ${summary.conflicts} élément(s) avaient été modifiés sur les deux appareils : '
-                    '${receivedFromPeer ? 'la version de $peer' : 'la version de cet appareil'} a été gardée '
+                    'la version choisie sur ${receivedFromPeer ? peer : 'cet appareil'} a été gardée '
                     '(marqués « conflit » ci-dessus).',
                     style: const TextStyle(fontSize: 12, color: Color(0xFFB26A00)),
                   ),

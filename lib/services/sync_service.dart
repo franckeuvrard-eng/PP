@@ -357,20 +357,32 @@ class SyncSummary {
   final int mediaDownloaded;
   final int mediaUploaded;
 
-  int get conflicts => changes.where((c) => c.conflict).length;
+  /// Elements en conflit (un meme element peut changer des deux cotes).
+  int get conflicts =>
+      changes.where((c) => c.conflict).map((c) => '${c.category}/${c.key}').toSet().length;
 }
 
 /// Cote qui lance la synchronisation (typiquement l'iPhone, mais le Mac peut
 /// aussi se connecter a un autre appareil).
+String _contentHash(Map<String, dynamic> snapshot) =>
+    SyncMerge.hash(SyncMerge.fingerprints(SyncMerge.flatten(snapshot)));
+
 class SyncClient {
   SyncClient(this.host, {this.timeout = const Duration(seconds: 10)});
 
   final SyncHost host;
   final Duration timeout;
 
+  /// [resolveConflicts] : appele s'il y a des conflits, avant toute ecriture
+  /// sur l'un ou l'autre appareil. Renvoie la valeur choisie par
+  /// [MergeConflict.id] (absente = garder la version d'ici), ou null pour
+  /// annuler la synchronisation. Sans lui, la version d'ici l'emporte.
   Future<SyncSummary> sync(
     SyncPairing pairing, {
     void Function(String step)? onProgress,
+    Future<Map<String, Object?>?> Function(
+            List<MergeConflict> conflicts, String peerName, Map<String, dynamic> merged)?
+        resolveConflicts,
   }) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
     try {
@@ -390,11 +402,26 @@ class SyncClient {
 
       onProgress?.call('Fusion…');
       final local = await host.syncSnapshot();
-      final result = SyncMerge.merge(
-        local: local,
-        remote: remoteData,
-        base: await host.syncLoadBase(peerId),
-      );
+      final mergeBase = await host.syncLoadBase(peerId);
+      var result = SyncMerge.merge(local: local, remote: remoteData, base: mergeBase);
+      if (result.conflicts.isNotEmpty && resolveConflicts != null) {
+        onProgress?.call('En attente de vos choix…');
+        final choices = await resolveConflicts(result.conflicts, peerName, result.snapshot);
+        if (choices == null) {
+          throw SyncException('Synchronisation annulée : rien n’a été modifié.');
+        }
+        // Le choix peut prendre du temps : si l'autre appareil a ete modifie
+        // entre-temps, appliquer la fusion ecraserait ces modifications.
+        // Comparaison par empreintes : `exportedAt` change a chaque lecture.
+        final again = await _getJson(client, base, pairing.token, '/snapshot');
+        if (_contentHash(Map<String, dynamic>.from(again['data'] as Map)) !=
+            _contentHash(remoteData)) {
+          throw SyncException('$peerName a été modifié pendant vos choix : '
+              'relancez la synchronisation (rien n’a été modifié).');
+        }
+        result = SyncMerge.merge(
+            local: local, remote: remoteData, base: mergeBase, resolutions: choices);
+      }
 
       // Medias d'abord : les donnees fusionnees y font reference.
       final localMedia = (await host.syncMediaList()).toSet();
