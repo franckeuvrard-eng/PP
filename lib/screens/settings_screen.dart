@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
@@ -650,6 +651,15 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     return result;
   }
 
+  /// `auto_2026-10-17T15-05-19[_avant-synchro].json` → « 17/10/2026 à 15:05 ».
+  static String _autoBackupLabel(String fileName) {
+    final m = RegExp(r'(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})').firstMatch(fileName);
+    if (m == null) return fileName;
+    final d = DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!),
+        int.parse(m[4]!), int.parse(m[5]!));
+    return DateFormat("dd/MM/yyyy 'à' HH:mm").format(d);
+  }
+
   Future<void> _showAutoBackups(BuildContext context, AppStateProvider provider) async {
     final backups = await provider.listAutoBackups();
     if (!context.mounted) return;
@@ -669,16 +679,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: backups.map((file) {
-                    final stamp = file.path.split(RegExp(r'[/\\]')).last
-                        .replaceFirst('auto_', '')
-                        .replaceFirst('.json', '');
+                    final name = file.path.split(RegExp(r'[/\\]')).last;
+                    final beforeSync = name.contains(kSyncBackupSuffix);
                     final sizeKo = (file.lengthSync() / 1024).toStringAsFixed(0);
                     return ListTile(
                       dense: true,
-                      leading: const Icon(Icons.description_outlined),
-                      title: Text(stamp.replaceAll('T', ' à ').replaceAll('-', '/'),
-                          style: const TextStyle(fontSize: 13)),
-                      subtitle: Text('$sizeKo Ko', style: const TextStyle(fontSize: 12)),
+                      leading: Icon(beforeSync ? Icons.sync_alt : Icons.description_outlined),
+                      title: Text(_autoBackupLabel(name), style: const TextStyle(fontSize: 13)),
+                      subtitle: Text(
+                          beforeSync ? 'Avant synchronisation · $sizeKo Ko' : 'Quotidienne · $sizeKo Ko',
+                          style: const TextStyle(fontSize: 12)),
                       trailing: TextButton(
                         onPressed: () async {
                           final confirme = await showDialog<bool>(

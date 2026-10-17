@@ -24,6 +24,9 @@ import '../data/sons_data.dart';
 import '../services/app_database.dart';
 import '../services/reminder_service.dart';
 
+/// Suffixe des sauvegardes automatiques faites juste avant une synchronisation.
+const kSyncBackupSuffix = '_avant-synchro';
+
 class AppStateProvider extends ChangeNotifier {
   /// Sous-dossiers de `_docsDirPath` pouvant contenir des photos ou notes
   /// vocales referencees par les donnees. Liste unique partagee par la
@@ -684,11 +687,11 @@ class AppStateProvider extends ChangeNotifier {
   /// Ne contient pas les photos : l'objectif est de proteger le travail de
   /// saisie sans saturer le stockage de l'appareil. L'export ZIP manuel reste
   /// la sauvegarde complete.
-  Future<void> _writeAutoBackup() async {
+  Future<void> _writeAutoBackup({bool beforeSync = false}) async {
     try {
       final dir = await _autoBackupDir();
       final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      final file = File('${dir.path}/auto_$stamp.json');
+      final file = File('${dir.path}/auto_$stamp${beforeSync ? kSyncBackupSuffix : ''}.json');
       await file.writeAsString(json.encode({
         'version': 2,
         'exportedAt': DateTime.now().toIso8601String(),
@@ -1360,7 +1363,7 @@ class AppStateProvider extends ChangeNotifier {
   /// Applique un jeu de donnees fusionne. Une sauvegarde automatique est faite
   /// avant, pour pouvoir revenir en arriere depuis les reglages.
   Future<void> applySyncSnapshot(Map<String, dynamic> data) async {
-    await _writeAutoBackup();
+    await _writeAutoBackup(beforeSync: true);
     await _applyBackupMap(data);
   }
 

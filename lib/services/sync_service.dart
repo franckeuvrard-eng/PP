@@ -201,7 +201,7 @@ class SyncServer {
   bool _busy = false;
 
   /// Appele apres chaque synchronisation recue avec succes.
-  void Function()? onSynced;
+  void Function(SyncSummary summary)? onSynced;
 
   bool get isRunning => _server != null;
   int get port => _server?.port ?? 0;
@@ -285,7 +285,18 @@ class SyncServer {
           final fingerprints = Map<String, String>.from(body['fingerprints'] as Map);
           await host.syncApply(data);
           await host.syncSaveBase(peerId, fingerprints);
-          onSynced?.call();
+          // Compte rendu prepare par l'autre appareil, deja vu de ce cote-ci.
+          final changes = [
+            for (final raw in (body['changes'] as List? ?? const []))
+              if (MergeChange.fromMap(raw) case final c?) c,
+          ];
+          onSynced?.call(SyncSummary(
+            peerName: (body['deviceName'] ?? '').toString(),
+            changes: changes,
+            snapshot: data,
+            mediaDownloaded: (body['mediaUploaded'] as num?)?.toInt() ?? 0,
+            mediaUploaded: (body['mediaDownloaded'] as num?)?.toInt() ?? 0,
+          ));
           return _reply(req, HttpStatus.ok, {'ok': true});
         } finally {
           _busy = false;
@@ -328,18 +339,25 @@ Future<Uint8List> _readBytes(Stream<List<int>> stream, int max) async {
 // ─────────────────────────── CLIENT ───────────────────────────
 
 /// Resume d'une synchronisation, montre a l'utilisateur.
+/// Vu depuis l'appareil qui l'affiche : [MergeChange.onLocal] vrai = ici.
 class SyncSummary {
   const SyncSummary({
     required this.peerName,
-    required this.stats,
+    required this.changes,
+    required this.snapshot,
     required this.mediaDownloaded,
     required this.mediaUploaded,
   });
 
   final String peerName;
-  final MergeStats stats;
+  final List<MergeChange> changes;
+
+  /// Donnees fusionnees, pour retrouver les noms dans le compte rendu.
+  final Map<String, dynamic> snapshot;
   final int mediaDownloaded;
   final int mediaUploaded;
+
+  int get conflicts => changes.where((c) => c.conflict).length;
 }
 
 /// Cote qui lance la synchronisation (typiquement l'iPhone, mais le Mac peut
@@ -403,15 +421,20 @@ class SyncClient {
       // prochaine tentative repart de la meme base.
       await _postJson(client, base, pairing.token, '/apply', {
         'deviceId': await host.syncDeviceId(),
+        'deviceName': await host.syncDeviceName(),
         'data': result.snapshot,
         'fingerprints': result.fingerprints,
+        'changes': [for (final c in result.stats.changes) c.flipped().toMap()],
+        'mediaDownloaded': downloaded,
+        'mediaUploaded': uploaded,
       });
       await host.syncApply(result.snapshot);
       await host.syncSaveBase(peerId, result.fingerprints);
 
       return SyncSummary(
         peerName: peerName,
-        stats: result.stats,
+        changes: result.stats.changes,
+        snapshot: result.snapshot,
         mediaDownloaded: downloaded,
         mediaUploaded: uploaded,
       );

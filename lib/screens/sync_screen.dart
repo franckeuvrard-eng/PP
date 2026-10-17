@@ -11,6 +11,7 @@ import '../providers/provider_sync_host.dart';
 import '../services/sync_discovery.dart';
 import '../services/sync_service.dart';
 import '../utils/platform_support.dart';
+import '../widgets/sync_report_view.dart';
 
 /// Synchronisation locale Mac ⇄ iPhone/iPad, sans serveur ni compte.
 ///
@@ -38,7 +39,6 @@ class _SyncScreenState extends State<SyncScreen> {
 
   SyncPairing? _pairing;
   bool _starting = false;
-  DateTime? _lastReceived;
 
   final _addressController = TextEditingController();
   final _portController = TextEditingController(text: '$kSyncDefaultPort');
@@ -48,14 +48,23 @@ class _SyncScreenState extends State<SyncScreen> {
   String _step = '';
   String? _error;
   SyncSummary? _summary;
+  DateTime? _summaryAt;
+  // Vrai si la synchronisation a ete lancee par l'autre appareil.
+  bool _summaryReceived = false;
 
   @override
   void initState() {
     super.initState();
     _host = ProviderSyncHost(Provider.of<AppStateProvider>(context, listen: false));
     _server = SyncServer(_host)
-      ..onSynced = () {
-        if (mounted) setState(() => _lastReceived = DateTime.now());
+      ..onSynced = (summary) {
+        if (!mounted) return;
+        setState(() {
+          _summary = summary;
+          _summaryAt = DateTime.now();
+          _summaryReceived = true;
+          _error = null;
+        });
       };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startServer();
@@ -159,7 +168,13 @@ class _SyncScreenState extends State<SyncScreen> {
           if (mounted) setState(() => _step = s);
         },
       );
-      if (mounted) setState(() => _summary = summary);
+      if (mounted) {
+        setState(() {
+          _summary = summary;
+          _summaryAt = DateTime.now();
+          _summaryReceived = false;
+        });
+      }
     } on SyncException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -187,10 +202,6 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
               const SizedBox(height: 16),
               _buildNearbyCard(),
-              const SizedBox(height: 16),
-              _buildReceiveCard(),
-              const SizedBox(height: 16),
-              _buildConnectCard(),
               if (_syncing) ...[
                 const SizedBox(height: 16),
                 Row(children: [
@@ -206,9 +217,16 @@ class _SyncScreenState extends State<SyncScreen> {
               ],
               if (_summary != null) ...[
                 const SizedBox(height: 16),
-                _banner(_summaryText(_summary!), Icons.check_circle_outline,
-                    const Color(0xFF4E9F3D)),
+                SyncReportView(
+                  summary: _summary!,
+                  at: _summaryAt!,
+                  receivedFromPeer: _summaryReceived,
+                ),
               ],
+              const SizedBox(height: 16),
+              _buildReceiveCard(),
+              const SizedBox(height: 16),
+              _buildConnectCard(),
             ],
           ),
         ),
@@ -232,26 +250,6 @@ class _SyncScreenState extends State<SyncScreen> {
           ],
         ),
       );
-
-  String _summaryText(SyncSummary s) {
-    final st = s.stats;
-    final here = st.changesLocally;
-    final there = st.changesRemotely;
-    final parts = <String>[
-      if (here == 0 && there == 0 && s.mediaDownloaded == 0 && s.mediaUploaded == 0)
-        'Déjà à jour avec ${s.peerName}.'
-      else ...[
-        'Synchronisé avec ${s.peerName}.',
-        'Sur cet appareil : ${st.addedLocally} ajouté(s), ${st.updatedLocally} modifié(s), ${st.deletedLocally} supprimé(s).',
-        'Sur l’autre appareil : ${st.addedRemotely} ajouté(s), ${st.updatedRemotely} modifié(s), ${st.deletedRemotely} supprimé(s).',
-        if (s.mediaDownloaded + s.mediaUploaded > 0)
-          'Photos et sons : ${s.mediaDownloaded} reçu(s), ${s.mediaUploaded} envoyé(s).',
-      ],
-      if (st.conflicts > 0)
-        '${st.conflicts} élément(s) modifié(s) des deux côtés : la version de cet appareil a été conservée.',
-    ];
-    return parts.join('\n');
-  }
 
   Widget _buildNearbyCard() {
     return Card(
@@ -348,17 +346,6 @@ class _SyncScreenState extends State<SyncScreen> {
                 ),
               _copyRow('Port', '${pairing.port}'),
               _copyRow('Code', pairing.token),
-              if (_lastReceived != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Dernière synchronisation reçue à '
-                    '${_lastReceived!.hour.toString().padLeft(2, '0')}:'
-                    '${_lastReceived!.minute.toString().padLeft(2, '0')}.',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.bold),
-                  ),
-                ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _stopServer,

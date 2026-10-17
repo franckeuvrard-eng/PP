@@ -238,23 +238,39 @@ class SyncMerge {
         // Effet sur chaque appareil, pour le compte rendu.
         final target = chosenHas ? (winner == 'L' ? lc[key] : rc[key]) : null;
         final targetHash = chosenHas ? hash(target) : null;
+        final conflict = hasL && hasR && winner == 'L' && (bh == null || (lh != bh && rh != bh));
+        // Valeur qui decrit l'element : la nouvelle, ou l'ancienne s'il disparait.
         if (targetHash != lh) {
+          final ChangeKind kind;
           if (!hasL) {
+            kind = ChangeKind.added;
             stats.addedLocally++;
           } else if (!chosenHas) {
+            kind = ChangeKind.deleted;
             stats.deletedLocally++;
           } else {
+            kind = ChangeKind.updated;
             stats.updatedLocally++;
           }
+          stats.changes.add(MergeChange(
+              category: cat, key: key, kind: kind, onLocal: true,
+              value: chosenHas ? target : lc[key]));
         }
         if (targetHash != rh) {
+          final ChangeKind kind;
           if (!hasR) {
+            kind = ChangeKind.added;
             stats.addedRemotely++;
           } else if (!chosenHas) {
+            kind = ChangeKind.deleted;
             stats.deletedRemotely++;
           } else {
+            kind = ChangeKind.updated;
             stats.updatedRemotely++;
           }
+          stats.changes.add(MergeChange(
+              category: cat, key: key, kind: kind, onLocal: false,
+              value: chosenHas ? target : rc[key], conflict: conflict));
         }
       }
       merged[cat] = out;
@@ -277,6 +293,9 @@ class MergeStats {
   int deletedRemotely = 0;
   int conflicts = 0;
 
+  /// Detail de chaque changement, pour le compte rendu a l'utilisateur.
+  final List<MergeChange> changes = [];
+
   int get changesLocally => addedLocally + updatedLocally + deletedLocally;
   int get changesRemotely => addedRemotely + updatedRemotely + deletedRemotely;
 
@@ -289,6 +308,62 @@ class MergeStats {
         'deletedRemotely': deletedRemotely,
         'conflicts': conflicts,
       };
+}
+
+enum ChangeKind { added, updated, deleted }
+
+/// Un enregistrement ajoute, modifie ou supprime sur un des deux appareils.
+class MergeChange {
+  const MergeChange({
+    required this.category,
+    required this.key,
+    required this.kind,
+    required this.onLocal,
+    this.value,
+    this.conflict = false,
+  });
+
+  /// Categorie de [SyncMerge.flatten] (`children`, `activities`, `sons_progress`…).
+  final String category;
+  final String key;
+  final ChangeKind kind;
+
+  /// Vrai si le changement a lieu sur l'appareil qui lance la synchronisation.
+  final bool onLocal;
+
+  /// Nouvelle valeur, ou ancienne pour une suppression.
+  final Object? value;
+
+  /// Modifie des deux cotes : la version de l'autre appareil a ete ecartee.
+  final bool conflict;
+
+  /// Meme changement vu depuis l'autre appareil (envoye avec `/apply`).
+  MergeChange flipped() => MergeChange(
+      category: category, key: key, kind: kind, onLocal: !onLocal,
+      value: value, conflict: conflict);
+
+  Map<String, dynamic> toMap() => {
+        'category': category,
+        'key': key,
+        'kind': kind.name,
+        'onLocal': onLocal,
+        'value': value,
+        'conflict': conflict,
+      };
+
+  static MergeChange? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final kind = ChangeKind.values.where((k) => k.name == raw['kind']).firstOrNull;
+    if (kind == null || raw['category'] is! String || raw['key'] is! String) return null;
+    return MergeChange(
+      category: raw['category'] as String,
+      key: raw['key'] as String,
+      kind: kind,
+      onLocal: raw['onLocal'] == true,
+      value: raw['value'],
+      conflict: raw['conflict'] == true,
+    );
+  }
 }
 
 class MergeResult {

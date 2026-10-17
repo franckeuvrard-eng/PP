@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petitpas/services/sync_merge.dart';
+import 'package:petitpas/services/sync_report.dart';
 import 'package:petitpas/services/sync_service.dart';
 
 Map<String, dynamic> snap(List<Map<String, dynamic>> children,
@@ -158,6 +159,32 @@ void main() {
       await SyncClient(phone).sync(pairing);
       expect((mac.data['children'] as List).map((c) => c['name']), ['Robert']);
       expect((phone.data['children'] as List).map((c) => c['name']), ['Robert']);
+    });
+
+    test('compte rendu detaille sur les deux appareils', () async {
+      const lea = {'id': 'l', 'firstname': 'Léa', 'lastname': 'Martin'};
+      const tom = {'id': 't', 'firstname': 'Tom', 'lastname': 'Petit'};
+      final mac = FakeHost('mac', snap([lea]));
+      final phone = FakeHost('phone', snap([tom]));
+      SyncSummary? received;
+      final server = SyncServer(mac)..onSynced = (s) => received = s;
+      final started = await server.start();
+      addTearDown(server.stop);
+
+      final summary = await SyncClient(phone).sync(SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac'));
+
+      List<String> labels(SyncSummary s, {required bool here}) => [
+            for (final g in SyncReport.build(s.changes, onLocal: here, snapshot: s.snapshot))
+              for (final l in g.lines) '${g.title}:${l.kind.name}:${l.label}',
+          ];
+      // L'iPhone recoit Lea, le Mac recoit Tom ; chacun le voit de son cote.
+      expect(labels(summary, here: true), ['Élèves:added:Léa Martin']);
+      expect(labels(summary, here: false), ['Élèves:added:Tom Petit']);
+      expect(received, isNotNull);
+      expect(received!.peerName, 'appareil-phone');
+      expect(labels(received!, here: true), ['Élèves:added:Tom Petit']);
+      expect(labels(received!, here: false), ['Élèves:added:Léa Martin']);
     });
 
     test('jeton invalide refuse, serveur arrete injoignable', () async {
