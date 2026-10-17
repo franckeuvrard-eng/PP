@@ -35,6 +35,14 @@ class FakeHost implements SyncHost {
   @override
   Future<Map<String, dynamic>> syncSnapshot() async =>
       Map<String, dynamic>.from(json.decode(json.encode(data)) as Map);
+  /// Mettre a vrai pour simuler une sauvegarde impossible (disque plein…).
+  bool backupFails = false;
+  int backups = 0;
+  @override
+  Future<void> syncBackup() async {
+    if (backupFails) throw StateError('disque plein');
+    backups++;
+  }
   @override
   Future<void> syncApply(Map<String, dynamic> s) async => data = Map<String, dynamic>.from(s);
   @override
@@ -198,6 +206,28 @@ void main() {
         expect(child['notes'], 'Allergie');
       }
       expect(summary.conflicts, 1);
+    });
+
+    test('sauvegarde impossible d\'un cote ou de l\'autre : rien n\'est modifie', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final phone = FakeHost('phone', snap([bob]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+
+      for (final failing in [phone, mac]) {
+        failing.backupFails = true;
+        await expectLater(SyncClient(phone).sync(pairing), throwsA(isA<SyncException>()));
+        failing.backupFails = false;
+        expect((mac.data['children'] as List).map((c) => c['id']), ['a']);
+        expect((phone.data['children'] as List).map((c) => c['id']), ['b']);
+      }
+
+      await SyncClient(phone).sync(pairing);
+      expect(mac.backups, 1);
+      expect(phone.backups, 2); // une par tentative arrivee jusqu'a l'echec du Mac, puis la bonne
     });
 
     test('compte rendu detaille sur les deux appareils', () async {

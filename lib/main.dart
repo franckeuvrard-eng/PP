@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'utils/platform_support.dart';
 import 'widgets/desktop_frame.dart';
+import 'widgets/storage_error_banner.dart';
 import 'screens/help_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
@@ -150,7 +151,7 @@ class PetitPasApp extends StatelessWidget {
       // bonne partie des tailles d'accessibilite.
       builder: (context, child) => MediaQuery.withClampedTextScaling(
         maxScaleFactor: 1.8,
-        child: child ?? const SizedBox.shrink(),
+        child: StorageErrorBanner(child: child ?? const SizedBox.shrink()),
       ),
       home: const LockScreen(),
     );

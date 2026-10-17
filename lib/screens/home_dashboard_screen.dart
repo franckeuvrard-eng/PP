@@ -432,6 +432,11 @@ class _LoadFailureBanner extends StatelessWidget {
             'Sauvegarde & Sécurité, ou réessayez.',
             style: TextStyle(color: Colors.white, fontSize: 12),
           ),
+          if (provider.loadError != null) ...[
+            const SizedBox(height: 6),
+            SelectableText('Détail : ${provider.loadError}',
+                style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          ],
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,

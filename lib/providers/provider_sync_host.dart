@@ -30,6 +30,9 @@ class ProviderSyncHost implements SyncHost {
       Map<String, dynamic>.from(json.decode(json.encode(_provider.buildSyncSnapshot())) as Map);
 
   @override
+  Future<void> syncBackup() => _provider.backupBeforeSync();
+
+  @override
   Future<void> syncApply(Map<String, dynamic> snapshot) =>
       _provider.applySyncSnapshot(snapshot);
 

@@ -19,6 +19,10 @@ abstract class SyncHost {
   /// Toutes les donnees, au format « sauvegarde » (cf. [SyncMerge]).
   Future<Map<String, dynamic>> syncSnapshot();
 
+  /// Sauvegarde des donnees locales avant de les modifier. Doit lever une
+  /// exception si elle echoue : la synchronisation s'arrete alors.
+  Future<void> syncBackup();
+
   /// Remplace les donnees locales par [snapshot] (deja fusionne).
   Future<void> syncApply(Map<String, dynamic> snapshot);
 
@@ -283,6 +287,7 @@ class SyncServer {
           final data = Map<String, dynamic>.from(body['data'] as Map);
           final peerId = body['deviceId'] as String;
           final fingerprints = Map<String, String>.from(body['fingerprints'] as Map);
+          await host.syncBackup();
           await host.syncApply(data);
           await host.syncSaveBase(peerId, fingerprints);
           // Compte rendu prepare par l'autre appareil, deja vu de ce cote-ci.
@@ -421,6 +426,15 @@ class SyncClient {
         }
         result = SyncMerge.merge(
             local: local, remote: remoteData, base: mergeBase, resolutions: choices);
+      }
+
+      // Sauvegarde d'ici avant toute ecriture, sur l'un ou l'autre appareil.
+      onProgress?.call('Sauvegarde avant synchronisation…');
+      try {
+        await host.syncBackup();
+      } catch (e) {
+        throw SyncException('Synchronisation annulée : la sauvegarde de sécurité a échoué ($e). '
+            'Rien n’a été modifié.');
       }
 
       // Medias d'abord : les donnees fusionnees y font reference.

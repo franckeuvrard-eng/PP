@@ -133,6 +133,14 @@ class AppStateProvider extends ChangeNotifier {
   /// persistait des la premiere modification.
   bool _loadFailed = false;
 
+  /// Cause technique de l'echec de chargement, montree dans le bandeau.
+  String? _loadError;
+
+  /// Derniere ecriture en base qui a echoue : l'ecran montrait la saisie,
+  /// mais elle n'est pas sur le disque. Affiche dans un bandeau sur toutes
+  /// les pages (une base inaccessible passait jusqu'ici inapercue).
+  String? _storageError;
+
   final AppDatabase _db;
 
   /// Suivi « Analyse des sons » : idEleve -> son -> statut.
@@ -332,6 +340,16 @@ class AppStateProvider extends ChangeNotifier {
   /// vide, et rien ne doit etre saisi avant une restauration.
   bool get loadFailed => _loadFailed;
 
+  String? get loadError => _loadError;
+
+  String? get storageError => _storageError;
+
+  /// L'utilisateur a pris connaissance du bandeau d'erreur d'enregistrement.
+  void dismissStorageError() {
+    _storageError = null;
+    notifyListeners();
+  }
+
   /// Vrai une fois les preferences relues du disque.
   ///
   /// L'ecran de verrouillage doit attendre ce signal : autrement il lirait
@@ -522,13 +540,16 @@ class AppStateProvider extends ChangeNotifier {
   /// remonter une exception asynchrone non capturee, qui ferait crasher
   /// l'application pour une simple ecriture manquee.
   void _write(Future<void> operation) {
-    operation.catchError(
-      (Object e) => debugPrint('Echec d\'ecriture en base : $e'),
-    );
+    operation.catchError((Object e) {
+      debugPrint('Echec d\'ecriture en base : $e');
+      _storageError = '$e';
+      notifyListeners();
+    });
   }
 
   Future<void> _load() async {
     _loadFailed = false;
+    _loadError = null;
     try {
       _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
 
@@ -632,6 +653,7 @@ class AppStateProvider extends ChangeNotifier {
       unawaited(_scheduleReminderIfEnabled());
     } catch (e) {
       debugPrint('Erreur au chargement des donnees : $e');
+      _loadError = '$e';
       // L'application doit demarrer plutot que rester bloquee sur l'ecran
       // d'attente : l'enseignante a besoin d'atteindre la restauration.
       // En revanche elle ne doit surtout pas voir la classe d'exemple des
@@ -670,7 +692,11 @@ class AppStateProvider extends ChangeNotifier {
 
   // ─── SAUVEGARDE AUTOMATIQUE & ENTRETIEN DU STOCKAGE ───
 
+  /// Sauvegardes conservees : les quotidiennes et celles d'avant
+  /// synchronisation sont comptees a part, pour que plusieurs synchros dans
+  /// la journee ne fassent pas disparaitre l'etat du matin.
   static const int _maxAutoBackups = 5;
+  static const int _maxSyncBackups = 10;
 
   /// Repertoire des sauvegardes automatiques, dans les documents de
   /// l'application : elles survivent ainsi a un redemarrage et sont reprises
@@ -687,7 +713,9 @@ class AppStateProvider extends ChangeNotifier {
   /// Ne contient pas les photos : l'objectif est de proteger le travail de
   /// saisie sans saturer le stockage de l'appareil. L'export ZIP manuel reste
   /// la sauvegarde complete.
-  Future<void> _writeAutoBackup({bool beforeSync = false}) async {
+  ///
+  /// Renvoie false si la sauvegarde n'a pas pu etre ecrite.
+  Future<bool> _writeAutoBackup({bool beforeSync = false}) async {
     try {
       final dir = await _autoBackupDir();
       final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
@@ -711,15 +739,20 @@ class AppStateProvider extends ChangeNotifier {
           .listSync()
           .whereType<File>()
           .where((f) => f.path.endsWith('.json'))
+          .where((f) => f.path.contains(kSyncBackupSuffix) == beforeSync)
           .toList()
         ..sort((a, b) => b.path.compareTo(a.path));
-      for (final old in backups.skip(_maxAutoBackups)) {
+      for (final old in backups.skip(beforeSync ? _maxSyncBackups : _maxAutoBackups)) {
         await old.delete();
       }
-      await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
+      // Seule la quotidienne compte pour « une par jour ».
+      if (!beforeSync) {
+        await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
+      }
+      return true;
     } catch (e) {
       debugPrint('Echec de la sauvegarde automatique : $e');
-      return;
+      return false;
     }
   }
 
@@ -1360,12 +1393,18 @@ class AppStateProvider extends ChangeNotifier {
         'referential_status': _referentialStatusAsMap(),
       };
 
-  /// Applique un jeu de donnees fusionne. Une sauvegarde automatique est faite
-  /// avant, pour pouvoir revenir en arriere depuis les reglages.
-  Future<void> applySyncSnapshot(Map<String, dynamic> data) async {
-    await _writeAutoBackup(beforeSync: true);
-    await _applyBackupMap(data);
+  /// Sauvegarde « avant synchronisation », pour pouvoir revenir en arriere
+  /// depuis les reglages. Leve une exception si elle echoue : la
+  /// synchronisation ne doit pas continuer sans filet.
+  Future<void> backupBeforeSync() async {
+    if (!await _writeAutoBackup(beforeSync: true)) {
+      throw StateError('la sauvegarde d’avant synchronisation n’a pas pu être écrite');
+    }
   }
+
+  /// Applique un jeu de donnees fusionne (sauvegarde deja faite par
+  /// [backupBeforeSync]).
+  Future<void> applySyncSnapshot(Map<String, dynamic> data) => _applyBackupMap(data);
 
   Future<String> syncDeviceId() async {
     final settings = await _db.readSettings();
@@ -1751,7 +1790,8 @@ class AppStateProvider extends ChangeNotifier {
     bool clearSpaces = false,
     bool clearPhotos = false,
   }) async {
-    await _writeAutoBackup();
+    // Sans sauvegarde, pas d'effacement : il serait irrattrapable.
+    if (!await _writeAutoBackup()) return false;
 
     if (clearChildren) {
       _children = [];
