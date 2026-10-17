@@ -79,6 +79,31 @@ void main() {
     });
   });
 
+  test('referencedMedia : chemins relatifs et anciens chemins absolus', () {
+    final refs = referencedMedia({
+      'children': [
+        {'imagePath': 'profiles/a.jpg'},
+        {'imagePath': null},
+      ],
+      'activity_types': [
+        {'imagePath': r'C:\Users\x\Documents\workshops\w.jpg', 'photoPaths': ['ateliers/p.jpg']},
+      ],
+      'activities': [
+        {'photoPaths': ['activities/o.jpg'], 'audioPath': '/var/mobile/Documents/audio/n.m4a'},
+        {'photoPaths': ['../../etc/passwd']},
+      ],
+      'class_settings': {'logoPath': 'settings/logo.png'},
+    });
+    expect(refs, {
+      'profiles/a.jpg',
+      'workshops/w.jpg',
+      'ateliers/p.jpg',
+      'activities/o.jpg',
+      'audio/n.m4a',
+      'settings/logo.png',
+    });
+  });
+
   group('SyncMerge', () {
     test('premiere synchronisation : union, rien n\'est perdu', () {
       final r = SyncMerge.merge(local: snap([alice]), remote: snap([bob]));
@@ -143,10 +168,15 @@ void main() {
 
   group('SyncServer / SyncClient', () {
     test('synchronisation complete sur le reseau local', () async {
-      final mac = FakeHost('mac', snap([alice]));
-      final phone = FakeHost('phone', snap([bob]));
+      final mac = FakeHost('mac', snap([alice])
+        ..['activities'] = [
+          {'id': 'x', 'childId': 'a', 'audioPath': 'audio/x.m4a'}
+        ]);
+      final phone = FakeHost('phone', snap([{...bob, 'imagePath': 'profiles/b.jpg'}]));
       phone.media['profiles/b.jpg'] = Uint8List.fromList([1, 2, 3]);
       mac.media['audio/x.m4a'] = Uint8List.fromList([9]);
+      // Plus utilisee par aucune donnee (supprimee) : ne doit pas voyager.
+      mac.media['profiles/ancienne.jpg'] = Uint8List.fromList([7]);
 
       final server = SyncServer(mac);
       final started = await server.start();
@@ -159,6 +189,7 @@ void main() {
       expect((phone.data['children'] as List).length, 2);
       expect(mac.media.keys, contains('profiles/b.jpg'));
       expect(phone.media.keys, contains('audio/x.m4a'));
+      expect(phone.media.keys, isNot(contains('profiles/ancienne.jpg')));
       expect(summary.mediaDownloaded, 1);
       expect(summary.mediaUploaded, 1);
 

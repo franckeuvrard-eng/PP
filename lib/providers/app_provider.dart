@@ -1404,7 +1404,13 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Applique un jeu de donnees fusionne (sauvegarde deja faite par
   /// [backupBeforeSync]).
-  Future<void> applySyncSnapshot(Map<String, dynamic> data) => _applyBackupMap(data);
+  ///
+  /// Les photos et notes vocales qui ne servent plus (supprimees sur l'autre
+  /// appareil) sont ensuite effacees ici aussi.
+  Future<void> applySyncSnapshot(Map<String, dynamic> data) async {
+    await _applyBackupMap(data);
+    await purgeOrphanPhotos();
+  }
 
   Future<String> syncDeviceId() async {
     final settings = await _db.readSettings();

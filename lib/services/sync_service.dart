@@ -62,6 +62,43 @@ bool isSafeMediaPath(String rel) {
   return true;
 }
 
+/// Photos et notes vocales utilisees par un jeu de donnees, en chemins
+/// `dossier/fichier` (meme forme que [SyncHost.syncMediaList]). Les anciens
+/// chemins absolus sont ramenes a leurs deux derniers segments.
+Set<String> referencedMedia(Map<String, dynamic> snapshot) {
+  final out = <String>{};
+  void add(Object? path) {
+    if (path is! String || path.isEmpty) return;
+    final parts = path.replaceAll(r'\', '/').split('/').where((s) => s.isNotEmpty).toList();
+    if (parts.length < 2) return;
+    final rel = '${parts[parts.length - 2]}/${parts.last}';
+    if (isSafeMediaPath(rel)) out.add(rel);
+  }
+
+  void addAll(Object? list) {
+    if (list is List) list.forEach(add);
+  }
+
+  for (final c in snapshot['children'] as List? ?? const []) {
+    if (c is Map) add(c['imagePath']);
+  }
+  for (final a in snapshot['activity_types'] as List? ?? const []) {
+    if (a is Map) {
+      add(a['imagePath']);
+      addAll(a['photoPaths']);
+    }
+  }
+  for (final l in snapshot['activities'] as List? ?? const []) {
+    if (l is Map) {
+      addAll(l['photoPaths']);
+      add(l['audioPath']);
+    }
+  }
+  final settings = snapshot['class_settings'];
+  if (settings is Map) add(settings['logoPath']);
+  return out;
+}
+
 const int kSyncDefaultPort = 48765;
 // 2 : accord explicite de l'appareil qui recoit (/request + jeton de session).
 const int _protocol = 2;
@@ -494,8 +531,12 @@ class SyncClient {
             'Rien n’a été modifié.');
       }
 
-      // Medias d'abord : les donnees fusionnees y font reference.
-      final localMedia = (await host.syncMediaList()).toSet();
+      // Medias d'abord : les donnees fusionnees y font reference. Seuls ceux
+      // encore utilises voyagent : une photo supprimee d'un cote ne doit pas
+      // etre renvoyee par l'autre (chaque appareil purge ensuite les siennes).
+      final needed = referencedMedia(result.snapshot);
+      final localMedia = (await host.syncMediaList()).toSet().intersection(needed);
+      remoteMedia.retainAll(needed);
       var downloaded = 0;
       var uploaded = 0;
       for (final rel in remoteMedia.difference(localMedia)) {
