@@ -130,16 +130,60 @@ bool _constantTimeEquals(String a, String b) {
   return diff == 0;
 }
 
-/// Adresses IPv4 locales de cette machine (hors boucle locale).
+/// Adresses IPv4 locales de cette machine, la plus probablement celle du
+/// Wi-Fi/Ethernet en premier (c'est elle qu'affichent le QR et la saisie
+/// manuelle). Les adresses auto-attribuees et les interfaces virtuelles (VPN,
+/// Docker, Hyper-V, machines virtuelles, donnees mobiles) sont ecartees ou
+/// reléguees en fin de liste.
 Future<List<String>> localIPv4Addresses() async {
   final interfaces = await NetworkInterface.list(
     type: InternetAddressType.IPv4,
     includeLoopback: false,
   );
-  return [
+  final candidates = <(String, int)>[
     for (final i in interfaces)
-      for (final a in i.addresses) a.address,
+      for (final a in i.addresses)
+        if (!a.address.startsWith('169.254.')) (a.address, lanAddressScore(i.name, a.address)),
   ];
+  // Tri stable : a score egal, l'ordre du systeme est conserve.
+  final indexed = candidates.indexed.toList()
+    ..sort((x, y) {
+      final c = y.$2.$2.compareTo(x.$2.$2);
+      return c != 0 ? c : x.$1.compareTo(y.$1);
+    });
+  return [for (final e in indexed) e.$2.$1];
+}
+
+/// Plus le score est haut, plus [address] sur l'interface [name] a de
+/// chances d'etre l'adresse du reseau local de l'ecole.
+int lanAddressScore(String name, String address) {
+  final n = name.toLowerCase();
+  // Noms courts (Mac, iPhone, Linux) : reconnus en debut de nom.
+  const virtualPrefixes = [
+    'utun', 'tun', 'tap', 'ppp', 'ipsec', 'wg', 'zt', 'pdp_ip', 'rmnet', 'awdl',
+    'llw', 'anpi', 'bridge', 'br-', 'veth', 'docker', 'vmnet', 'vboxnet',
+  ];
+  // Noms longs (Windows) : reconnus n'importe ou dans le nom.
+  const virtualWords = [
+    'vethernet', 'virtualbox', 'vmware', 'hyper-v', 'wsl', 'docker', 'tailscale',
+    'zerotier', 'wireguard', 'hamachi', 'vpn', 'loopback',
+  ];
+  var score = 0;
+  // « Connexion au réseau local* 2 » : adaptateurs Wi-Fi Direct de Windows.
+  if (virtualPrefixes.any(n.startsWith) || virtualWords.any(n.contains) || n.contains('*')) {
+    score -= 100;
+  }
+  // en0/en1 (Mac, iPhone), wlan/eth (Linux, Android), « Wi-Fi »/« Ethernet » (Windows).
+  if (RegExp(r'^(en\d|wlan|wlp|eth|enp|wi-?fi|ethernet|wireless)').hasMatch(n)) score += 20;
+  if (address.startsWith('192.168.')) {
+    score += 10;
+  } else if (address.startsWith('10.')) {
+    score += 8;
+  } else if (RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(address)) {
+    // Plage souvent occupee par Docker / Hyper-V / WSL.
+    score += 4;
+  }
+  return score;
 }
 
 // ─────────────────────────── SERVEUR ───────────────────────────

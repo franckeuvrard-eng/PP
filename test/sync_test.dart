@@ -52,6 +52,23 @@ void main() {
   const alice = {'id': 'a', 'name': 'Alice'};
   const bob = {'id': 'b', 'name': 'Bob'};
 
+  group('lanAddressScore', () {
+    test('le Wi-Fi passe devant les interfaces virtuelles', () {
+      final wifi = lanAddressScore('Wi-Fi', '192.168.1.20');
+      expect(wifi, greaterThan(lanAddressScore('vEthernet (WSL)', '172.24.16.1')));
+      expect(wifi, greaterThan(lanAddressScore('VirtualBox Host-Only Network', '192.168.56.1')));
+      expect(wifi, greaterThan(lanAddressScore('Connexion au réseau local* 2', '192.168.137.1')));
+      expect(wifi, greaterThan(lanAddressScore('Tailscale', '100.64.0.3')));
+    });
+
+    test('sur iPhone, en0 passe devant les donnees mobiles et le VPN', () {
+      final en0 = lanAddressScore('en0', '10.0.0.42');
+      expect(en0, greaterThan(lanAddressScore('pdp_ip0', '10.120.4.7')));
+      expect(en0, greaterThan(lanAddressScore('utun3', '10.8.0.2')));
+      expect(en0, greaterThan(lanAddressScore('bridge100', '192.168.2.1')));
+    });
+  });
+
   group('SyncMerge', () {
     test('premiere synchronisation : union, rien n\'est perdu', () {
       final r = SyncMerge.merge(local: snap([alice]), remote: snap([bob]));

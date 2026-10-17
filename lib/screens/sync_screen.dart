@@ -337,6 +337,14 @@ class _SyncScreenState extends State<SyncScreen> {
               const Text('Ou saisir manuellement :', style: TextStyle(fontSize: 12)),
               const SizedBox(height: 4),
               _copyRow('Adresse', pairing.hosts.isEmpty ? 'inconnue' : pairing.hosts.first),
+              if (pairing.hosts.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(left: 70, bottom: 4),
+                  child: Text(
+                    'Si elle ne fonctionne pas : ${pairing.hosts.skip(1).join(', ')}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
               _copyRow('Port', '${pairing.port}'),
               _copyRow('Code', pairing.token),
               if (_lastReceived != null)
