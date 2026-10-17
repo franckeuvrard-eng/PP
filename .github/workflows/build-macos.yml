@@ -41,6 +41,12 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Notes vocales sur les observations.'" macos/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Synchronisation avec l application sur iPhone/iPad.'" macos/Runner/Info.plist
           grep -n "minSize" macos/Runner/MainFlutterWindow.swift
+          # Le plugin record (notes vocales) exige macOS 10.15, le template
+          # Flutter 3.19 cible 10.14 : on realigne Podfile et projet Xcode.
+          sed -i '' -E "s/^#? *platform :osx, '[0-9.]+'/platform :osx, '10.15'/" macos/Podfile
+          sed -i '' -E 's/MACOSX_DEPLOYMENT_TARGET = [0-9.]+;/MACOSX_DEPLOYMENT_TARGET = 10.15;/g' macos/Runner.xcodeproj/project.pbxproj
+          grep -n 'platform :osx' macos/Podfile
+          grep -n 'MACOSX_DEPLOYMENT_TARGET' macos/Runner.xcodeproj/project.pbxproj
 
       - name: Install dependencies
         run: flutter pub get

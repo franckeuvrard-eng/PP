@@ -9,7 +9,10 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    # Epingle sur VS 2022 : Flutter 3.19 ne reconnait pas les versions plus
+    # recentes de Visual Studio (windows-latest) et retombe sur le generateur
+    # CMake "Visual Studio 16 2019", absent du runner.
+    runs-on: windows-2022
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
