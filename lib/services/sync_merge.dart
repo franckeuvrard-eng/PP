@@ -28,6 +28,10 @@ class SyncMerge {
 
   static const _sep = '\u0000';
 
+  /// Separe un enregistrement de ses champs dans les empreintes de base
+  /// (distinct de [_sep], deja present dans certaines cles).
+  static const _fieldSep = '\u0001';
+
   /// Empreinte stable d'une valeur JSON (cles triees), sur 64 bits.
   static String hash(Object? value) {
     final text = json.encode(_canonical(value));
@@ -176,11 +180,48 @@ class SyncMerge {
 
   /// Empreintes de tous les enregistrements : sert de « base » a la
   /// prochaine synchronisation.
+  ///
+  /// Les objets ont aussi une empreinte par champ : elle permet de savoir quel
+  /// appareil a modifie quel champ, et de fusionner sans rien demander quand
+  /// ils n'ont pas touche aux memes.
   static Map<String, String> fingerprints(Map<String, Map<String, Object?>> flat) => {
         for (final cat in flat.entries)
-          for (final rec in cat.value.entries)
+          for (final rec in cat.value.entries) ...{
             '${cat.key}$_sep${rec.key}': hash(rec.value),
+            if (rec.value is Map)
+              for (final f in (rec.value as Map).entries)
+                '${cat.key}$_sep${rec.key}$_fieldSep${f.key}': hash(f.value),
+          },
       };
+
+  /// Fusion champ par champ d'un objet modifie des deux cotes. Renvoie la
+  /// version fusionnee (champs en conflit : valeur locale) et les champs
+  /// modifies differemment des deux cotes ; null si la base ne connait pas
+  /// les champs (base d'une version precedente) ou si ce ne sont pas des objets.
+  static (Map<String, Object?>, List<String>)? _mergeFields(
+      Object? local, Object? remote, Map<String, String> base, String recordId) {
+    if (local is! Map || remote is! Map) return null;
+    final prefix = '$recordId$_fieldSep';
+    if (!base.keys.any((k) => k.startsWith(prefix))) return null;
+
+    final merged = <String, Object?>{};
+    final conflicting = <String>[];
+    for (final f in {...local.keys, ...remote.keys}.map((k) => k.toString())) {
+      final hasL = local.containsKey(f), hasR = remote.containsKey(f);
+      final lh = hasL ? hash(local[f]) : null;
+      final rh = hasR ? hash(remote[f]) : null;
+      final bh = base['$prefix$f'];
+      if (lh == rh || rh == bh) {
+        if (hasL) merged[f] = local[f]; // identiques, ou change ici seulement
+      } else if (lh == bh) {
+        if (hasR) merged[f] = remote[f]; // change la-bas seulement
+      } else {
+        conflicting.add(f);
+        if (hasL) merged[f] = local[f];
+      }
+    }
+    return (merged, conflicting);
+  }
 
   /// Fusionne [local] et [remote]. [base] vaut null a la premiere
   /// synchronisation avec cet appareil.
@@ -220,12 +261,28 @@ class SyncMerge {
         // Present des deux cotes et modifie des deux cotes (ou sans base
         // commune) : c'est a l'utilisateur de trancher. Supprime d'un cote et
         // modifie de l'autre n'en est pas un : la modification gagne.
-        final conflict = hasL && hasR && (bh == null || (lh != bh && rh != bh));
+        var conflict = hasL && hasR && (bh == null || (lh != bh && rh != bh));
+
+        // Champs modifies chacun d'un seul cote : fusion automatique.
+        final fields = conflict && bh != null
+            ? _mergeFields(lc[key], rc[key], base!, '$cat$_sep$key')
+            : null;
+        if (fields != null && fields.$2.isEmpty) conflict = false;
 
         bool chosenHas;
         Object? chosen;
-        if (conflict) {
-          final c = MergeConflict(category: cat, key: key, local: lc[key], remote: rc[key]);
+        if (fields != null && !conflict) {
+          chosenHas = true;
+          chosen = fields.$1;
+        } else if (conflict) {
+          final c = MergeConflict(
+            category: cat,
+            key: key,
+            local: lc[key],
+            remote: rc[key],
+            autoMerged: fields?.$1,
+            fields: fields?.$2,
+          );
           conflicts.add(c);
           stats.conflicts++;
           chosenHas = true;
@@ -304,12 +361,21 @@ class MergeConflict {
     required this.key,
     required this.local,
     required this.remote,
+    this.autoMerged,
+    this.fields,
   });
 
   final String category;
   final String key;
   final Object? local;
   final Object? remote;
+
+  /// Version deja fusionnee pour les champs modifies d'un seul cote (champs
+  /// en conflit : valeur locale). Null sans empreintes de champs en base.
+  final Map<String, Object?>? autoMerged;
+
+  /// Champs reellement en conflit, si connus (sinon : tous ceux qui different).
+  final List<String>? fields;
 
   /// Cle des [SyncMerge.merge] `resolutions`.
   String get id => '$category${SyncMerge._sep}$key';
@@ -319,6 +385,7 @@ class MergeConflict {
   List<String> get differingFields {
     final l = local, r = remote;
     if (l is! Map || r is! Map) return const [];
+    if (fields != null) return fields!;
     return [
       for (final f in {...l.keys, ...r.keys}.map((k) => k.toString()))
         if (SyncMerge.hash(l[f]) != SyncMerge.hash(r[f])) f,
@@ -330,7 +397,7 @@ class MergeConflict {
   Object? combine(Set<String> fromRemote) {
     final l = local, r = remote;
     if (l is! Map || r is! Map) return fromRemote.isEmpty ? l : r;
-    final out = Map<String, Object?>.from(l);
+    final out = Map<String, Object?>.from(autoMerged ?? l);
     for (final f in fromRemote) {
       if (r.containsKey(f)) {
         out[f] = r[f];

@@ -170,7 +170,7 @@ void main() {
       expect((phone.data['children'] as List).map((c) => c['name']), ['Robert']);
     });
 
-    test('conflit : choix champ par champ, ou annulation sans rien modifier', () async {
+    test('champs differents modifies de chaque cote : fusion sans question', () async {
       const lea = {'id': 'l', 'firstname': 'Léa', 'birthdate': '2021-03-12', 'notes': ''};
       final mac = FakeHost('mac', snap([lea]));
       final phone = FakeHost('phone', snap([lea]));
@@ -181,12 +181,38 @@ void main() {
           hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
       await SyncClient(phone).sync(pairing); // etablit la base commune
 
-      // Meme fiche modifiee des deux cotes, sur des champs differents.
       phone.data = snap([{...lea, 'birthdate': '2021-03-15'}]);
       mac.data = snap([{...lea, 'notes': 'Allergie'}]);
+      var asked = false;
+      final summary = await SyncClient(phone).sync(pairing, resolveConflicts: (c, _, __) async {
+        asked = true;
+        return null;
+      });
+      expect(asked, isFalse);
+      expect(summary.conflicts, 0);
+      for (final host in [mac, phone]) {
+        final child = (host.data['children'] as List).single as Map;
+        expect(child['birthdate'], '2021-03-15');
+        expect(child['notes'], 'Allergie');
+      }
+    });
+
+    test('meme champ modifie des deux cotes : choix, ou annulation sans rien modifier', () async {
+      const lea = {'id': 'l', 'firstname': 'Léa', 'birthdate': '2021-03-12', 'notes': ''};
+      final mac = FakeHost('mac', snap([lea]));
+      final phone = FakeHost('phone', snap([lea]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+      await SyncClient(phone).sync(pairing);
+
+      // Date changee des deux cotes (conflit), notes changees sur le Mac seul.
+      phone.data = snap([{...lea, 'birthdate': '2021-03-15'}]);
+      mac.data = snap([{...lea, 'birthdate': '2021-03-20', 'notes': 'Allergie'}]);
 
       List<MergeConflict>? seen;
-      // Annulation : aucun des deux appareils ne change.
       await expectLater(
         SyncClient(phone).sync(pairing, resolveConflicts: (c, _, __) async {
           seen = c;
@@ -194,16 +220,16 @@ void main() {
         }),
         throwsA(isA<SyncException>()),
       );
-      expect(seen!.single.differingFields.toSet(), {'birthdate', 'notes'});
-      expect((mac.data['children'] as List).single['notes'], 'Allergie');
+      expect(seen!.single.differingFields, ['birthdate']);
+      expect((mac.data['children'] as List).single['birthdate'], '2021-03-20');
       expect((phone.data['children'] as List).single['birthdate'], '2021-03-15');
 
-      // Date de naissance de l'iPhone, notes du Mac : les deux sont gardees.
+      // Date du Mac choisie ; les notes du Mac arrivent d'elles-memes.
       final summary = await SyncClient(phone).sync(pairing,
-          resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'notes'})});
+          resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'birthdate'})});
       for (final host in [mac, phone]) {
         final child = (host.data['children'] as List).single as Map;
-        expect(child['birthdate'], '2021-03-15');
+        expect(child['birthdate'], '2021-03-20');
         expect(child['notes'], 'Allergie');
       }
       expect(summary.conflicts, 1);
