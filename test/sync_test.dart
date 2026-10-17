@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -206,6 +207,47 @@ void main() {
         expect(child['notes'], 'Allergie');
       }
       expect(summary.conflicts, 1);
+    });
+
+    test('accord de l\'appareil qui recoit : refus, puis acceptation memorisee', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final phone = FakeHost('phone', snap([bob]));
+      final asked = <String>[];
+      var answer = false;
+      final server = SyncServer(mac)
+        ..onConsentRequest = (name) async {
+          asked.add(name);
+          return answer;
+        };
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+
+      await expectLater(SyncClient(phone).sync(pairing), throwsA(isA<SyncException>()));
+      expect(asked, ['appareil-phone']);
+      expect((mac.data['children'] as List).length, 1);
+      expect((phone.data['children'] as List).length, 1);
+
+      answer = true;
+      await SyncClient(phone).sync(pairing);
+      await SyncClient(phone).sync(pairing); // deja accepte : pas de nouvelle question
+      expect(asked.length, 2);
+      expect((mac.data['children'] as List).length, 2);
+    });
+
+    test('sans accord, les donnees ne sont pas lisibles meme avec le jeton', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final c = HttpClient();
+      addTearDown(() => c.close(force: true));
+      final req = await c.getUrl(Uri.parse('http://127.0.0.1:${started.port}/snapshot'));
+      req.headers.set('authorization', 'Bearer ${started.token}');
+      final res = await req.close();
+      await res.drain<void>();
+      expect(res.statusCode, 403);
     });
 
     test('sauvegarde impossible d\'un cote ou de l\'autre : rien n\'est modifie', () async {

@@ -20,9 +20,9 @@ class DiscoveredPeer {
 
 /// Annonce le [SyncServer] en cours sur le reseau local.
 ///
-/// Pas d'appairage : le jeton du serveur est publie avec l'annonce, tout
-/// appareil du Wi-Fi qui a l'application peut donc se synchroniser tant que
-/// l'ecran de synchronisation est ouvert (choix explicite de simplicite).
+/// Pas de code a saisir : le jeton du serveur est publie avec l'annonce. La
+/// protection vient de l'accord demande sur cet appareil a chaque nouvel
+/// appareil qui se connecte (cf. [SyncServer.onConsentRequest]).
 class SyncAdvertiser {
   BonsoirBroadcast? _broadcast;
 

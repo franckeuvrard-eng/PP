@@ -58,6 +58,7 @@ class _SyncScreenState extends State<SyncScreen> {
     super.initState();
     _host = ProviderSyncHost(Provider.of<AppStateProvider>(context, listen: false));
     _server = SyncServer(_host)
+      ..onConsentRequest = _askConsent
       ..onSynced = (summary) {
         if (!mounted) return;
         setState(() {
@@ -71,6 +72,38 @@ class _SyncScreenState extends State<SyncScreen> {
       _startServer();
       _startBrowsing();
     });
+  }
+
+  /// « iPhone de Léa veut se synchroniser » : personne ne lit ni n'ecrit les
+  /// donnees de la classe sans un accord explicite sur cet appareil. Sans
+  /// reponse, la fenetre se ferme seule et la demande est refusee.
+  Future<bool> _askConsent(String peerName) async {
+    if (!mounted) return false;
+    final timer = Timer(kSyncConsentTimeout - const Duration(seconds: 5), () {
+      if (mounted) Navigator.of(context, rootNavigator: true).maybePop(false);
+    });
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.sync_lock, color: Color(0xFF4E9F3D)),
+          title: Text('$peerName veut se synchroniser'),
+          content: const Text(
+            'Accepter lui permet de lire et de modifier les données de la classe '
+            '(élèves, observations, photos) jusqu’à ce que vous quittiez cet écran.\n\n'
+            'Refusez si vous ne reconnaissez pas cet appareil.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Refuser')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accepter')),
+          ],
+        ),
+      );
+      return ok ?? false;
+    } finally {
+      timer.cancel();
+    }
   }
 
   Future<void> _startBrowsing() async {

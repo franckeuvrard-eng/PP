@@ -63,7 +63,11 @@ bool isSafeMediaPath(String rel) {
 }
 
 const int kSyncDefaultPort = 48765;
-const int _protocol = 1;
+// 2 : accord explicite de l'appareil qui recoit (/request + jeton de session).
+const int _protocol = 2;
+
+/// Delai laisse a l'appareil qui recoit pour accepter ou refuser.
+const kSyncConsentTimeout = Duration(seconds: 90);
 const int _maxJsonBytes = 64 * 1024 * 1024;
 const int _maxMediaBytes = 64 * 1024 * 1024;
 
@@ -204,8 +208,17 @@ class SyncServer {
   String _token = '';
   bool _busy = false;
 
+  /// Sessions accordees (jeton → appareil), valables jusqu'a l'arret.
+  final Map<String, String> _sessions = {};
+  bool _asking = false;
+
   /// Appele apres chaque synchronisation recue avec succes.
   void Function(SyncSummary summary)? onSynced;
+
+  /// Demande a l'utilisateur s'il accepte que [peerName] se synchronise.
+  /// Sans lui, tout appareil connaissant le jeton est accepte (tests).
+  /// Un appareil deja accepte ne redemande pas tant que le serveur tourne.
+  Future<bool> Function(String peerName)? onConsentRequest;
 
   bool get isRunning => _server != null;
   int get port => _server?.port ?? 0;
@@ -233,6 +246,7 @@ class SyncServer {
     final server = _server;
     _server = null;
     _token = '';
+    _sessions.clear();
     await server?.close(force: true);
   }
 
@@ -249,6 +263,14 @@ class SyncServer {
           'deviceId': await host.syncDeviceId(),
           'name': await host.syncDeviceName(),
         });
+      }
+      if (req.method == 'POST' && path == '/request') {
+        return _handleConsent(req);
+      }
+      // Tout le reste lit ou ecrit les donnees : accord prealable exige.
+      final session = req.headers.value('x-sync-session') ?? '';
+      if (!_sessions.containsKey(session)) {
+        return _reply(req, HttpStatus.forbidden, {'error': 'Synchronisation non acceptée'});
       }
       if (req.method == 'GET' && path == '/snapshot') {
         return _reply(req, HttpStatus.ok, {
@@ -320,6 +342,35 @@ class SyncServer {
     }
   }
 
+  Future<void> _handleConsent(HttpRequest req) async {
+    final body = json.decode(utf8.decode(await _readBytes(req, 64 * 1024)));
+    final peerId = (body is Map ? body['deviceId'] : null)?.toString() ?? '';
+    final peerName = (body is Map ? body['deviceName'] : null)?.toString() ?? '';
+    if (peerId.isEmpty) return _reply(req, HttpStatus.badRequest, {'error': 'Appareil inconnu'});
+
+    final already = _sessions.entries.where((e) => e.value == peerId).firstOrNull;
+    if (already != null) return _reply(req, HttpStatus.ok, {'session': already.key});
+
+    if (_asking) {
+      return _reply(req, HttpStatus.conflict, {'error': 'Une autre demande est en cours'});
+    }
+    _asking = true;
+    bool accepted;
+    try {
+      final ask = onConsentRequest;
+      accepted = ask == null
+          ? true
+          : await ask(peerName.isEmpty ? 'Un appareil' : peerName)
+              .timeout(kSyncConsentTimeout, onTimeout: () => false);
+    } finally {
+      _asking = false;
+    }
+    if (!accepted) return _reply(req, HttpStatus.forbidden, {'error': 'refused'});
+    final session = _randomToken();
+    _sessions[session] = peerId;
+    return _reply(req, HttpStatus.ok, {'session': session});
+  }
+
   Future<void> _reply(HttpRequest req, int status, Map<String, dynamic> body) async {
     final bytes = utf8.encode(json.encode(body));
     req.response
@@ -378,6 +429,9 @@ class SyncClient {
   final SyncHost host;
   final Duration timeout;
 
+  /// Jeton de session accorde par l'autre appareil (cf. [SyncServer.onConsentRequest]).
+  String? _session;
+
   /// [resolveConflicts] : appele s'il y a des conflits, avant toute ecriture
   /// sur l'un ou l'autre appareil. Renvoie la valeur choisie par
   /// [MergeConflict.id] (absente = garder la version d'ici), ou null pour
@@ -399,6 +453,9 @@ class SyncClient {
       }
       final peerId = hello['deviceId'] as String;
       final peerName = (hello['name'] ?? pairing.name).toString();
+
+      onProgress?.call('En attente de l’accord de $peerName…');
+      _session = await _requestConsent(client, base, pairing.token, peerName);
 
       onProgress?.call('Lecture des données de $peerName…');
       final remote = await _getJson(client, base, pairing.token, '/snapshot');
@@ -519,6 +576,7 @@ class SyncClient {
     final uri = base.resolve(pathAndQuery);
     final req = await client.openUrl(method, uri).timeout(timeout);
     req.headers.set('authorization', 'Bearer $token');
+    if (_session != null) req.headers.set('x-sync-session', _session!);
     if (body != null) {
       req.headers.contentType = contentType ?? ContentType.json;
       req.contentLength = body.length;
@@ -542,6 +600,35 @@ class SyncClient {
       throw SyncException('Erreur ${res.statusCode} de l’autre appareil$detail.');
     }
     return res;
+  }
+
+  /// Demande l'accord de l'autre appareil, qui affiche « Accepter / Refuser ».
+  Future<String> _requestConsent(HttpClient c, Uri base, String token, String peerName) async {
+    final body = utf8.encode(json.encode({
+      'deviceId': await host.syncDeviceId(),
+      'deviceName': await host.syncDeviceName(),
+    }));
+    final req = await c.openUrl('POST', base.resolve('/request')).timeout(timeout);
+    req.headers
+      ..set('authorization', 'Bearer $token')
+      ..contentType = ContentType.json;
+    req.contentLength = body.length;
+    req.add(body);
+    // L'utilisateur d'en face a [kSyncConsentTimeout] pour repondre.
+    final res = await req.close().timeout(kSyncConsentTimeout + const Duration(seconds: 15));
+    final bytes = await _readBytes(res, 64 * 1024);
+    switch (res.statusCode) {
+      case HttpStatus.ok:
+        final session = (json.decode(utf8.decode(bytes)) as Map)['session'];
+        if (session is String && session.isNotEmpty) return session;
+      case HttpStatus.forbidden:
+        throw SyncException('$peerName a refusé la synchronisation, ou n’a pas répondu à temps.');
+      case HttpStatus.conflict:
+        throw SyncException('$peerName répond déjà à une autre demande : réessayez dans un instant.');
+      case HttpStatus.unauthorized:
+        throw SyncException('Code d’appairage invalide ou expiré : rescannez le QR code.');
+    }
+    throw SyncException('Erreur ${res.statusCode} de l’autre appareil.');
   }
 
   Future<Map<String, dynamic>> _getJson(HttpClient c, Uri base, String token, String path) async {
