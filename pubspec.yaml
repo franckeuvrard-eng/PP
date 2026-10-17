@@ -34,7 +34,7 @@ dependencies:
   path: ^1.9.0
   # sqflite ne cible que iOS et Android : l'implementation FFI permet de
   # continuer a previsualiser l'application sur poste de travail.
-  sqflite_common_ffi: ^2.3.3
+  sqflite_common_ffi: ^2.4.4
   flutter_localizations:
     sdk: flutter
   flutter_local_notifications: ^17.2.1+2
