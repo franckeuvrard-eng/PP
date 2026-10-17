@@ -887,10 +887,10 @@ class AppStateProvider extends ChangeNotifier {
   Future<bool> shareArchive(SchoolYearArchive archive) async {
     final file = await archiveFile(archive);
     if (file == null) return false;
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/zip')],
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(file.path, mimeType: 'application/zip')],
       subject: 'Archive A petits pas ${archive.schoolYear}',
-    );
+    ));
     return true;
   }
 
@@ -1249,11 +1249,11 @@ class AppStateProvider extends ChangeNotifier {
       await File(zipPath).writeAsBytes(zipBytes);
 
       // 4. Share
-      await Share.shareXFiles(
-        [XFile(zipPath, mimeType: 'application/zip')],
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(zipPath, mimeType: 'application/zip')],
         subject: 'Sauvegarde A petits pas',
         text: 'Backup complet A petits pas incluant toutes les données et photos.',
-      );
+      ));
     } catch (e) {
       debugPrint('Export error: $e');
       rethrow;
@@ -1268,18 +1268,14 @@ class AppStateProvider extends ChangeNotifier {
         _docsDirPath = directory.path;
       }
 
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['zip'],
-        allowMultiple: false,
       );
+      if (picked == null) return 'cancelled';
 
-      if (result == null || result.files.isEmpty) return 'cancelled';
-
-      final zipPath = result.files.first.path;
-      if (zipPath == null) return 'error';
-
-      final bytes = await File(zipPath).readAsBytes();
+      // Lecture via XFile : fonctionne aussi sans chemin local (iCloud Drive…).
+      final bytes = await picked.xFile.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
 
       // Find backup.json

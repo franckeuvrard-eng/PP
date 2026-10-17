@@ -43,7 +43,7 @@ class SyncAdvertiser {
     );
     final broadcast = BonsoirBroadcast(service: service);
     _broadcast = broadcast;
-    await broadcast.ready;
+    await broadcast.initialize();
     await broadcast.start();
   }
 
@@ -74,17 +74,17 @@ class SyncBrowser {
     await stop();
     final discovery = BonsoirDiscovery(type: kSyncServiceType);
     _discovery = discovery;
-    await discovery.ready;
+    await discovery.initialize();
     _sub = discovery.eventStream?.listen((event) {
-      final service = event.service;
-      if (service == null) return;
-      switch (event.type) {
-        case BonsoirDiscoveryEventType.discoveryServiceFound:
-          service.resolve(discovery.serviceResolver);
-        case BonsoirDiscoveryEventType.discoveryServiceResolved:
-          if (service is ResolvedBonsoirService) _onResolved(service);
-        case BonsoirDiscoveryEventType.discoveryServiceLost:
-          if (_peers.remove(service.name) != null) _emit();
+      switch (event) {
+        case BonsoirDiscoveryServiceFoundEvent():
+          event.service.resolve(discovery.serviceResolver);
+        case BonsoirDiscoveryServiceResolvedEvent():
+          _onResolved(event.service);
+        case BonsoirDiscoveryServiceUpdatedEvent():
+          _onResolved(event.service);
+        case BonsoirDiscoveryServiceLostEvent():
+          if (_peers.remove(event.service.name) != null) _emit();
         default:
           break;
       }
@@ -92,14 +92,20 @@ class SyncBrowser {
     await discovery.start();
   }
 
-  void _onResolved(ResolvedBonsoirService service) {
+  void _onResolved(BonsoirService service) {
     final a = service.attributes;
     final id = a['id'] ?? '';
     final token = a['token'] ?? '';
     if (id.isEmpty || token.isEmpty || id == ownDeviceId) return;
+    // Adresses resolues par le systeme d'abord (les plus sures), puis celles
+    // annoncees par l'appareil, puis son nom .local en dernier recours.
     final ips = (a['ips'] ?? '').split(',').where((s) => s.isNotEmpty);
-    final hostname = _stripDot(service.host ?? '');
-    final hosts = <String>{...ips, if (hostname.isNotEmpty) hostname}.toList();
+    final hostname = _stripDot(service.hostname ?? '');
+    final hosts = <String>{
+      ...service.hostAddresses.where((h) => !h.contains(':')), // IPv4 seulement
+      ...ips,
+      if (hostname.isNotEmpty) hostname,
+    }.toList();
     if (hosts.isEmpty) return;
     // Un meme appareil peut reapparaitre sous un autre nom de service
     // (renommage Bonjour apres redemarrage) : on dedoublonne par identifiant.

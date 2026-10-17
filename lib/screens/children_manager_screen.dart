@@ -324,7 +324,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       style: TextStyle(fontSize: 11),
                     ),
                     value: onlyLatestPerAtelier,
-                    activeColor: const Color(0xFF4E9F3D),
+                    activeThumbColor: const Color(0xFF4E9F3D),
                     onChanged: (val) => setDialogState(() => onlyLatestPerAtelier = val),
                   ),
                   if (customRange != null) ...[
@@ -620,6 +620,9 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                   if (current.isNotEmpty && !widget.provider.sections.contains(current)) current,
                 ];
                 return DropdownButtonFormField<String>(
+                  // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                  // ne suivrait pas ses changements.
+                  // ignore: deprecated_member_use
                   value: options.contains(current) ? current : null,
                   isExpanded: true,
                   decoration: const InputDecoration(

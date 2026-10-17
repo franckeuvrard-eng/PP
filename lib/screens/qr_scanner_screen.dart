@@ -482,6 +482,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     children: [
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
+                        // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                        // ne suivrait pas ses changements.
+                        // ignore: deprecated_member_use
                         value: _selectedChildId,
                         decoration: const InputDecoration(
                           labelText: 'Élève sélectionné',
@@ -523,6 +526,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                 .where((e) => e.value.isAllowed)
                                 .toList();
                         return DropdownButtonFormField<String>(
+                          // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                          // ne suivrait pas ses changements.
+                          // ignore: deprecated_member_use
                           value: _selectedActivityTypeId,
                           decoration: InputDecoration(
                             labelText: 'Atelier sélectionné',
@@ -606,6 +612,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 // Customizable Evaluation Status
                 if (provider.evaluationStatuses.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
+                    // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                    // ne suivrait pas ses changements.
+                    // ignore: deprecated_member_use
                     value: provider.evaluationStatuses.any((s) => s.id == _selectedEvaluationStatusId)
                         ? _selectedEvaluationStatusId
                         : null,
@@ -1078,15 +1087,17 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                   style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
+                  // Le controleur porte lui-meme l'etat (dont la lampe).
                   icon: ValueListenableBuilder(
-                    valueListenable: _controller.torchState,
-                    builder: (context, state, child) {
-                      switch (state) {
-                        case TorchState.off:
-                          return const Icon(Icons.flash_off, color: Colors.white, size: 24);
-                        case TorchState.on:
-                          return const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 24);
-                      }
+                    valueListenable: _controller,
+                    builder: (context, state, child) => switch (state.torchState) {
+                      TorchState.on =>
+                        const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 24),
+                      TorchState.auto =>
+                        const Icon(Icons.flash_auto, color: Color(0xFFFFD54F), size: 24),
+                      TorchState.unavailable =>
+                        const Icon(Icons.flash_off, color: Colors.white38, size: 24),
+                      TorchState.off => const Icon(Icons.flash_off, color: Colors.white, size: 24),
                     },
                   ),
                   onPressed: () => _controller.toggleTorch(),

@@ -172,7 +172,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                         style: TextStyle(fontSize: 12),
                       ),
                       value: _isProgression,
-                      activeColor: const Color(0xFF4E9F3D),
+                      activeThumbColor: const Color(0xFF4E9F3D),
                       onChanged: (val) => setState(() => _isProgression = val),
                     ),
                     if (_isProgression && provider.evaluationStatuses.isEmpty)
@@ -190,6 +190,9 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                         provider.evaluationStatuses.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
+                        // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                        // ne suivrait pas ses changements.
+                        // ignore: deprecated_member_use
                         value: provider.evaluationStatuses
                                 .any((s) => s.id == _progressionMinStatusId)
                             ? _progressionMinStatusId

@@ -73,10 +73,10 @@ class ChildrenImportService {
       final file = File('${tempDir.path}/APetitPas_Modele_Import_Eleves.xlsx');
       await file.writeAsBytes(bytes);
 
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
         subject: 'Modèle d\'import élèves A petits pas',
-      );
+      ));
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,17 +93,14 @@ class ChildrenImportService {
     required AppStateProvider provider,
   }) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
-        allowMultiple: false,
       );
-      if (result == null || result.files.isEmpty) return;
+      if (picked == null) return;
 
-      final path = result.files.first.path;
-      if (path == null) return;
-
-      final bytes = await File(path).readAsBytes();
+      // Lecture via XFile : fonctionne aussi sans chemin local (iCloud Drive…).
+      final bytes = await picked.xFile.readAsBytes();
       final excel = xl.Excel.decodeBytes(bytes);
       if (excel.tables.isEmpty) throw Exception('Le fichier ne contient aucune feuille.');
 

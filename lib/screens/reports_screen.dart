@@ -190,7 +190,7 @@ class ReportsScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 11),
                   ),
                   value: onlyLatestPerAtelier,
-                  activeColor: const Color(0xFF4E9F3D),
+                  activeThumbColor: const Color(0xFF4E9F3D),
                   onChanged: (val) => setSheetState(() => onlyLatestPerAtelier = val),
                 ),
                 if (customRange != null) ...[

@@ -269,6 +269,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
+                      // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                      // ne suivrait pas ses changements.
+                      // ignore: deprecated_member_use
                       value: provider.spaces.any((s) => s.id == _spaceId)
                           ? _spaceId
                           : null,
@@ -302,7 +305,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         style: TextStyle(fontSize: 12, color: kMutedTextColor),
                       ),
                       value: _isObligatory,
-                      activeColor: const Color(0xFF4E9F3D),
+                      activeThumbColor: const Color(0xFF4E9F3D),
                       onChanged: (val) => setState(() => _isObligatory = val),
                     ),
                     if (_isObligatory) ...[
@@ -378,6 +381,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 children: [
                   DropdownButtonFormField<String>(
+                    // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                    // ne suivrait pas ses changements.
+                    // ignore: deprecated_member_use
                     value: (_selectedDomainId == 'custom' ||
                             _selectedDomainId == 'none' ||
                             EduscolData.domains

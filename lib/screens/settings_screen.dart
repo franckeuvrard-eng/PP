@@ -329,35 +329,35 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  RadioListTile<ThemeMode>(
-                    title: const Text('📱 Mode Automatique (Système)'),
-                    subtitle: const Text('S\'adapte aux réglages de votre iPad / iPhone.'),
-                    value: ThemeMode.system,
-                    groupValue: provider.themeMode,
-                    activeColor: const Color(0xFF4E9F3D),
-                    onChanged: (val) => provider.setThemeMode(val!),
-                  ),
-                  const Divider(),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('☀️ Mode Clair'),
-                    subtitle: const Text('Fond lumineux traditionnel.'),
-                    value: ThemeMode.light,
-                    groupValue: provider.themeMode,
-                    activeColor: const Color(0xFF4E9F3D),
-                    onChanged: (val) => provider.setThemeMode(val!),
-                  ),
-                  const Divider(),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('🌙 Mode Sombre (Dark Mode)'),
-                    subtitle: const Text('Fond sombre reposant pour les yeux et économe en batterie.'),
-                    value: ThemeMode.dark,
-                    groupValue: provider.themeMode,
-                    activeColor: const Color(0xFF4E9F3D),
-                    onChanged: (val) => provider.setThemeMode(val!),
-                  ),
-                ],
+              child: RadioGroup<ThemeMode>(
+                groupValue: provider.themeMode,
+                onChanged: (val) {
+                  if (val != null) provider.setThemeMode(val);
+                },
+                child: const Column(
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: Text('📱 Mode Automatique (Système)'),
+                      subtitle: Text('S\'adapte aux réglages de votre iPad / iPhone.'),
+                      value: ThemeMode.system,
+                      activeColor: Color(0xFF4E9F3D),
+                    ),
+                    Divider(),
+                    RadioListTile<ThemeMode>(
+                      title: Text('☀️ Mode Clair'),
+                      subtitle: Text('Fond lumineux traditionnel.'),
+                      value: ThemeMode.light,
+                      activeColor: Color(0xFF4E9F3D),
+                    ),
+                    Divider(),
+                    RadioListTile<ThemeMode>(
+                      title: Text('🌙 Mode Sombre (Dark Mode)'),
+                      subtitle: Text('Fond sombre reposant pour les yeux et économe en batterie.'),
+                      value: ThemeMode.dark,
+                      activeColor: Color(0xFF4E9F3D),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -790,7 +790,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       style: const TextStyle(fontSize: 12, color: kMutedTextColor),
                     ),
                     value: provider.biometricLockEnabled,
-                    activeColor: const Color(0xFF4E9F3D),
+                    activeThumbColor: const Color(0xFF4E9F3D),
                     onChanged: (val) => provider.setBiometricLockEnabled(val),
                   ),
                   if (!provider.biometricLockEnabled)
@@ -943,7 +943,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       style: TextStyle(fontSize: 12, color: kMutedTextColor),
                     ),
                     value: provider.reminderEnabled,
-                    activeColor: const Color(0xFF4E9F3D),
+                    activeThumbColor: const Color(0xFF4E9F3D),
                     onChanged: (val) async {
                       final ok = await provider.setReminderEnabled(val);
                       if (!ok && mounted) {

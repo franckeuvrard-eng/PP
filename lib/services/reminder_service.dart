@@ -35,7 +35,7 @@ class ReminderService {
       requestSoundPermission: false,
     );
     await _plugin.initialize(
-      const InitializationSettings(iOS: iosSettings, macOS: iosSettings),
+      settings: const InitializationSettings(iOS: iosSettings, macOS: iosSettings),
     );
     _initialized = true;
   }
@@ -66,7 +66,7 @@ class ReminderService {
   }) async {
     if (!isSupported) return;
     await _ensureInitialized();
-    await _plugin.cancel(_notificationId);
+    await _plugin.cancel(id: _notificationId);
     if (pendingCount <= 0) return;
 
     final now = tz.TZDateTime.now(tz.local);
@@ -74,23 +74,24 @@ class ReminderService {
     if (!scheduled.isAfter(now)) return;
 
     await _plugin.zonedSchedule(
-      _notificationId,
-      'Élèves non évalués',
-      pendingCount > 1
+      id: _notificationId,
+      title: 'Élèves non évalués',
+      body: pendingCount > 1
           ? '$pendingCount élèves n\'ont pas encore d\'observation aujourd\'hui.'
           : '1 élève n\'a pas encore d\'observation aujourd\'hui.',
-      scheduled,
-      const NotificationDetails(
+      scheduledDate: scheduled,
+      notificationDetails: const NotificationDetails(
         iOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
         macOS: DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
       ),
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      // Sans effet sur iOS/macOS (seules plateformes du rappel), mais requis.
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
 
   static Future<void> cancelReminder() async {
     if (!isSupported) return;
     await _ensureInitialized();
-    await _plugin.cancel(_notificationId);
+    await _plugin.cancel(id: _notificationId);
   }
 }

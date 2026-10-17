@@ -149,12 +149,12 @@ class SpacesWorkshopsTab extends StatelessWidget {
                     ReorderableListView(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      onReorder: (oldIndex, newIndex) {
+                      // newIndex deja corrige du decalage de l'element retire.
+                      onReorderItem: (oldIndex, newIndex) {
                         final ordered = provider
                             .ateliersInSpaceOrdered(space.id)
                             .map((a) => a.id)
                             .toList();
-                        if (newIndex > oldIndex) newIndex -= 1;
                         final id = ordered.removeAt(oldIndex);
                         ordered.insert(newIndex, id);
                         provider.reorderAteliersInSpace(space.id, ordered);
