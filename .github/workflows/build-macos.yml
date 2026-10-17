@@ -1,0 +1,91 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ main, master, 'claude/**' ]
+    paths-ignore: [ 'web_prototype/**' ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    # Meme runner epingle que le build iOS : Flutter 3.19 n'est pas compatible
+    # avec Xcode 16 (macos-latest).
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 15.4
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Recreate macOS platform files
+        # Comme pour iOS, le dossier plateforme n'est pas versionne : on le
+        # regenere, puis on applique la configuration propre a l'application
+        # (droits reseau/micro, taille minimale de fenetre, textes de permission).
+        run: |
+          flutter config --enable-macos-desktop
+          flutter create --project-name=petitpas --platforms=macos .
+          rm -f test/widget_test.dart
+          cp macos_config/DebugProfile.entitlements macos/Runner/DebugProfile.entitlements
+          cp macos_config/Release.entitlements macos/Runner/Release.entitlements
+          # Taille minimale de fenetre : en dessous, la barre laterale ecrase
+          # le contenu.
+          perl -0pi -e 's/super\.awakeFromNib\(\)/self.minSize = NSSize(width: 900, height: 640)\n    super.awakeFromNib()/' macos/Runner/MainFlutterWindow.swift
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Notes vocales sur les observations.'" macos/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Synchronisation avec l application sur iPhone/iPad.'" macos/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" macos/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices:0 string _petitpas._tcp" macos/Runner/Info.plist
+          grep -n "minSize" macos/Runner/MainFlutterWindow.swift
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: flutter test --reporter expanded
+
+      - name: Build macOS App
+        run: |
+          set -o pipefail
+          flutter build macos --release --verbose > build_output.txt 2>&1 || {
+            grep -n -i -E 'error:|\*\* BUILD FAILED|Encountered error' build_output.txt | head -n 50
+            tail -n 200 build_output.txt
+            exit 1
+          }
+
+      - name: Read app version
+        id: version
+        run: |
+          V=$(grep -m1 '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//' | cut -d'+' -f1)
+          echo "app_version=${V}" >> "$GITHUB_OUTPUT"
+
+      - name: Package .app
+        # ditto conserve les attributs macOS (liens symboliques des frameworks)
+        # que `zip` abimerait.
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent *.app "$GITHUB_WORKSPACE/PetitPas_v${{ steps.version.outputs.app_version }}_macOS.zip"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PetitPas-v${{ steps.version.outputs.app_version }}-macOS
+          path: PetitPas_v${{ steps.version.outputs.app_version }}_macOS.zip
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics-macos
+          if-no-files-found: warn
+          path: |
+            build_output.txt
+            pubspec.lock

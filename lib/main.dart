@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'utils/platform_support.dart';
+import 'widgets/desktop_frame.dart';
 import 'screens/help_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
@@ -31,9 +32,11 @@ class PetitPasApp extends StatelessWidget {
     return MaterialApp(
       title: 'A petits pas - Suivi Maternelle',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const DesktopScrollBehavior(),
       themeMode: appProvider.themeMode,
       theme: ThemeData(
         useMaterial3: true,
+        visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
@@ -77,6 +80,7 @@ class PetitPasApp extends StatelessWidget {
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
+        visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
@@ -299,6 +303,14 @@ class MainNavigationFrame extends StatefulWidget {
 class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
+  static const _destinations = [
+    DesktopDestination(label: 'Accueil', icon: Icons.home_outlined, selectedIcon: Icons.home),
+    DesktopDestination(label: 'Scan & Go', icon: Icons.qr_code_2, selectedIcon: Icons.qr_code_2),
+    DesktopDestination(label: 'Élèves', icon: Icons.people_outline, selectedIcon: Icons.people),
+    DesktopDestination(label: 'Badges QR', icon: Icons.print_outlined, selectedIcon: Icons.print),
+    DesktopDestination(label: 'Paramètres', icon: Icons.tune, selectedIcon: Icons.tune),
+  ];
+
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
     QrScannerScreen(),
@@ -329,9 +341,84 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     }
   }
 
+  void _select(int index) => setState(() => _currentIndex = index);
+
+  void _openHelp() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+  }
+
+  /// Barre de menus de macOS : Cmd+1..5 pour changer de page, Cmd+? pour l'aide.
+  /// Sur les autres plateformes, `PlatformMenuBar` ne fait rien et les memes
+  /// raccourcis passent par Ctrl+1..5 ([desktopNavigationShortcuts]).
+  List<PlatformMenuItem> _macMenus() {
+    const digits = [
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+      LogicalKeyboardKey.digit5,
+    ];
+    return [
+      const PlatformMenu(
+        label: 'A petits pas',
+        menus: [
+          PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
+          PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.quit),
+        ],
+      ),
+      PlatformMenu(
+        label: 'Aller à',
+        menus: [
+          for (var i = 0; i < _destinations.length; i++)
+            PlatformMenuItem(
+              label: _destinations[i].label,
+              shortcut: SingleActivator(digits[i], meta: true),
+              onSelected: () => _select(i),
+            ),
+        ],
+      ),
+      PlatformMenu(
+        label: 'Aide',
+        menus: [
+          PlatformMenuItem(
+            label: 'Aide de A petits pas',
+            shortcut: const SingleActivator(LogicalKeyboardKey.slash, meta: true, shift: true),
+            onSelected: _openHelp,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Widget _buildDesktop(AppStateProvider appProvider) {
+    final frame = DesktopFrame(
+      destinations: _destinations,
+      currentIndex: _currentIndex,
+      onSelected: _select,
+      className: appProvider.classSettings.name,
+      onHelp: _openHelp,
+      body: IndexedStack(index: _currentIndex, children: _screens),
+    );
+    if (isMacOSPlatform) {
+      return PlatformMenuBar(menus: _macMenus(), child: frame);
+    }
+    return CallbackShortcuts(
+      bindings: desktopNavigationShortcuts(_destinations.length, _select),
+      child: Focus(autofocus: true, child: frame),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = Provider.of<AppStateProvider>(context);
+
+    // Mise en page ordinateur : fenetre large OU plateforme de bureau. Le
+    // second critere evite de rebasculer sur la barre d'onglets mobile quand
+    // l'utilisateur reduit la fenetre un peu trop.
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= kDesktopBreakpoint || (isDesktopPlatform && width >= 600)) {
+      return _buildDesktop(appProvider);
+    }
 
     return Scaffold(
       appBar: AppBar(
