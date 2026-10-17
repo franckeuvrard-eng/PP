@@ -1,6 +1,10 @@
 # `flutter_lints` etait declare dans pubspec.yaml sans ce fichier : aucune regle
 # n'etait donc appliquee, et le `flutter analyze` de la CI ne verifiait guere
 # plus que la compilation.
+analyzer:
+  exclude:
+    - build/**
+    - ios/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
