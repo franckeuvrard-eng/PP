@@ -295,8 +295,11 @@ class SyncServer {
     } on _TooLarge {
       return _reply(req, HttpStatus.requestEntityTooLarge, {'error': 'Trop volumineux'});
     } catch (e) {
+      // Le detail remonte a l'autre appareil : sans lui, une erreur 500 est
+      // impossible a diagnostiquer sur le terrain. Reseau local, jeton exige.
       try {
-        await _reply(req, HttpStatus.internalServerError, {'error': 'Erreur interne'});
+        await _reply(req, HttpStatus.internalServerError,
+            {'error': '${req.method} ${req.uri.path} : $e'});
       } catch (_) {}
     }
   }
@@ -467,8 +470,12 @@ class SyncClient {
       throw SyncException('L’autre appareil est déjà en cours de synchronisation.');
     }
     if (res.statusCode != HttpStatus.ok) {
-      await res.drain<void>();
-      throw SyncException('Erreur ${res.statusCode} de l’autre appareil.');
+      var detail = '';
+      try {
+        final body = json.decode(utf8.decode(await _readBytes(res, 64 * 1024)));
+        if (body is Map && body['error'] != null) detail = ' (${body['error']})';
+      } catch (_) {}
+      throw SyncException('Erreur ${res.statusCode} de l’autre appareil$detail.');
     }
     return res;
   }
