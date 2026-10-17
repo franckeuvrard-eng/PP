@@ -1,9 +1,6 @@
 name: Build macOS App
 
 on:
-  push:
-    branches: [ main, master, claude/mac-app-mobile-communication-ftwnjw ]
-    paths-ignore: [ 'web_prototype/**' ]
   workflow_dispatch:
   workflow_call:
 

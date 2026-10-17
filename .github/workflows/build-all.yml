@@ -1,9 +1,14 @@
 name: Build All Platforms
 
-# Lance iOS, macOS et Windows en parallele : Actions > Build All Platforms >
-# Run workflow, en choisissant la branche. Chaque plateforme publie son propre
-# artefact (IPA, .zip macOS, .zip Windows).
+# Lance iOS, macOS et Windows en parallele a chaque push (ou a la main :
+# Actions > Build All Platforms > Run workflow). Seul point d'entree sur push :
+# les workflows par plateforme ne se declenchent plus seuls, pour ne pas
+# construire deux fois. Chaque plateforme publie son propre artefact (IPA,
+# .zip macOS, .zip Windows).
 on:
+  push:
+    branches: [ main, master, claude/mac-app-mobile-communication-ftwnjw ]
+    paths-ignore: [ 'web_prototype/**' ]
   workflow_dispatch:
 
 jobs:
