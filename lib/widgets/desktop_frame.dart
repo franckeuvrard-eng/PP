@@ -74,12 +74,12 @@ class DesktopFrame extends StatelessWidget {
             selectedIndex: currentIndex,
             onDestinationSelected: onSelected,
             backgroundColor: theme.cardColor,
-            indicatorColor: _green.withOpacity(0.15),
+            indicatorColor: _green.withValues(alpha: 0.15),
             selectedIconTheme: const IconThemeData(color: _green),
             selectedLabelTextStyle: const TextStyle(
                 color: _green, fontWeight: FontWeight.bold, fontSize: 14),
             unselectedLabelTextStyle: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14),
             // Largeur fixe : le rail donne a `leading` une largeur non bornee,
             // incompatible avec l'Expanded du titre.

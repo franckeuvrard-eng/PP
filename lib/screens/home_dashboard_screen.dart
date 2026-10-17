@@ -119,7 +119,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(40),
                     child: Text(
                       'Aucune activité enregistrée aujourd\'hui.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                     ),
                   ),
                 )
@@ -217,7 +217,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                                            color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
@@ -229,7 +229,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.15),
+                                            color: Colors.orange.withValues(alpha: 0.15),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: const Text(
@@ -239,7 +239,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                         ),
                                       Text(
                                         '• ${DateFormat('HH:mm').format(act.timestamp)}',
-                                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                                       ),
                                     ],
                                   ),
@@ -250,7 +250,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceVariant,
+                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -273,7 +273,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                                       ),
                                     ),
                                   ],
@@ -371,7 +371,7 @@ class HomeDashboardScreen extends StatelessWidget {
           CircleAvatar(
             // Pastille teintee en mode sombre : un cercle blanc franc sur la
             // carte sombre etait trop contraste.
-            backgroundColor: isDark ? textColor.withOpacity(0.18) : Colors.white,
+            backgroundColor: isDark ? textColor.withValues(alpha: 0.18) : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
           ),
@@ -380,7 +380,7 @@ class HomeDashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.8))),
+              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.8))),
             ],
           ),
         ],

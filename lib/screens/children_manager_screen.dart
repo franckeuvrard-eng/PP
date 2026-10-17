@@ -130,7 +130,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       FilterChip(
                         label: Text('Tous (${allChildren.length})'),
                         selected: _filterMode == ChildFilterMode.all,
-                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        selectedColor: const Color(0xFF4E9F3D).withValues(alpha: 0.2),
                         checkmarkColor: const Color(0xFF4E9F3D),
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.all),
                       ),
@@ -138,7 +138,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       FilterChip(
                         label: Text('⏳ En attente ($pendingTodayCount)'),
                         selected: _filterMode == ChildFilterMode.pendingToday,
-                        selectedColor: Colors.amber.withOpacity(0.2),
+                        selectedColor: Colors.amber.withValues(alpha: 0.2),
                         checkmarkColor: Colors.amber.shade900,
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.pendingToday),
                       ),
@@ -146,7 +146,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       FilterChip(
                         label: Text('✅ Évalués aujourd\'hui ($evaluatedTodayCount)'),
                         selected: _filterMode == ChildFilterMode.evaluatedToday,
-                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        selectedColor: const Color(0xFF4E9F3D).withValues(alpha: 0.2),
                         checkmarkColor: const Color(0xFF4E9F3D),
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.evaluatedToday),
                       ),
@@ -195,7 +195,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                   ? Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF4E9F3D).withOpacity(0.15),
+                                        color: const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -206,7 +206,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                   : Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.15),
+                                        color: Colors.amber.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(

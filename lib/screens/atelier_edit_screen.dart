@@ -341,7 +341,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                     style: const TextStyle(fontSize: 13)),
                                 selected: isSelected,
                                 selectedColor:
-                                    const Color(0xFF4E9F3D).withOpacity(0.2),
+                                    const Color(0xFF4E9F3D).withValues(alpha: 0.2),
                                 checkmarkColor: const Color(0xFF4E9F3D),
                                 onSelected: (sel) {
                                   setState(() {
@@ -575,7 +575,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                             });
                           },
                           backgroundColor:
-                              const Color(0xFF4E9F3D).withOpacity(0.15),
+                              const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                         );
                       }).toList(),
                     ),
@@ -691,7 +691,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                             height: 88,
                             decoration: BoxDecoration(
                               color:
-                                  Theme.of(context).colorScheme.surfaceVariant,
+                                  Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                   color: Theme.of(context).dividerColor),
@@ -730,7 +730,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                               height: 88,
                                               color: Theme.of(context)
                                                   .colorScheme
-                                                  .surfaceVariant,
+                                                  .surfaceContainerHighest,
                                               child: const Icon(
                                                   Icons.broken_image,
                                                   size: 24),

@@ -197,10 +197,10 @@ class _SyncConflictsScreenState extends State<SyncConflictsScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.1) : null,
+            color: selected ? color.withValues(alpha: 0.1) : null,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: selected ? color : Colors.grey.withOpacity(0.4),
+                color: selected ? color : Colors.grey.withValues(alpha: 0.4),
                 width: selected ? 2 : 1),
           ),
           child: Row(

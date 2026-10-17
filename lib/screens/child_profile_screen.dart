@@ -234,16 +234,16 @@ class ChildProfileScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
           Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
+          Text(label, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.8))),
         ],
       ),
     );
@@ -354,7 +354,7 @@ class ChildProfileScreen extends StatelessWidget {
                             constraints: const BoxConstraints(minWidth: 54, minHeight: 54),
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: couleur.withOpacity(0.15),
+                              color: couleur.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: couleur, width: 2),
                             ),
@@ -488,7 +488,7 @@ class ChildProfileScreen extends StatelessWidget {
                             constraints: const BoxConstraints(minHeight: 44),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: couleur.withOpacity(0.15),
+                              color: couleur.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: couleur, width: 2),
                             ),
@@ -537,7 +537,7 @@ class ChildProfileScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: couleur.withOpacity(0.15),
+        color: couleur.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -643,7 +643,7 @@ class ChildProfileScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                          color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -655,7 +655,7 @@ class ChildProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.15),
+                            color: Colors.orange.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
@@ -667,7 +667,7 @@ class ChildProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -703,7 +703,7 @@ class ChildProfileScreen extends StatelessWidget {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: couleur?.withOpacity(0.15) ??
+                          color: couleur?.withValues(alpha: 0.15) ??
                               (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                           borderRadius: BorderRadius.circular(8),
                         ),

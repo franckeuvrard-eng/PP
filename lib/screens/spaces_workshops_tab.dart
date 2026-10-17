@@ -56,7 +56,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: spaceColor.withOpacity(0.3)),
+                side: BorderSide(color: spaceColor.withValues(alpha: 0.3)),
               ),
               child: ExpansionTile(
                 tilePadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
@@ -230,7 +230,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(label,

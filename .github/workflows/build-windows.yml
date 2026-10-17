@@ -6,10 +6,8 @@ on:
 
 jobs:
   build-windows:
-    # Epingle sur VS 2022 : Flutter 3.19 ne reconnait pas les versions plus
-    # recentes de Visual Studio (windows-latest) et retombe sur le generateur
-    # CMake "Visual Studio 16 2019", absent du runner.
-    runs-on: windows-2022
+    runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -17,7 +15,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.47.7'
           channel: 'stable'
 
       - name: Recreate Windows platform files
@@ -86,7 +84,11 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile innosetup.exe
           $actual = (Get-FileHash innosetup.exe -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $expected) { throw "Empreinte Inno Setup inattendue : $actual" }
-          Start-Process innosetup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/DIR=C:\InnoSetup' -Wait
+          # /ALLUSERS : sinon l'installateur demande « pour tous / pour moi »
+          # et attend indefiniment. Delai max pour ne jamais bloquer le job.
+          $p = Start-Process innosetup.exe -PassThru -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/ALLUSERS','/DIR=C:\InnoSetup'
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "Installation d'Inno Setup bloquee" }
+          if (-not (Test-Path C:\InnoSetup\ISCC.exe)) { throw "ISCC.exe introuvable apres installation" }
           $release = Resolve-Path build\windows\x64\runner\Release
           $icon = Resolve-Path windows\runner\resources\app_icon.ico
           & C:\InnoSetup\ISCC.exe "/DAppVersion=${{ steps.version.outputs.app_version }}" "/DSourceDir=$release" "/DIconFile=$icon" "/O$PWD" windows_config\petitpas.iss

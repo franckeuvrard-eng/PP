@@ -278,9 +278,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.12),
+              color: Colors.orange.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orange.withOpacity(0.4)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +308,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Theme.of(context).dividerColor),
                   ),
@@ -405,7 +405,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
               ],
             ),
             child: Column(
@@ -569,7 +569,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF0FAF0),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF4E9F3D).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF4E9F3D).withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,7 +814,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF4E9F3D).withOpacity(0.3),
+                        color: const Color(0xFF4E9F3D).withValues(alpha: 0.3),
                         blurRadius: 20,
                         spreadRadius: 4,
                       ),
@@ -1104,7 +1104,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _isErrorMessage ? Colors.red.withOpacity(0.9) : const Color(0xFF4E9F3D).withOpacity(0.95),
+                  color: _isErrorMessage ? Colors.red.withValues(alpha: 0.9) : const Color(0xFF4E9F3D).withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: const [
                     BoxShadow(color: Colors.black38, blurRadius: 10, offset: Offset(0, 4)),
@@ -1140,7 +1140,7 @@ class _QrCameraScannerOverlayState extends State<QrCameraScannerOverlay> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
+                    color: Colors.black.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -1245,7 +1245,7 @@ class ScannerOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final backgroundPaint = Paint()
-      ..color = Colors.black.withOpacity(0.6)
+      ..color = Colors.black.withValues(alpha: 0.6)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()

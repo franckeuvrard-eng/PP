@@ -102,9 +102,9 @@ class _VoiceNoteFieldState extends State<VoiceNoteField> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.08),
+          color: Colors.red.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.red.withOpacity(0.4)),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
         ),
         child: Row(
           children: [
@@ -125,7 +125,7 @@ class _VoiceNoteFieldState extends State<VoiceNoteField> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF4E9F3D).withOpacity(0.08),
+          color: const Color(0xFF4E9F3D).withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

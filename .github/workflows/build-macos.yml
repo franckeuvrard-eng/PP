@@ -6,20 +6,16 @@ on:
 
 jobs:
   build-macos:
-    # Meme runner epingle que le build iOS : Flutter 3.19 n'est pas compatible
-    # avec Xcode 16 (macos-latest).
-    runs-on: macos-14
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      - name: Select Xcode 15.4
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.47.7'
           channel: 'stable'
 
       - name: Recreate macOS platform files
@@ -40,12 +36,10 @@ jobs:
           # Service Bonjour de decouverte automatique (cf. sync_discovery.dart).
           /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" -c "Add :NSBonjourServices:0 string '_petitpas._tcp'" macos/Runner/Info.plist
           grep -n "minSize" macos/Runner/MainFlutterWindow.swift
-          # Le plugin record (notes vocales) exige macOS 10.15, le template
-          # Flutter 3.19 cible 10.14 : on realigne Podfile et projet Xcode.
-          sed -i '' -E "s/^#? *platform :osx, '[0-9.]+'/platform :osx, '10.15'/" macos/Podfile
-          sed -i '' -E 's/MACOSX_DEPLOYMENT_TARGET = [0-9.]+;/MACOSX_DEPLOYMENT_TARGET = 10.15;/g' macos/Runner.xcodeproj/project.pbxproj
-          grep -n 'platform :osx' macos/Podfile
-          grep -n 'MACOSX_DEPLOYMENT_TARGET' macos/Runner.xcodeproj/project.pbxproj
+          # Cible macOS : celle du template Flutter (12.0 depuis Flutter 3.4x),
+          # au-dessus du minimum du plugin record (10.15).
+          grep -n 'platform :osx' macos/Podfile || true
+          grep -m1 'MACOSX_DEPLOYMENT_TARGET' macos/Runner.xcodeproj/project.pbxproj
 
       - name: Install dependencies
         run: flutter pub get

@@ -76,7 +76,7 @@ class AtelierHistoryScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
                   child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
                 ),
               ],
@@ -105,7 +105,7 @@ class AtelierHistoryScreen extends StatelessWidget {
                             : Container(
                                 width: 72,
                                 height: 72,
-                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                 child: const Icon(Icons.broken_image, size: 20),
                               ),
                       );

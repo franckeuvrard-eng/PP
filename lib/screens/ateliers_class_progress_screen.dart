@@ -129,7 +129,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
           },
           children: [
             TableRow(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
               children: [
                 const SizedBox(height: rowHeight),
                 for (final atelier in ateliers)
@@ -202,7 +202,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
             width: 16,
             height: 16,
             decoration: BoxDecoration(
-              color: snapshot.hasLogInPeriod ? color : color.withOpacity(0.25),
+              color: snapshot.hasLogInPeriod ? color : color.withValues(alpha: 0.25),
               shape: BoxShape.circle,
               border: snapshot.hasLogInPeriod ? null : Border.all(color: color, width: 1.5),
             ),

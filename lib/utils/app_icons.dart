@@ -102,8 +102,8 @@ Future<String?> showAppIconPicker(BuildContext context, String? current) {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF4E9F3D).withOpacity(0.15)
-                          : Theme.of(context).colorScheme.surfaceVariant,
+                          ? const Color(0xFF4E9F3D).withValues(alpha: 0.15)
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected
                           ? Border.all(color: const Color(0xFF4E9F3D), width: 2)

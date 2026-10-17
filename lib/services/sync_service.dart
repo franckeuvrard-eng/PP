@@ -291,26 +291,26 @@ class SyncServer {
     try {
       final auth = req.headers.value('authorization') ?? '';
       if (_token.isEmpty || !_constantTimeEquals(auth, 'Bearer $_token')) {
-        return _reply(req, HttpStatus.unauthorized, {'error': 'Jeton invalide'});
+        return await _reply(req, HttpStatus.unauthorized, {'error': 'Jeton invalide'});
       }
       final path = req.uri.path;
       if (req.method == 'GET' && path == '/hello') {
-        return _reply(req, HttpStatus.ok, {
+        return await _reply(req, HttpStatus.ok, {
           'protocol': _protocol,
           'deviceId': await host.syncDeviceId(),
           'name': await host.syncDeviceName(),
         });
       }
       if (req.method == 'POST' && path == '/request') {
-        return _handleConsent(req);
+        return await _handleConsent(req);
       }
       // Tout le reste lit ou ecrit les donnees : accord prealable exige.
       final session = req.headers.value('x-sync-session') ?? '';
       if (!_sessions.containsKey(session)) {
-        return _reply(req, HttpStatus.forbidden, {'error': 'Synchronisation non acceptée'});
+        return await _reply(req, HttpStatus.forbidden, {'error': 'Synchronisation non acceptée'});
       }
       if (req.method == 'GET' && path == '/snapshot') {
-        return _reply(req, HttpStatus.ok, {
+        return await _reply(req, HttpStatus.ok, {
           'data': await host.syncSnapshot(),
           'media': await host.syncMediaList(),
         });
@@ -318,10 +318,10 @@ class SyncServer {
       if (req.method == 'GET' && path == '/media') {
         final rel = req.uri.queryParameters['path'] ?? '';
         if (!isSafeMediaPath(rel)) {
-          return _reply(req, HttpStatus.badRequest, {'error': 'Chemin refuse'});
+          return await _reply(req, HttpStatus.badRequest, {'error': 'Chemin refuse'});
         }
         final bytes = await host.syncReadMedia(rel);
-        if (bytes == null) return _reply(req, HttpStatus.notFound, {'error': 'Absent'});
+        if (bytes == null) return await _reply(req, HttpStatus.notFound, {'error': 'Absent'});
         req.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.binary
@@ -332,14 +332,14 @@ class SyncServer {
       if (req.method == 'PUT' && path == '/media') {
         final rel = req.uri.queryParameters['path'] ?? '';
         if (!isSafeMediaPath(rel)) {
-          return _reply(req, HttpStatus.badRequest, {'error': 'Chemin refuse'});
+          return await _reply(req, HttpStatus.badRequest, {'error': 'Chemin refuse'});
         }
         final bytes = await _readBytes(req, _maxMediaBytes);
         await host.syncWriteMedia(rel, bytes);
-        return _reply(req, HttpStatus.ok, {'ok': true});
+        return await _reply(req, HttpStatus.ok, {'ok': true});
       }
       if (req.method == 'POST' && path == '/apply') {
-        if (_busy) return _reply(req, HttpStatus.conflict, {'error': 'Synchronisation en cours'});
+        if (_busy) return await _reply(req, HttpStatus.conflict, {'error': 'Synchronisation en cours'});
         _busy = true;
         try {
           final body = json.decode(utf8.decode(await _readBytes(req, _maxJsonBytes)));
@@ -361,14 +361,14 @@ class SyncServer {
             mediaDownloaded: (body['mediaUploaded'] as num?)?.toInt() ?? 0,
             mediaUploaded: (body['mediaDownloaded'] as num?)?.toInt() ?? 0,
           ));
-          return _reply(req, HttpStatus.ok, {'ok': true});
+          return await _reply(req, HttpStatus.ok, {'ok': true});
         } finally {
           _busy = false;
         }
       }
-      return _reply(req, HttpStatus.notFound, {'error': 'Inconnu'});
+      return await _reply(req, HttpStatus.notFound, {'error': 'Inconnu'});
     } on _TooLarge {
-      return _reply(req, HttpStatus.requestEntityTooLarge, {'error': 'Trop volumineux'});
+      return await _reply(req, HttpStatus.requestEntityTooLarge, {'error': 'Trop volumineux'});
     } catch (e) {
       // Le detail remonte a l'autre appareil : sans lui, une erreur 500 est
       // impossible a diagnostiquer sur le terrain. Reseau local, jeton exige.
@@ -383,13 +383,13 @@ class SyncServer {
     final body = json.decode(utf8.decode(await _readBytes(req, 64 * 1024)));
     final peerId = (body is Map ? body['deviceId'] : null)?.toString() ?? '';
     final peerName = (body is Map ? body['deviceName'] : null)?.toString() ?? '';
-    if (peerId.isEmpty) return _reply(req, HttpStatus.badRequest, {'error': 'Appareil inconnu'});
+    if (peerId.isEmpty) return await _reply(req, HttpStatus.badRequest, {'error': 'Appareil inconnu'});
 
     final already = _sessions.entries.where((e) => e.value == peerId).firstOrNull;
-    if (already != null) return _reply(req, HttpStatus.ok, {'session': already.key});
+    if (already != null) return await _reply(req, HttpStatus.ok, {'session': already.key});
 
     if (_asking) {
-      return _reply(req, HttpStatus.conflict, {'error': 'Une autre demande est en cours'});
+      return await _reply(req, HttpStatus.conflict, {'error': 'Une autre demande est en cours'});
     }
     _asking = true;
     bool accepted;
@@ -402,10 +402,10 @@ class SyncServer {
     } finally {
       _asking = false;
     }
-    if (!accepted) return _reply(req, HttpStatus.forbidden, {'error': 'refused'});
+    if (!accepted) return await _reply(req, HttpStatus.forbidden, {'error': 'refused'});
     final session = _randomToken();
     _sessions[session] = peerId;
-    return _reply(req, HttpStatus.ok, {'session': session});
+    return await _reply(req, HttpStatus.ok, {'session': session});
   }
 
   Future<void> _reply(HttpRequest req, int status, Map<String, dynamic> body) async {

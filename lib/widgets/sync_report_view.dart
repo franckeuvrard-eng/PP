@@ -39,7 +39,7 @@ class SyncReportView extends StatelessWidget {
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: _green.withOpacity(0.5)),
+        side: BorderSide(color: _green.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

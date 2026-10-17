@@ -40,7 +40,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       case StatsPeriod.month:
         return DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
       case StatsPeriod.all:
-      default:
         return null;
     }
   }
@@ -60,7 +59,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return logs.where((l) =>
             l.timestamp.year == now.year && l.timestamp.month == now.month).toList();
       case StatsPeriod.all:
-      default:
         return logs;
     }
   }
@@ -209,7 +207,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: Column(
                 children: [
@@ -237,7 +235,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             child: LinearProgressIndicator(
                               value: ratio,
                               minHeight: 8,
-                              backgroundColor: color.withOpacity(0.15),
+                              backgroundColor: color.withValues(alpha: 0.15),
                               color: color,
                             ),
                           ),
@@ -269,7 +267,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                 ),
                 child: Column(
                   children: sortedDomains.map((entry) {
@@ -293,7 +291,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             child: LinearProgressIndicator(
                               value: ratio,
                               minHeight: 8,
-                              backgroundColor: const Color(0xFF4E9F3D).withOpacity(0.15),
+                              backgroundColor: const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                               color: const Color(0xFF4E9F3D),
                             ),
                           ),
@@ -331,7 +329,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: ListView.separated(
                 shrinkWrap: true,
@@ -381,7 +379,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange).withOpacity(0.15),
+                        color: (breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -434,7 +432,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: ListView.separated(
                 shrinkWrap: true,
@@ -589,7 +587,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Widget _miniCounter(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
       child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
     );
   }
@@ -633,7 +631,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ? null
           : Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
               child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
             ),
       onTap: () => Navigator.push(
@@ -890,7 +888,7 @@ class _StatCard extends StatelessWidget {
             // Un cercle blanc franc sur une carte sombre etait trop dur :
             // en mode sombre on utilise une pastille teintee.
             backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? textColor.withOpacity(0.18)
+                ? textColor.withValues(alpha: 0.18)
                 : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
@@ -901,7 +899,7 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.8))),
+                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.8))),
               ],
             ),
           ),

@@ -126,7 +126,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
   Widget _summaryChip(String label, int count, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
       child: Text('$count $label', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
     );
   }
@@ -178,7 +178,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
     if (eligibility.status == AtelierEligibility.blockedProgression) {
       return Card(
         margin: const EdgeInsets.only(bottom: 8),
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: ListTile(
           dense: true,
           leading: const Icon(Icons.lock_outline, color: Colors.grey),
@@ -206,7 +206,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
             : null,
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
           child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
         ),
         onTap: () => Navigator.push(

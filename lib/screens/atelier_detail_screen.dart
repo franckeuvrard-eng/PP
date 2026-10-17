@@ -99,7 +99,7 @@ class AtelierDetailScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.12),
+                      color: Colors.orange.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -150,7 +150,7 @@ class AtelierDetailScreen extends StatelessWidget {
                               : Container(
                                   width: 96,
                                   height: 96,
-                                  color: Theme.of(context).colorScheme.surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   child: const Icon(Icons.broken_image, size: 24),
                                 ),
                         );

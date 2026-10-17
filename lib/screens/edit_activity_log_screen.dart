@@ -139,7 +139,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: hexToColor(space.colorHex).withOpacity(0.15),
+                            color: hexToColor(space.colorHex).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -186,7 +186,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                 return ChoiceChip(
                   label: Text(status.label),
                   selected: isSelected,
-                  selectedColor: couleur.withOpacity(0.2),
+                  selectedColor: couleur.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: isSelected ? couleur : Theme.of(context).colorScheme.onSurface,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

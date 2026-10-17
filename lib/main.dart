@@ -54,7 +54,7 @@ class PetitPasApp extends StatelessWidget {
         // sert de base commune aux ecrans qui redefinissaient chacun a la
         // main `shape: RoundedRectangleBorder(borderRadius: circular(16))`
         // sur leurs Card.
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.white,
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -93,7 +93,7 @@ class PetitPasApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -127,7 +127,7 @@ class PetitPasApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
           titleMedium: TextStyle(color: Colors.white),
         ),
-        dialogTheme: const DialogTheme(
+        dialogTheme: const DialogThemeData(
           backgroundColor: Color(0xFF1E293B),
           titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),

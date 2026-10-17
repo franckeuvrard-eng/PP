@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 children: [
                   CircleAvatar(
                     radius: 44,
-                    backgroundColor: const Color(0xFF4E9F3D).withOpacity(0.15),
+                    backgroundColor: const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                     backgroundImage: (absoluteLogoPath != null && File(absoluteLogoPath).existsSync())
                         ? FileImage(File(absoluteLogoPath))
                         : null,
