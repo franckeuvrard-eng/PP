@@ -44,6 +44,9 @@ dependencies:
   # Decouverte automatique des appareils sur le Wi-Fi (Bonjour / mDNS).
   # 5.x : la 7.x change l API des evenements de decouverte (migration a part).
   bonsoir: ^7.1.5
+  # Conteneur iCloud Drive prive (iOS/macOS), code natif dans le depot.
+  petitpas_icloud:
+    path: packages/petitpas_icloud
 
 dev_dependencies:
   flutter_test:

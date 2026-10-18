@@ -28,6 +28,11 @@ jobs:
           rm -f test/widget_test.dart
           cp macos_config/DebugProfile.entitlements macos/Runner/DebugProfile.entitlements
           cp macos_config/Release.entitlements macos/Runner/Release.entitlements
+          # Identifiant definitif de l'app (le meme que sur iOS).
+          sed -i '' 's/^PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = fr.franckeuvrard.apetitspas/' macos/Runner/Configs/AppInfo.xcconfig
+          grep -n PRODUCT_BUNDLE_IDENTIFIER macos/Runner/Configs/AppInfo.xcconfig
+          # Pas de droits iCloud ici : sur Mac, une app non signee par Apple qui
+          # les declare refuse de demarrer. Ils sont ajoutes par testflight.yml.
           # Taille minimale de fenetre : en dessous, la barre laterale ecrase
           # le contenu.
           perl -0pi -e 's/super\.awakeFromNib\(\)/self.minSize = NSSize(width: 900, height: 640)\n    super.awakeFromNib()/' macos/Runner/MainFlutterWindow.swift

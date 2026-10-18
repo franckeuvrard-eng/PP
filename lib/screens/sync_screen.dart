@@ -6,10 +6,16 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:intl/intl.dart';
+
 import '../providers/app_provider.dart';
+import '../providers/cloud_sync_controller.dart';
 import '../providers/provider_sync_host.dart';
+import '../services/icloud_sync.dart';
 import '../services/sync_discovery.dart';
+import '../services/sync_merge.dart';
 import '../services/sync_service.dart';
+import '../utils/color_utils.dart';
 import '../utils/platform_support.dart';
 import '../widgets/sync_report_view.dart';
 import 'sync_confirm_screen.dart';
@@ -73,6 +79,131 @@ class _SyncScreenState extends State<SyncScreen> {
       _startServer();
       _startBrowsing();
     });
+  }
+
+  /// Apercu obligatoire avant d'ecrire (synchro Wi-Fi, ou iCloud quand des
+  /// suppressions nombreuses sont en jeu).
+  Future<bool> _confirmChanges(SyncSummary preview) async {
+    if (!mounted) return false;
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => SyncConfirmScreen(preview: preview),
+      ),
+    );
+    return ok ?? false;
+  }
+
+  Future<Map<String, Object?>?> _resolveConflicts(
+      List<MergeConflict> conflicts, String peerName, Map<String, dynamic> merged) async {
+    if (!mounted) return null;
+    return Navigator.push<Map<String, Object?>>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) =>
+            SyncConflictsScreen(conflicts: conflicts, peerName: peerName, snapshot: merged),
+      ),
+    );
+  }
+
+  Future<void> _syncICloudNow(CloudSyncController cloud) async {
+    final outcome = await cloud.syncInteractive(
+      resolveConflicts: _resolveConflicts,
+      confirmChanges: _confirmChanges,
+    );
+    if (!mounted || outcome == null) return;
+    final text = switch (outcome.status) {
+      CloudSyncStatus.synced => 'Synchronisé avec iCloud.',
+      CloudSyncStatus.upToDate => 'Déjà à jour avec iCloud.',
+      _ => outcome.message ?? 'Synchronisation iCloud non terminée.',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _buildICloudCard() {
+    final cloud = context.watch<CloudSyncController>();
+    final app = context.watch<AppStateProvider>();
+    final outcome = cloud.lastOutcome;
+    String status;
+    Color color = kMutedTextColor;
+    if (!app.iCloudSyncEnabled) {
+      status = 'Désactivée sur cet appareil.';
+    } else if (cloud.syncing) {
+      status = 'Synchronisation en cours…';
+    } else if (outcome == null) {
+      status = 'En attente de la première synchronisation.';
+    } else {
+      final time = DateFormat('HH:mm').format(outcome.at);
+      switch (outcome.status) {
+        case CloudSyncStatus.synced:
+        case CloudSyncStatus.upToDate:
+          status = 'À jour (dernière vérification à $time).';
+          color = const Color(0xFF4E9F3D);
+        case CloudSyncStatus.unavailable:
+          status = 'iCloud indisponible : connectez-vous à iCloud et activez iCloud Drive '
+              'dans les réglages de l’appareil.';
+        case CloudSyncStatus.needsConfirmation:
+        case CloudSyncStatus.needsResolution:
+          status = '${outcome.message} Rien n’a été modifié : vérifiez avant de continuer.';
+          color = const Color(0xFFB26A00);
+        case CloudSyncStatus.retryLater:
+          status = 'Nouvel essai dans un instant.';
+        case CloudSyncStatus.error:
+          status = 'Échec à $time : ${outcome.message}';
+          color = Colors.red;
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.cloud_sync, color: Color(0xFF4E9F3D)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('iCloud (iPhone, iPad, Mac)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+              Switch(
+                value: app.iCloudSyncEnabled,
+                activeThumbColor: const Color(0xFF4E9F3D),
+                onChanged: app.setICloudSyncEnabled,
+              ),
+            ]),
+            const Text(
+              'Automatique : à l’ouverture de l’app et après chaque modification. '
+              'Les données restent dans votre iCloud personnel.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Text(status, style: TextStyle(fontSize: 13, color: color)),
+            if (app.iCloudSyncEnabled) ...[
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: cloud.syncing ? null : () => _syncICloudNow(cloud),
+                icon: Icon(cloud.needsAttention ? Icons.fact_check : Icons.sync),
+                label: Text(cloud.needsAttention
+                    ? 'Vérifier et synchroniser'
+                    : 'Synchroniser maintenant'),
+              ),
+            ],
+            if (cloud.lastChanges != null && cloud.lastChangesAt != null) ...[
+              const SizedBox(height: 12),
+              SyncReportView(
+                summary: cloud.lastChanges!,
+                at: cloud.lastChangesAt!,
+                receivedFromPeer: false,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   /// « iPhone de Léa veut se synchroniser » : personne ne lit ni n'ecrit les
@@ -202,28 +333,8 @@ class _SyncScreenState extends State<SyncScreen> {
         onProgress: (s) {
           if (mounted) setState(() => _step = s);
         },
-        confirmChanges: (preview) async {
-          if (!mounted) return false;
-          final ok = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (_) => SyncConfirmScreen(preview: preview),
-            ),
-          );
-          return ok ?? false;
-        },
-        resolveConflicts: (conflicts, peerName, merged) async {
-          if (!mounted) return null;
-          return Navigator.push<Map<String, Object?>>(
-            context,
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (_) => SyncConflictsScreen(
-                  conflicts: conflicts, peerName: peerName, snapshot: merged),
-            ),
-          );
-        },
+        confirmChanges: _confirmChanges,
+        resolveConflicts: _resolveConflicts,
       );
       if (mounted) {
         setState(() {
@@ -252,6 +363,13 @@ class _SyncScreenState extends State<SyncScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (CloudSyncController.isSupported) ...[
+                _buildICloudCard(),
+                const SizedBox(height: 24),
+                const Text('Synchronisation Wi-Fi (PC Windows, ou sans iCloud)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 6),
+              ],
               const Text(
                 'Les deux appareils doivent être sur le même réseau Wi‑Fi. '
                 'Les données restent dans l’école : rien ne passe par internet.',

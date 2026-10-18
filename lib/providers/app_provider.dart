@@ -363,6 +363,17 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
+  /// Synchronisation automatique via iCloud (iPhone, iPad, Mac). Active par
+  /// defaut ; sans effet si iCloud est indisponible.
+  bool _iCloudSyncEnabled = true;
+  bool get iCloudSyncEnabled => _iCloudSyncEnabled;
+
+  void setICloudSyncEnabled(bool enabled) {
+    _iCloudSyncEnabled = enabled;
+    _write(_db.setSetting('icloud_sync_enabled', enabled.toString()));
+    _notify();
+  }
+
   bool get reminderEnabled => _reminderEnabled;
   int get reminderHour => _reminderHour;
   int get reminderMinute => _reminderMinute;
@@ -629,6 +640,7 @@ class AppStateProvider extends ChangeNotifier {
           }
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
+        _iCloudSyncEnabled = settings['icloud_sync_enabled'] != 'false';
         _reminderEnabled = settings['reminder_enabled'] == 'true';
         _reminderHour = int.tryParse(settings['reminder_hour'] ?? '') ?? _reminderHour;
         _reminderMinute = int.tryParse(settings['reminder_minute'] ?? '') ?? _reminderMinute;

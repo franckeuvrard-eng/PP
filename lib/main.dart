@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
+import 'providers/cloud_sync_controller.dart';
 import 'utils/platform_support.dart';
 import 'widgets/desktop_frame.dart';
 import 'widgets/storage_error_banner.dart';
@@ -16,8 +17,15 @@ import 'screens/settings_screen.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppStateProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        // Synchronisation iCloud automatique (iPhone, iPad, Mac seulement).
+        ChangeNotifierProvider(
+          create: (context) => CloudSyncController(context.read<AppStateProvider>()),
+          lazy: false,
+        ),
+      ],
       child: const PetitPasApp(),
     ),
   );

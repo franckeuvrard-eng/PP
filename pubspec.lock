@@ -837,6 +837,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  petitpas_icloud:
+    dependency: "direct main"
+    description:
+      path: "packages/petitpas_icloud"
+      relative: true
+    source: path
+    version: "1.0.0"
   platform:
     dependency: transitive
     description:
