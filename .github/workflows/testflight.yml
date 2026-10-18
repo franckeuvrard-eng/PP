@@ -1,0 +1,158 @@
+name: TestFlight
+
+# Construit, signe et envoie l'app iOS et macOS sur TestFlight (puis App
+# Store), avec la synchronisation iCloud active. Lancement manuel :
+# Actions > TestFlight > Run workflow.
+#
+# Secrets du depot (Settings > Secrets and variables > Actions) :
+#   APPLE_TEAM_ID       identifiant d'equipe (10 caracteres, developer.apple.com > Membership)
+#   ASC_KEY_ID          ID de la cle API App Store Connect (role Admin)
+#   ASC_ISSUER_ID       Issuer ID affiche au-dessus de la liste des cles
+#   ASC_PRIVATE_KEY     contenu complet du fichier AuthKey_XXXX.p8
+#
+# Signature automatique « cloud » : Xcode cree certificats et profils via la
+# cle API, rien a gerer a la main.
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.47.7'
+  IOS_DEPLOYMENT_TARGET: '15.0'
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check secrets
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          for v in TEAM KEY_ID ISSUER KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Secret manquant ($v) : voir l'en-tete de .github/workflows/testflight.yml"
+              exit 1
+            fi
+          done
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Prepare iOS project
+        run: |
+          bash scripts/prepare_ios.sh "${IOS_DEPLOYMENT_TARGET}"
+          flutter pub get
+          dart run flutter_launcher_icons
+
+      - name: Tests
+        run: flutter test
+
+      - name: API key
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+
+      - name: Archive and upload
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          flutter build ios --release --config-only --build-number=${{ github.run_number }}
+          AUTH=(-allowProvisioningUpdates
+                -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+                -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic "${AUTH[@]}" archive | tail -n 60
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" | tail -n 60
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check secrets
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          for v in TEAM KEY_ID ISSUER KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Secret manquant ($v) : voir l'en-tete de .github/workflows/testflight.yml"
+              exit 1
+            fi
+          done
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Prepare macOS project (avec iCloud)
+        run: |
+          bash scripts/prepare_macos.sh --icloud
+          flutter pub get
+
+      - name: API key
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+
+      - name: Archive and upload
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          flutter build macos --release --config-only --build-number=${{ github.run_number }}
+          AUTH=(-allowProvisioningUpdates
+                -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
+                -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+          xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner -configuration Release \
+            -destination 'generic/platform=macOS' -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic "${AUTH[@]}" archive | tail -n 60
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" | tail -n 60
