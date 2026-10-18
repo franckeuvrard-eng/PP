@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/file_export.dart';
 import '../models/school_year_archive.dart';
 import '../providers/app_provider.dart';
 import '../utils/color_utils.dart';
@@ -121,7 +122,7 @@ class _SchoolYearCardState extends State<SchoolYearCard> {
   }
 
   Future<void> _partager(SchoolYearArchive archive) async {
-    final ok = await widget.provider.shareArchive(archive);
+    final ok = await widget.provider.shareArchive(archive, origin: shareOriginOf(context));
     if (!ok) _toast('Fichier d\'archive introuvable sur l\'appareil.', success: false);
   }
 

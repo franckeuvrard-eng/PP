@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../utils/file_export.dart';
 import '../providers/app_provider.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
@@ -863,10 +864,16 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton.icon(
+                        child: Builder(builder: (buttonContext) => ElevatedButton.icon(
                           onPressed: () async {
                             try {
-                              await provider.exportFullBackup();
+                              final outcome = await provider.exportFullBackup(
+                                  origin: shareOriginOf(buttonContext));
+                              if (outcome == ExportOutcome.saved && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                    content: Text('Sauvegarde complète enregistrée.'),
+                                    backgroundColor: Color(0xFF4E9F3D)));
+                              }
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -878,7 +885,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                           icon: const Icon(Icons.download),
                           label: const Text('Exporter'),
                           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4E9F3D), foregroundColor: Colors.white),
-                        ),
+                        )),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -5,12 +5,12 @@ import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import '../utils/file_export.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -898,13 +898,17 @@ class AppStateProvider extends ChangeNotifier {
     return await file.exists() ? file : null;
   }
 
-  Future<bool> shareArchive(SchoolYearArchive archive) async {
+  /// [origin] : bouton touche, pour ancrer le partage sur iPad.
+  Future<bool> shareArchive(SchoolYearArchive archive, {Rect? origin}) async {
     final file = await archiveFile(archive);
     if (file == null) return false;
-    await SharePlus.instance.share(ShareParams(
-      files: [XFile(file.path, mimeType: 'application/zip')],
+    await exportFile(
+      fileName: archive.fileName,
+      bytes: await file.readAsBytes(),
+      mimeType: 'application/zip',
       subject: 'Archive A petits pas ${archive.schoolYear}',
-    ));
+      origin: origin,
+    );
     return true;
   }
 
@@ -1310,21 +1314,20 @@ class AppStateProvider extends ChangeNotifier {
     return zipBytes;
   }
 
-  Future<void> exportFullBackup() async {
+  /// Sur ordinateur : « Enregistrer sous… » ; sur iPhone/iPad : partage ancre
+  /// sur [origin] (bouton touche).
+  Future<ExportOutcome> exportFullBackup({Rect? origin}) async {
     try {
       final zipBytes = await _buildBackupArchiveBytes();
-
-      final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final zipPath = '${tempDir.path}/petitpas_backup_$timestamp.zip';
-      await File(zipPath).writeAsBytes(zipBytes);
-
-      // 4. Share
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile(zipPath, mimeType: 'application/zip')],
+      return await exportFile(
+        fileName: 'petitpas_backup_$timestamp.zip',
+        bytes: zipBytes,
+        mimeType: 'application/zip',
         subject: 'Sauvegarde A petits pas',
         text: 'Backup complet A petits pas incluant toutes les données et photos.',
-      ));
+        origin: origin,
+      );
     } catch (e) {
       debugPrint('Export error: $e');
       rethrow;

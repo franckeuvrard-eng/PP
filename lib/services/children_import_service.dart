@@ -1,11 +1,8 @@
-import 'dart:typed_data';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
 
+import '../utils/file_export.dart';
 import '../models/child.dart';
 import '../providers/app_provider.dart';
 import '../utils/color_utils.dart';
@@ -68,15 +65,17 @@ class ChildrenImportService {
       final rawBytes = excel.encode();
       if (rawBytes == null) throw Exception('Erreur lors de la génération du modèle.');
 
-      final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/APetitPas_Modele_Import_Eleves.xlsx');
-      await file.writeAsBytes(bytes);
-
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      final outcome = await exportFile(
+        fileName: 'APetitPas_Modele_Import_Eleves.xlsx',
+        bytes: rawBytes,
+        mimeType: kXlsxMime,
         subject: 'Modèle d\'import élèves A petits pas',
-      ));
+        origin: context.mounted ? shareOriginOf(context) : null,
+      );
+      if (outcome == ExportOutcome.saved && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Modèle enregistré. Remplissez-le puis utilisez « Importer ».')));
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
