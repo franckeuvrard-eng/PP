@@ -433,6 +433,15 @@ void main() {
       await SyncClient(ProviderSyncHost(phone)).sync(SyncPairing(
           hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: ''));
       expect(phone.children.any((c) => c.id == 'child_sync'), isFalse);
+
+      // La photo n'est plus utilisee : a la corbeille, pas effacee...
+      expect(await phone.readSyncMedia('profiles/lea.jpg'), isNull);
+      // ...et restaurer la sauvegarde d'avant synchro la fait revenir.
+      final avantSynchro = (await phone.listAutoBackups())
+          .firstWhere((f) => f.path.contains(kSyncBackupSuffix));
+      expect(await phone.restoreAutoBackup(avantSynchro), isTrue);
+      expect(phone.children.any((c) => c.id == 'child_sync'), isTrue);
+      expect(await phone.readSyncMedia('profiles/lea.jpg'), Uint8List.fromList([7, 7, 7]));
     });
   });
 }

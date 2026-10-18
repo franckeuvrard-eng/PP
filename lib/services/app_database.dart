@@ -456,6 +456,12 @@ class AppDatabase {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// Supprime tous les reglages dont la cle commence par [prefix].
+  Future<void> deleteSettingsWithPrefix(String prefix) async {
+    final db = await _database;
+    await db.delete('settings', where: 'substr(key, 1, ?) = ?', whereArgs: [prefix.length, prefix]);
+  }
+
   // ─────────────── Remplacement global (restauration de sauvegarde) ───────────────
 
   Future<void> replaceAll({

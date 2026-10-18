@@ -832,6 +832,8 @@ class AppStateProvider extends ChangeNotifier {
       sons: _sonsProgress,
     );
     await _restoreReferentialsFrom(data);
+    // Photos des donnees restaurees, si elles etaient parties a la corbeille.
+    await restoreMediaFromTrash();
     _notify();
   }
 
@@ -981,10 +983,41 @@ class AppStateProvider extends ChangeNotifier {
   ///
   /// Supprimer une observation ou un atelier laissait jusqu'ici ses fichiers
   /// en place : le stockage ne faisait que croitre.
+  ///
+  /// Les fichiers ne sont pas effaces mais deplaces dans la corbeille des
+  /// medias ([_mediaTrashDir]), videe apres [_mediaTrashRetention] : une
+  /// synchronisation ou une suppression malheureuse ne doit jamais faire
+  /// perdre de photos (restaurer une sauvegarde les fait revenir).
   Future<int> purgeOrphanPhotos() async {
     try {
       _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
-      final referenced = <String>{
+      final referenced = _referencedMedia();
+
+      var removed = 0;
+      for (final subDir in _mediaSubDirs) {
+        final dir = Directory('$_docsDirPath/$subDir');
+        if (!await dir.exists()) continue;
+        for (final file in dir.listSync().whereType<File>()) {
+          final name = file.path.split(Platform.pathSeparator).last;
+          if (referenced.contains('$subDir/$name')) continue;
+          await _moveToMediaTrash(file, subDir, name);
+          removed++;
+        }
+      }
+      if (removed > 0) debugPrint('Photos orphelines mises a la corbeille : $removed');
+      await _emptyOldMediaTrash();
+      return removed;
+    } catch (e) {
+      debugPrint('Echec de la purge des photos : $e');
+      return 0;
+    }
+  }
+
+  /// Corbeille des photos et notes vocales, sous les documents de l'app.
+  static const _mediaTrashDir = 'corbeille_medias';
+  static const _mediaTrashRetention = Duration(days: 60);
+
+  Set<String> _referencedMedia() => <String>{
         for (final c in _children)
           if (c.imagePath != null && c.imagePath!.isNotEmpty) c.imagePath!,
         for (final a in _activityTypes) ...a.allPhotoPaths,
@@ -995,21 +1028,47 @@ class AppStateProvider extends ChangeNotifier {
           _classSettings.logoPath!,
       }.map(_normalizeRelPath).toSet();
 
-      var removed = 0;
-      for (final subDir in _mediaSubDirs) {
-        final dir = Directory('$_docsDirPath/$subDir');
-        if (!await dir.exists()) continue;
-        for (final file in dir.listSync().whereType<File>()) {
-          final name = file.path.split(Platform.pathSeparator).last;
-          if (referenced.contains('$subDir/$name')) continue;
-          await file.delete();
-          removed++;
-        }
+  Future<void> _moveToMediaTrash(File file, String subDir, String name) async {
+    final target = File('$_docsDirPath/$_mediaTrashDir/$subDir/$name');
+    await target.parent.create(recursive: true);
+    try {
+      await file.rename(target.path);
+    } on FileSystemException {
+      await file.copy(target.path);
+      await file.delete();
+    }
+    // Date de mise a la corbeille, pour la duree de conservation.
+    await target.setLastModified(DateTime.now());
+  }
+
+  Future<void> _emptyOldMediaTrash() async {
+    final trash = Directory('$_docsDirPath/$_mediaTrashDir');
+    if (!await trash.exists()) return;
+    final limit = DateTime.now().subtract(_mediaTrashRetention);
+    for (final f in trash.listSync(recursive: true).whereType<File>()) {
+      if (f.lastModifiedSync().isBefore(limit)) await f.delete();
+    }
+  }
+
+  /// Remet en place, depuis la corbeille, les photos et notes vocales
+  /// utilisees par les donnees actuelles mais absentes du disque (apres une
+  /// restauration de sauvegarde ou une synchronisation qui les reutilise).
+  Future<int> restoreMediaFromTrash() async {
+    try {
+      _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+      var restored = 0;
+      for (final rel in _referencedMedia()) {
+        final current = File('$_docsDirPath/$rel');
+        final trashed = File('$_docsDirPath/$_mediaTrashDir/$rel');
+        if (await current.exists() || !await trashed.exists()) continue;
+        await current.parent.create(recursive: true);
+        await trashed.rename(current.path);
+        restored++;
       }
-      if (removed > 0) debugPrint('Photos orphelines supprimees : $removed');
-      return removed;
+      if (restored > 0) debugPrint('Medias recuperes de la corbeille : $restored');
+      return restored;
     } catch (e) {
-      debugPrint('Echec de la purge des photos : $e');
+      debugPrint('Echec de la recuperation des medias : $e');
       return 0;
     }
   }
@@ -1795,6 +1854,11 @@ class AppStateProvider extends ChangeNotifier {
     // Sans sauvegarde, pas d'effacement : il serait irrattrapable.
     if (!await _writeAutoBackup()) return false;
 
+    // Un appareil remis a zero repart comme neuf pour la synchronisation :
+    // sans etat commun memorise, la prochaine synchro le re-remplit depuis
+    // l'autre appareil au lieu de propager l'effacement chez lui.
+    await _db.deleteSettingsWithPrefix('sync_base_');
+
     if (clearChildren) {
       _children = [];
       _sonsProgress = {};
@@ -1859,10 +1923,12 @@ class AppStateProvider extends ChangeNotifier {
         final directory = await getApplicationDocumentsDirectory();
         _docsDirPath = directory.path;
       }
+      // A la corbeille plutot qu'effacees : recuperables pendant 60 jours.
       for (final subDir in _mediaSubDirs) {
         final dir = Directory('$_docsDirPath/$subDir');
-        if (await dir.exists()) {
-          await dir.delete(recursive: true);
+        if (!await dir.exists()) continue;
+        for (final file in dir.listSync().whereType<File>()) {
+          await _moveToMediaTrash(file, subDir, file.path.split(Platform.pathSeparator).last);
         }
       }
     } catch (e) {

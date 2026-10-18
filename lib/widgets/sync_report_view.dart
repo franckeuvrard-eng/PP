@@ -16,6 +16,7 @@ class SyncReportView extends StatelessWidget {
     required this.summary,
     required this.at,
     required this.receivedFromPeer,
+    this.preview = false,
   });
 
   final SyncSummary summary;
@@ -23,6 +24,10 @@ class SyncReportView extends StatelessWidget {
 
   /// Vrai quand c'est l'autre appareil qui a lance la synchronisation.
   final bool receivedFromPeer;
+
+  /// Apercu avant synchronisation (rien n'est encore ecrit) : memes listes,
+  /// au futur, sans titre.
+  final bool preview;
 
   /// Au-dela, une categorie affiche « … et N autres » (premiere synchro).
   static const _maxLines = 40;
@@ -46,7 +51,7 @@ class SyncReportView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
+            if (!preview) Row(children: [
               const Icon(Icons.check_circle, color: _green),
               const SizedBox(width: 8),
               Expanded(
@@ -60,15 +65,17 @@ class SyncReportView extends StatelessWidget {
                 ),
               ),
             ]),
-            if (upToDate)
+            if (upToDate && !preview)
               const Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Text('Les deux appareils avaient déjà les mêmes données : rien n’a changé.',
                     style: TextStyle(fontSize: 13)),
               )
             else ...[
-              _side(context, 'Sur cet appareil', here, received: summary.mediaDownloaded),
-              _side(context, 'Sur $peer', there, received: summary.mediaUploaded),
+              _side(context, preview ? 'Ce qui va changer sur CET appareil' : 'Sur cet appareil',
+                  here, received: summary.mediaDownloaded),
+              _side(context, preview ? 'Ce qui va changer sur $peer' : 'Sur $peer', there,
+                  received: summary.mediaUploaded),
               if (summary.conflicts > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
@@ -79,12 +86,15 @@ class SyncReportView extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: Color(0xFFB26A00)),
                   ),
                 ),
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
-                  'Une sauvegarde a été faite juste avant sur chaque appareil '
-                  '(Réglages › Sauvegardes automatiques, « Avant synchronisation »).',
-                  style: TextStyle(fontSize: 11, color: kMutedTextColor),
+                  preview
+                      ? 'Une sauvegarde sera faite juste avant sur chaque appareil, et les '
+                          'photos retirées restent 60 jours dans la corbeille.'
+                      : 'Une sauvegarde a été faite juste avant sur chaque appareil '
+                          '(Réglages › Sauvegardes automatiques, « Avant synchronisation »).',
+                  style: const TextStyle(fontSize: 11, color: kMutedTextColor),
                 ),
               ),
             ],
@@ -129,7 +139,10 @@ class SyncReportView extends StatelessWidget {
           if (received > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text('Photos et notes vocales : $received reçue(s)',
+              child: Text(
+                  preview
+                      ? 'Photos et notes vocales : $received à recevoir'
+                      : 'Photos et notes vocales : $received reçue(s)',
                   style: const TextStyle(fontSize: 13)),
             ),
         ],

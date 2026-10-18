@@ -100,6 +100,12 @@ Set<String> referencedMedia(Map<String, dynamic> snapshot) {
 }
 
 const int kSyncDefaultPort = 48765;
+
+/// Cle speciale des empreintes de base : identifiant tire a chaque
+/// synchronisation et enregistre des deux cotes. Une base n'est utilisee que
+/// si les deux appareils ont le meme : un appareil remis a zero (qui a oublie
+/// la sienne) ne peut alors jamais faire passer son vide pour des suppressions.
+const String kSyncGenerationKey = '\u0002generation';
 // 2 : accord explicite de l'appareil qui recoit (/request + jeton de session).
 const int _protocol = 2;
 
@@ -310,9 +316,11 @@ class SyncServer {
         return await _reply(req, HttpStatus.forbidden, {'error': 'Synchronisation non acceptée'});
       }
       if (req.method == 'GET' && path == '/snapshot') {
+        final base = await host.syncLoadBase(_sessions[session]!);
         return await _reply(req, HttpStatus.ok, {
           'data': await host.syncSnapshot(),
           'media': await host.syncMediaList(),
+          'baseGeneration': base?[kSyncGenerationKey],
         });
       }
       if (req.method == 'GET' && path == '/media') {
@@ -479,6 +487,7 @@ class SyncClient {
     Future<Map<String, Object?>?> Function(
             List<MergeConflict> conflicts, String peerName, Map<String, dynamic> merged)?
         resolveConflicts,
+    Future<bool> Function(SyncSummary preview)? confirmChanges,
   }) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
     try {
@@ -501,25 +510,59 @@ class SyncClient {
 
       onProgress?.call('Fusion…');
       final local = await host.syncSnapshot();
-      final mergeBase = await host.syncLoadBase(peerId);
+      // Base commune seulement si les deux appareils ont la meme generation.
+      var mergeBase = await host.syncLoadBase(peerId);
+      final localGeneration = mergeBase?[kSyncGenerationKey];
+      if (localGeneration == null || localGeneration != remote['baseGeneration']) {
+        mergeBase = null;
+      }
       var result = SyncMerge.merge(local: local, remote: remoteData, base: mergeBase);
+      var waited = false;
       if (result.conflicts.isNotEmpty && resolveConflicts != null) {
         onProgress?.call('En attente de vos choix…');
+        waited = true;
         final choices = await resolveConflicts(result.conflicts, peerName, result.snapshot);
         if (choices == null) {
           throw SyncException('Synchronisation annulée : rien n’a été modifié.');
         }
-        // Le choix peut prendre du temps : si l'autre appareil a ete modifie
-        // entre-temps, appliquer la fusion ecraserait ces modifications.
-        // Comparaison par empreintes : `exportedAt` change a chaque lecture.
+        result = SyncMerge.merge(
+            local: local, remote: remoteData, base: mergeBase, resolutions: choices);
+      }
+
+      // Medias utiles a la fusion : seuls ceux encore utilises voyagent, une
+      // photo supprimee d'un cote ne doit pas etre renvoyee par l'autre.
+      final needed = referencedMedia(result.snapshot);
+      final localMedia = (await host.syncMediaList()).toSet().intersection(needed);
+      remoteMedia.retainAll(needed);
+      final toDownload = remoteMedia.difference(localMedia);
+      final toUpload = localMedia.difference(remoteMedia);
+
+      // Rien n'est ecrit sans que l'utilisateur ait vu, appareil par
+      // appareil, ce qui va etre ajoute, modifie et SUPPRIME.
+      if (confirmChanges != null &&
+          (result.stats.changes.isNotEmpty || toDownload.isNotEmpty || toUpload.isNotEmpty)) {
+        onProgress?.call('En attente de votre confirmation…');
+        waited = true;
+        final ok = await confirmChanges(SyncSummary(
+          peerName: peerName,
+          changes: result.stats.changes,
+          snapshot: result.snapshot,
+          mediaDownloaded: toDownload.length,
+          mediaUploaded: toUpload.length,
+        ));
+        if (!ok) throw SyncException('Synchronisation annulée : rien n’a été modifié.');
+      }
+
+      // L'attente peut etre longue : si l'autre appareil a ete modifie
+      // entre-temps, appliquer la fusion ecraserait ces modifications.
+      // Comparaison par empreintes : `exportedAt` change a chaque lecture.
+      if (waited) {
         final again = await _getJson(client, base, pairing.token, '/snapshot');
         if (_contentHash(Map<String, dynamic>.from(again['data'] as Map)) !=
             _contentHash(remoteData)) {
-          throw SyncException('$peerName a été modifié pendant vos choix : '
+          throw SyncException('$peerName a été modifié entre-temps : '
               'relancez la synchronisation (rien n’a été modifié).');
         }
-        result = SyncMerge.merge(
-            local: local, remote: remoteData, base: mergeBase, resolutions: choices);
       }
 
       // Sauvegarde d'ici avant toute ecriture, sur l'un ou l'autre appareil.
@@ -531,22 +574,17 @@ class SyncClient {
             'Rien n’a été modifié.');
       }
 
-      // Medias d'abord : les donnees fusionnees y font reference. Seuls ceux
-      // encore utilises voyagent : une photo supprimee d'un cote ne doit pas
-      // etre renvoyee par l'autre (chaque appareil purge ensuite les siennes).
-      final needed = referencedMedia(result.snapshot);
-      final localMedia = (await host.syncMediaList()).toSet().intersection(needed);
-      remoteMedia.retainAll(needed);
+      // Medias d'abord : les donnees fusionnees y font reference.
       var downloaded = 0;
       var uploaded = 0;
-      for (final rel in remoteMedia.difference(localMedia)) {
+      for (final rel in toDownload) {
         if (!isSafeMediaPath(rel)) continue;
         onProgress?.call('Réception des photos ($downloaded)…');
         final bytes = await _getBytes(client, base, pairing.token, '/media?path=${Uri.encodeQueryComponent(rel)}');
         await host.syncWriteMedia(rel, bytes);
         downloaded++;
       }
-      for (final rel in localMedia.difference(remoteMedia)) {
+      for (final rel in toUpload) {
         if (!isSafeMediaPath(rel)) continue;
         final bytes = await host.syncReadMedia(rel);
         if (bytes == null) continue;
@@ -556,19 +594,20 @@ class SyncClient {
       }
 
       onProgress?.call('Enregistrement…');
+      final fingerprints = {...result.fingerprints, kSyncGenerationKey: _randomToken()};
       // L'autre appareil d'abord : s'il echoue, rien n'a change ici et la
       // prochaine tentative repart de la meme base.
       await _postJson(client, base, pairing.token, '/apply', {
         'deviceId': await host.syncDeviceId(),
         'deviceName': await host.syncDeviceName(),
         'data': result.snapshot,
-        'fingerprints': result.fingerprints,
+        'fingerprints': fingerprints,
         'changes': [for (final c in result.stats.changes) c.flipped().toMap()],
         'mediaDownloaded': downloaded,
         'mediaUploaded': uploaded,
       });
       await host.syncApply(result.snapshot);
-      await host.syncSaveBase(peerId, result.fingerprints);
+      await host.syncSaveBase(peerId, fingerprints);
 
       return SyncSummary(
         peerName: peerName,

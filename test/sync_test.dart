@@ -329,6 +329,60 @@ void main() {
       expect(phone.backups, 2); // une par tentative arrivee jusqu'a l'echec du Mac, puis la bonne
     });
 
+    test('appareil remis a zero : re-rempli, l\'autre ne perd rien, quel que soit le lanceur',
+        () async {
+      for (final resetIsClient in [true, false]) {
+        final mac = FakeHost('mac', snap([alice, bob]));
+        final phone = FakeHost('phone', snap([alice, bob]));
+        final server = SyncServer(mac);
+        final started = await server.start();
+        final pairing = SyncPairing(
+            hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+        await SyncClient(phone).sync(pairing); // base commune etablie
+
+        // Remise a zero d'un appareil : donnees videes, base oubliee.
+        final reset = resetIsClient ? phone : mac;
+        final other = resetIsClient ? mac : phone;
+        reset.data = snap([]);
+        reset.bases.clear();
+
+        await SyncClient(phone).sync(pairing);
+        expect((other.data['children'] as List).length, 2, reason: 'resetIsClient=$resetIsClient');
+        expect((reset.data['children'] as List).length, 2, reason: 'resetIsClient=$resetIsClient');
+        await server.stop();
+      }
+    });
+
+    test('apercu obligatoire : suppressions annoncees, refus sans rien modifier', () async {
+      final mac = FakeHost('mac', snap([alice, bob]));
+      final phone = FakeHost('phone', snap([alice, bob]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+      await SyncClient(phone).sync(pairing);
+
+      // Suppression volontaire sur l'iPhone (sans remise a zero).
+      phone.data = snap([alice]);
+      SyncSummary? seen;
+      await expectLater(
+        SyncClient(phone).sync(pairing, confirmChanges: (p) async {
+          seen = p;
+          return false;
+        }),
+        throwsA(isA<SyncException>()),
+      );
+      final deletedOnMac = seen!.changes
+          .where((c) => !c.onLocal && c.kind == ChangeKind.deleted)
+          .map((c) => c.key);
+      expect(deletedOnMac, ['b']);
+      expect((mac.data['children'] as List).length, 2); // refus : rien ecrit
+
+      await SyncClient(phone).sync(pairing, confirmChanges: (_) async => true);
+      expect((mac.data['children'] as List).length, 1);
+    });
+
     test('compte rendu detaille sur les deux appareils', () async {
       const lea = {'id': 'l', 'firstname': 'Léa', 'lastname': 'Martin'};
       const tom = {'id': 't', 'firstname': 'Tom', 'lastname': 'Petit'};
