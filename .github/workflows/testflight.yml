@@ -14,6 +14,12 @@ name: TestFlight
 # cle API, rien a gerer a la main.
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Plateformes a envoyer'
+        type: choice
+        options: [ios-et-macos, ios, macos]
+        default: ios-et-macos
 
 env:
   FLUTTER_VERSION: '3.47.7'
@@ -21,6 +27,7 @@ env:
 
 jobs:
   ios:
+    if: inputs.platforms != 'macos'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -69,7 +76,7 @@ jobs:
           ISSUER: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           set -o pipefail
-          flutter build ios --release --config-only --build-number=${{ github.run_number }}
+          flutter build ios --release --config-only --no-codesign --build-number=${{ github.run_number }}
           AUTH=(-allowProvisioningUpdates
                 -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${KEY_ID}.p8"
                 -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
@@ -92,6 +99,7 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" | tail -n 60
 
   macos:
+    if: inputs.platforms != 'ios'
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
