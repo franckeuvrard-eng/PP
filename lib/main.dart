@@ -15,6 +15,9 @@ import 'screens/children_manager_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 
+/// Polices emoji des systemes cibles (iOS/macOS, Windows, autres).
+const kEmojiFontFallback = ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'];
+
 void main() {
   runApp(
     MultiProvider(
@@ -47,6 +50,8 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
+        // Emojis des ateliers : police couleur de chaque systeme.
+        fontFamilyFallback: kEmojiFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF4E9F3D),
@@ -81,6 +86,7 @@ class PetitPasApp extends StatelessWidget {
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Color(0xFF2D3748)),
           titleTextStyle: TextStyle(
+            fontFamily: 'Outfit',
             color: Color(0xFF2D3748),
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -91,6 +97,7 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
+        fontFamilyFallback: kEmojiFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF66BB6A),
@@ -113,6 +120,7 @@ class PetitPasApp extends StatelessWidget {
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Colors.white),
           titleTextStyle: TextStyle(
+            fontFamily: 'Outfit',
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -137,7 +145,7 @@ class PetitPasApp extends StatelessWidget {
         ),
         dialogTheme: const DialogThemeData(
           backgroundColor: Color(0xFF1E293B),
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          titleTextStyle: TextStyle(fontFamily: 'Outfit', color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),
         ),
         snackBarTheme: const SnackBarThemeData(

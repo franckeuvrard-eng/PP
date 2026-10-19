@@ -331,7 +331,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
-              child: ListView.separated(
+              // Material transparent : sans lui, le fond blanc masquait l'effet
+              // de toucher des lignes depliables.
+              child: Material(
+                type: MaterialType.transparency,
+                child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: sortedChildren.length,
@@ -421,6 +425,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     ],
                   );
                 },
+              ),
               ),
             ),
             const SizedBox(height: 24),

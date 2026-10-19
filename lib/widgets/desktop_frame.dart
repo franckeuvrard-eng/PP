@@ -76,9 +76,10 @@ class DesktopFrame extends StatelessWidget {
             backgroundColor: theme.cardColor,
             indicatorColor: _green.withValues(alpha: 0.15),
             selectedIconTheme: const IconThemeData(color: _green),
-            selectedLabelTextStyle: const TextStyle(
+            // A partir du theme : garde la police de l'app (un TextStyle nu la perdait).
+            selectedLabelTextStyle: theme.textTheme.labelLarge?.copyWith(
                 color: _green, fontWeight: FontWeight.bold, fontSize: 14),
-            unselectedLabelTextStyle: TextStyle(
+            unselectedLabelTextStyle: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14),
             // Largeur fixe : le rail donne a `leading` une largeur non bornee,

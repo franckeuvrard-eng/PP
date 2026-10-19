@@ -201,6 +201,7 @@ class QrGeneratorScreen extends StatelessWidget {
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'fab_badges_qr',
           onPressed: () => _showExportDialog(context, provider),
           backgroundColor: const Color(0xFFFF7043),
           icon: const Icon(Icons.download, color: Colors.white),

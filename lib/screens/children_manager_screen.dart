@@ -91,6 +91,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_eleves', // onglets charges cote a cote : etiquettes Hero distinctes
         onPressed: () => _openChildDialog(context, provider),
         backgroundColor: const Color(0xFF4E9F3D),
         icon: const Icon(Icons.person_add, color: Colors.white),

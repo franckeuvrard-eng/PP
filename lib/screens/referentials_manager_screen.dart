@@ -24,6 +24,7 @@ class ReferentialsManagerScreen extends StatelessWidget {
         title: const Text('Référentiels personnalisés'),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_referentiels',
         backgroundColor: const Color(0xFF4E9F3D),
         onPressed: () => Navigator.push(
           context,
