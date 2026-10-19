@@ -7,40 +7,6 @@ import 'package:petitpas/services/sync_service.dart';
 
 import 'support/sync_fakes.dart';
 
-/// iCloud simule en memoire : un seul dossier partage par tous les appareils.
-class FakeCloud implements CloudFolder {
-  final files = <String, Uint8List>{};
-  bool available = true;
-
-  /// Appele juste avant chaque lecture : permet de simuler un autre appareil
-  /// qui ecrit pendant une synchronisation.
-  void Function()? beforeRead;
-
-  @override
-  Future<bool> isAvailable() async => available;
-  @override
-  Future<bool> exists(String rel) async => files.containsKey(rel);
-  @override
-  Future<List<String>> list(String relDir) async => [
-        for (final k in files.keys)
-          if (k.startsWith('$relDir/')) k.substring(relDir.length + 1),
-      ];
-  @override
-  Future<bool> ensureDownloaded(String rel) async => files.containsKey(rel);
-  @override
-  Future<Uint8List?> read(String rel) async {
-    beforeRead?.call();
-    return files[rel];
-  }
-
-  @override
-  Future<void> write(String rel, Uint8List bytes) async => files[rel] = bytes;
-  @override
-  Future<List<Uint8List>> conflictVersions(String rel) async => const [];
-  @override
-  Future<void> resolveConflicts(String rel) async {}
-}
-
 List<String> ids(FakeHost h) => [for (final c in h.data['children'] as List) c['id'] as String];
 
 Map<String, dynamic> child(String id, [String name = '']) =>
@@ -126,6 +92,25 @@ void main() {
         resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'firstname'})});
     expect(chosen.status, CloudSyncStatus.synced);
     expect((phone.data['children'] as List).first['firstname'], 'Alice');
+  });
+
+  test('appareil neuf (exemples seulement) : iCloud fait foi sans question ; '
+      'appareil avec ses propres donnees : question posee', () async {
+    // Dans iCloud : l'exemple child_1 renomme par l'enseignante.
+    mac.data = snap([child('child_1', 'Léo (modifié)'), child('a')]);
+    await on(mac).sync();
+
+    // iPhone neuf : seulement les exemples de l'installation.
+    phone.data = snap([child('child_1', 'Léo')]);
+    final fresh = await on(phone).sync();
+    expect(fresh.status, CloudSyncStatus.synced);
+    expect((phone.data['children'] as List).firstWhere((c) => c['id'] == 'child_1')['firstname'],
+        'Léo (modifié)');
+
+    // iPad avec un eleve a lui : la meme difference est une vraie question.
+    final ipad = FakeHost('ipad', snap([child('child_1', 'Léo'), child('mien')]));
+    final asked = await CloudSync(ipad, cloud).sync();
+    expect(asked.status, CloudSyncStatus.needsResolution);
   });
 
   test('photos : envoyees puis recuperees, seules celles utilisees voyagent', () async {

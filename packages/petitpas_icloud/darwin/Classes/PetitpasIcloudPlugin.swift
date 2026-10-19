@@ -23,6 +23,8 @@ public class PetitpasIcloudPlugin: NSObject, FlutterPlugin {
     #endif
     let channel = FlutterMethodChannel(name: "petitpas/icloud", binaryMessenger: messenger)
     registrar.addMethodCallDelegate(PetitpasIcloudPlugin(), channel: channel)
+    FlutterEventChannel(name: "petitpas/icloud/changes", binaryMessenger: messenger)
+      .setStreamHandler(ICloudChangeWatcher())
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -159,5 +161,48 @@ public class PetitpasIcloudPlugin: NSObject, FlutterPlugin {
 
   private func err(_ message: String) -> NSError {
     NSError(domain: "petitpas_icloud", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+  }
+}
+
+/// Previent Flutter des que iCloud apporte une nouvelle version d'un fichier
+/// du conteneur (ecrit par un autre appareil), pour synchroniser aussitot au
+/// lieu d'attendre la verification periodique.
+///
+/// Arguments d'ecoute : { "name": nom du fichier surveille }. Un evenement
+/// (nil) est envoye a chaque changement signale par iCloud.
+class ICloudChangeWatcher: NSObject, FlutterStreamHandler {
+  private var query: NSMetadataQuery?
+  private var sink: FlutterEventSink?
+  private var observers: [NSObjectProtocol] = []
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    let name = (arguments as? [String: Any])?["name"] as? String ?? "classe.json"
+    sink = events
+    // NSMetadataQuery doit vivre sur le fil principal (boucle d'evenements).
+    DispatchQueue.main.async {
+      let q = NSMetadataQuery()
+      q.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
+      q.predicate = NSPredicate(format: "%K == %@", NSMetadataItemFSNameKey, name)
+      let center = NotificationCenter.default
+      for n in [Notification.Name.NSMetadataQueryDidUpdate, .NSMetadataQueryDidFinishGathering] {
+        self.observers.append(center.addObserver(forName: n, object: q, queue: .main) { [weak self] _ in
+          self?.sink?(nil)
+        })
+      }
+      self.query = q
+      q.start()
+    }
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    DispatchQueue.main.async {
+      self.query?.stop()
+      self.query = nil
+      for o in self.observers { NotificationCenter.default.removeObserver(o) }
+      self.observers = []
+    }
+    sink = nil
+    return nil
   }
 }

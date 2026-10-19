@@ -46,4 +46,12 @@ class PetitpasIcloud {
   /// Marque les conflits comme resolus (apres les avoir fusionnes).
   Future<void> resolveConflicts(String path) =>
       _channel.invokeMethod<void>('resolveConflicts', {'path': path});
+
+  static const _changes = EventChannel('petitpas/icloud/changes');
+
+  /// Un evenement chaque fois qu'iCloud signale une nouvelle version du
+  /// fichier [fileName] du conteneur (ecrite par un autre appareil). A ecouter
+  /// apres un premier [containerDocuments].
+  Stream<void> changes(String fileName) =>
+      _changes.receiveBroadcastStream({'name': fileName}).map((_) {});
 }

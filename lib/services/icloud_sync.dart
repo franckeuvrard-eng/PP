@@ -4,6 +4,8 @@ import 'dart:typed_data';
 
 import 'package:petitpas_icloud/petitpas_icloud.dart';
 
+import '../data/seed_ids.dart';
+
 import 'sync_merge.dart';
 import 'sync_service.dart';
 
@@ -23,6 +25,10 @@ abstract class CloudFolder {
   Future<void> write(String rel, Uint8List bytes);
   Future<List<Uint8List>> conflictVersions(String rel);
   Future<void> resolveConflicts(String rel);
+
+  /// Signale qu'un autre appareil a depose une nouvelle version de [rel]
+  /// (pour synchroniser aussitot). Peut ne jamais rien emettre.
+  Stream<void> changes(String rel);
 }
 
 /// Le vrai conteneur iCloud Drive (iOS et macOS).
@@ -68,6 +74,8 @@ class ICloudFolder implements CloudFolder {
       plugin.conflictVersions(await _abs(rel));
   @override
   Future<void> resolveConflicts(String rel) async => plugin.resolveConflicts(await _abs(rel));
+  @override
+  Stream<void> changes(String rel) => plugin.changes(rel.split('/').last);
 }
 
 enum CloudSyncStatus {
@@ -187,7 +195,18 @@ class CloudSync {
     if (base == null || base[kSyncGenerationKey] != lineage) base = null;
     var result = SyncMerge.merge(local: local, remote: remoteData, base: base);
 
-    if (result.conflicts.isNotEmpty) {
+    // Appareil neuf (jamais synchronise, ni eleve ni observation) : ses
+    // differences ne sont que les exemples crees a l'installation. iCloud fait
+    // foi, sans poser de question qui bloquerait la premiere synchro.
+    var resolved = false;
+    if (result.conflicts.isNotEmpty && base == null && cloud != null && _isFreshInstall(local)) {
+      result = SyncMerge.merge(local: local, remote: remoteData, base: base, resolutions: {
+        for (final c in result.conflicts) c.id: c.remote,
+      });
+      resolved = true;
+    }
+
+    if (result.conflicts.isNotEmpty && !resolved) {
       final summary = _summary(result, 0, 0);
       if (resolveConflicts == null) {
         return CloudSyncOutcome(CloudSyncStatus.needsResolution, summary: summary,
@@ -294,6 +313,14 @@ class CloudSync {
         'updatedBy': by,
         'data': data,
       })));
+
+  /// Rien de saisi sur cet appareil : ses eleves et observations sont tous
+  /// des exemples de l'installation (ou il n'y en a aucun).
+  static bool _isFreshInstall(Map<String, dynamic> local) {
+    bool onlySeeds(String key, Set<String> seeds) => (local[key] as List? ?? const [])
+        .every((r) => r is Map && seeds.contains(r['id']));
+    return onlySeeds('children', kSeedChildIds) && onlySeeds('activities', kSeedActivityIds);
+  }
 
   static Map<String, String> _base(MergeResult r, String lineage) =>
       {...r.fingerprints, kSyncGenerationKey: lineage};

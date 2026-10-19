@@ -12,7 +12,8 @@ import 'provider_sync_host.dart';
 /// Synchronisation iCloud automatique (iPhone, iPad, Mac).
 ///
 /// Se declenche a l'ouverture, au retour au premier plan, quelques secondes
-/// apres chaque modification, et regulierement. Toute situation delicate
+/// apres chaque modification, des qu'iCloud signale une version deposee par un
+/// autre appareil, regulierement, et a la demande (tirer pour actualiser). Toute situation delicate
 /// (conflit, suppressions nombreuses) est mise en attente sans rien ecrire :
 /// [lastOutcome] la signale et l'ecran de synchronisation propose de la
 /// trancher avec [syncInteractive].
@@ -22,14 +23,19 @@ class CloudSyncController extends ChangeNotifier with WidgetsBindingObserver {
     if (!isSupported) return;
     WidgetsBinding.instance.addObserver(this);
     app.addListener(_onAppChanged);
-    _timer = Timer.periodic(const Duration(minutes: 3), (_) => _autoSync());
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _autoSync());
   }
 
   final AppStateProvider app;
   final CloudSync _sync;
   Timer? _timer;
   Timer? _debounce;
+  StreamSubscription<void>? _watch;
   bool _syncing = false;
+  bool _disposed = false;
+
+  /// Synchronisation en cours, a attendre avant d'en lancer une autre.
+  Future<CloudSyncOutcome>? _current;
   bool _startedOnce = false;
 
   CloudSyncOutcome? lastOutcome;
@@ -61,8 +67,36 @@ class CloudSyncController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     // Les modifications arrivent par rafales (saisie) : on attend le calme.
+    _schedule(const Duration(seconds: 3));
+  }
+
+  void _schedule(Duration delay) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 8), _autoSync);
+    _debounce = Timer(delay, _autoSync);
+  }
+
+  /// Ecoute les nouvelles versions deposees par les autres appareils (une
+  /// fois iCloud confirme disponible, sinon l'ecoute native echouerait).
+  void _ensureWatching() {
+    if (_watch != null) return;
+    _watch = _sync.folder.changes(CloudSync.classFile).listen(
+      (_) => _schedule(const Duration(milliseconds: 1500)),
+      onError: (Object _) => _watch = null, // nouvel essai a la prochaine synchro
+      cancelOnError: true,
+    );
+  }
+
+  /// Tirer pour actualiser : synchronise tout de suite. Ne repose pas une
+  /// question en attente (conflit, suppressions) : elle se traite depuis
+  /// l'ecran de synchronisation.
+  Future<CloudSyncOutcome?> refreshNow() async {
+    if (!_canRun) return null;
+    // Une synchro automatique est peut-etre en cours : on l'attend, puis on
+    // en relance une pour etre sur d'avoir le dernier etat d'iCloud.
+    final running = _current;
+    if (running != null) await running;
+    if (needsAttention) return lastOutcome;
+    return _run(() => _sync.sync());
   }
 
   @override
@@ -91,31 +125,44 @@ class CloudSyncController extends ChangeNotifier with WidgetsBindingObserver {
         ));
   }
 
-  Future<CloudSyncOutcome> _run(Future<CloudSyncOutcome> Function() action) async {
+  Future<CloudSyncOutcome> _run(Future<CloudSyncOutcome> Function() action) {
+    final future = _runOnce(action);
+    _current = future;
+    return future.whenComplete(() {
+      if (identical(_current, future)) _current = null;
+    });
+  }
+
+  Future<CloudSyncOutcome> _runOnce(Future<CloudSyncOutcome> Function() action) async {
     _syncing = true;
     notifyListeners();
     try {
       final outcome = await action();
       lastOutcome = outcome;
+      if (outcome.status != CloudSyncStatus.unavailable &&
+          outcome.status != CloudSyncStatus.error) {
+        _ensureWatching();
+      }
       if (outcome.status == CloudSyncStatus.synced && outcome.summary != null) {
         lastChanges = outcome.summary;
         lastChangesAt = outcome.at;
       }
       if (outcome.status == CloudSyncStatus.retryLater) {
-        _debounce?.cancel();
-        _debounce = Timer(const Duration(seconds: 20), _autoSync);
+        _schedule(const Duration(seconds: 20));
       }
       return outcome;
     } finally {
       _syncing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _timer?.cancel();
     _debounce?.cancel();
+    _watch?.cancel();
     if (isSupported) {
       WidgetsBinding.instance.removeObserver(this);
       app.removeListener(_onAppChanged);

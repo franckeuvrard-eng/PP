@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
 import 'providers/cloud_sync_controller.dart';
+import 'services/icloud_sync.dart';
 import 'utils/platform_support.dart';
 import 'widgets/desktop_frame.dart';
 import 'widgets/storage_error_banner.dart';
@@ -366,6 +367,40 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
   }
 
+  /// Synchronisation iCloud immediate (tirer pour actualiser, Cmd+R sur Mac),
+  /// suivie d'un message court sur ce qui s'est passe.
+  Future<void> _refresh() async {
+    final outcome = await context.read<CloudSyncController>().refreshNow();
+    if (!mounted || outcome == null) return;
+    final received = outcome.summary?.changes.where((c) => c.onLocal).length ?? 0;
+    final text = switch (outcome.status) {
+      CloudSyncStatus.synced =>
+        received > 0 ? '$received changement(s) reçu(s) via iCloud.' : 'Synchronisé avec iCloud.',
+      CloudSyncStatus.upToDate => 'Déjà à jour.',
+      CloudSyncStatus.needsConfirmation || CloudSyncStatus.needsResolution =>
+        'Synchronisation en attente de votre accord : Paramètres › Sauvegarde & Sécurité › '
+            'Synchroniser avec un autre appareil.',
+      CloudSyncStatus.unavailable => 'iCloud n’est pas disponible sur cet appareil.',
+      CloudSyncStatus.retryLater => 'iCloud est occupé : nouvel essai dans un instant.',
+      CloudSyncStatus.error => 'Échec de la synchronisation : ${outcome.message}',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Tirer vers le bas sur les ecrans principaux (iPhone, iPad) pour
+  /// synchroniser sans attendre.
+  Widget _refreshable(Widget child) {
+    if (!CloudSyncController.isSupported || isMacOSPlatform) return child;
+    return RefreshIndicator(
+      color: const Color(0xFF4E9F3D),
+      // Les listes des ecrans sont imbriquees (onglets, Scaffold) : toute
+      // liste verticale tiree en haut declenche l'actualisation.
+      notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+      onRefresh: _refresh,
+      child: child,
+    );
+  }
+
   /// Barre de menus de macOS : Cmd+1..5 pour changer de page, Cmd+? pour l'aide.
   /// Sur les autres plateformes, `PlatformMenuBar` ne fait rien et les memes
   /// raccourcis passent par Ctrl+1..5 ([desktopNavigationShortcuts]).
@@ -396,6 +431,17 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             ),
         ],
       ),
+      if (CloudSyncController.isSupported)
+        PlatformMenu(
+          label: 'Synchronisation',
+          menus: [
+            PlatformMenuItem(
+              label: 'Synchroniser maintenant',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyR, meta: true),
+              onSelected: _refresh,
+            ),
+          ],
+        ),
       PlatformMenu(
         label: 'Aide',
         menus: [
@@ -416,7 +462,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       onSelected: _select,
       className: appProvider.classSettings.name,
       onHelp: _openHelp,
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _refreshable(IndexedStack(index: _currentIndex, children: _screens)),
     );
     if (isMacOSPlatform) {
       return PlatformMenuBar(menus: _macMenus(), child: frame);
@@ -481,10 +527,10 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
           ),
         ],
       ),
-      body: IndexedStack(
+      body: _refreshable(IndexedStack(
         index: _currentIndex,
         children: _screens,
-      ),
+      )),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
