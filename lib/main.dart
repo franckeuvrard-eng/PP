@@ -15,6 +15,11 @@ import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/whats_new_screen.dart';
+import 'data/release_notes.dart';
+import 'data/seed_ids.dart';
+import 'services/children_import_service.dart';
 
 /// Polices de repli du theme : vide dans l'application (le systeme gere lui-
 /// meme les emojis ; mettre une police emoji en repli la faisait servir a tout
@@ -347,6 +352,75 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showIntroIfNeeded());
+  }
+
+  /// Premier lancement : prise en main. Apres une mise a jour : nouveautes
+  /// de la version, une seule fois. Une classe deja utilisee n'a pas besoin
+  /// de la visite guidee.
+  Future<void> _showIntroIfNeeded() async {
+    final app = context.read<AppStateProvider>();
+    if (app.loadFailed) return;
+    final latest = kReleaseNotes.first.version;
+    final seenBefore = app.releaseNotesSeen;
+    if (!app.onboardingDone) {
+      app.markOnboardingDone();
+      final usedAlready = app.children.any((c) => !kSeedChildIds.contains(c.id)) ||
+          app.activities.any((a) => !kSeedActivityIds.contains(a.id));
+      if (!usedAlready) {
+        app.markReleaseNotesSeen(latest);
+        await _openOnboarding();
+        return;
+      }
+    }
+    if (seenBefore == latest) return;
+    app.markReleaseNotesSeen(latest);
+    final unseen = <ReleaseNote>[];
+    for (final n in kReleaseNotes) {
+      if (n.version == seenBefore) break;
+      unseen.add(n);
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => WhatsNewScreen(notes: unseen)),
+    );
+  }
+
+  Future<void> _openOnboarding({bool checklist = false}) async {
+    final target = await Navigator.push<SetupTarget>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => OnboardingScreen(startOnChecklist: checklist),
+      ),
+    );
+    await _goToSetup(target);
+  }
+
+  /// Etape choisie dans la liste de parametrage.
+  Future<void> _goToSetup(SetupTarget? target) async {
+    if (target == null || !mounted) return;
+    void settings(int tab) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SettingsScreen(initialTab: tab, standalone: true)),
+        );
+    switch (target) {
+      case SetupTarget.classProfile:
+        settings(0);
+      case SetupTarget.spaces:
+        settings(1);
+      case SetupTarget.security:
+        settings(3);
+      case SetupTarget.students:
+        _select(2);
+      case SetupTarget.badges:
+        _select(3);
+      case SetupTarget.importStudents:
+        _select(2);
+        await ChildrenImportService.pickAndImport(
+            context: context, provider: context.read<AppStateProvider>());
+    }
   }
 
   @override
@@ -367,8 +441,10 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
 
   void _select(int index) => setState(() => _currentIndex = index);
 
-  void _openHelp() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+  Future<void> _openHelp() async {
+    final target = await Navigator.push<SetupTarget>(
+        context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+    await _goToSetup(target);
   }
 
   /// Synchronisation iCloud immediate (tirer pour actualiser, Cmd+R sur Mac),

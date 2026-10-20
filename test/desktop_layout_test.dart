@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:petitpas/data/release_notes.dart';
 import 'package:petitpas/main.dart';
 import 'package:petitpas/providers/app_provider.dart';
 import 'package:petitpas/services/app_database.dart';
@@ -39,6 +40,10 @@ void main() {
           autoLoad: false,
         );
         await p.initialize();
+        // Ce test porte sur la mise en page : pas de prise en main par-dessus.
+        p.markOnboardingDone();
+        p.markReleaseNotesSeen(kReleaseNotes.first.version);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
         return p;
       });
 

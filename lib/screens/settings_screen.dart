@@ -18,7 +18,15 @@ import 'referentials_manager_screen.dart';
 import 'spaces_workshops_tab.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.initialTab = 0, this.standalone = false});
+
+  /// Onglet ouvert au depart : 0 Profil Classe, 1 Espaces & Ateliers,
+  /// 2 Apparence, 3 Sauvegarde & Securite.
+  final int initialTab;
+
+  /// Ouvert comme page a part (depuis la prise en main) : barre de titre
+  /// avec retour, au lieu du seul bandeau d'onglets de l'ecran principal.
+  final bool standalone;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -39,7 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final settings = provider.classSettings;
 
@@ -69,7 +77,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 0, // TabBar only
+        toolbarHeight: widget.standalone ? null : 0, // onglets seuls dans l'ecran principal
+        title: widget.standalone ? const Text('Paramètres') : null,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,

@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petitpas/data/release_notes.dart';
 import 'package:petitpas/main.dart';
 import 'package:petitpas/models/activity.dart';
 import 'package:petitpas/models/child.dart';
@@ -132,6 +133,9 @@ Future<void> _demoClass(AppStateProvider app) async {
     }
   }
   app.setBiometricLockEnabled(false);
+  // Ni prise en main ni nouveautes par-dessus les ecrans a capturer.
+  app.markOnboardingDone();
+  app.markReleaseNotesSeen(kReleaseNotes.first.version);
 }
 
 /// PNG sans canal alpha (l'App Store refuse la transparence) a partir de

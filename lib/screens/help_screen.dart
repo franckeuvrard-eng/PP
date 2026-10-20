@@ -1,9 +1,51 @@
 import 'package:flutter/material.dart';
 
+import '../data/release_notes.dart';
+import 'onboarding_screen.dart';
+import 'whats_new_screen.dart';
+
 /// Aide intégrée : rappel du fonctionnement écran par écran.
 ///
 /// Volontairement hors ligne et sans lien externe : l'application est utilisée
 /// en classe, souvent sans réseau.
+/// Prise en main et nouveautes, en tete de l'Aide. Une etape choisie dans la
+/// liste de parametrage referme l'Aide en la renvoyant a l'ecran principal.
+class _QuickLinks extends StatelessWidget {
+  const _QuickLinks();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.school, color: Color(0xFF4E9F3D)),
+            title: const Text('Prise en main', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Visite des écrans et paramétrage de la classe, pas à pas.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final target = await Navigator.push<SetupTarget>(
+                context,
+                MaterialPageRoute(fullscreenDialog: true, builder: (_) => const OnboardingScreen()),
+              );
+              if (target != null && context.mounted) Navigator.pop(context, target);
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.new_releases, color: Color(0xFF4E9F3D)),
+            title: const Text('Nouveautés', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Ce qui a changé dans la version ${kReleaseNotes.first.version}.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const WhatsNewScreen())),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
 
@@ -16,6 +58,8 @@ class HelpScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
+          _QuickLinks(),
+          SizedBox(height: 8),
           _Intro(),
           SizedBox(height: 8),
           _HelpSection(

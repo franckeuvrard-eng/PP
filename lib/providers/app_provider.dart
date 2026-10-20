@@ -363,6 +363,24 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
+  /// Prise en main deja vue (ou inutile : classe deja utilisee).
+  bool _onboardingDone = false;
+  bool get onboardingDone => _onboardingDone;
+
+  void markOnboardingDone() {
+    _onboardingDone = true;
+    _write(_db.setSetting('onboarding_done', 'true'));
+  }
+
+  /// Derniere version dont les nouveautes ont ete montrees.
+  String? _releaseNotesSeen;
+  String? get releaseNotesSeen => _releaseNotesSeen;
+
+  void markReleaseNotesSeen(String version) {
+    _releaseNotesSeen = version;
+    _write(_db.setSetting('release_notes_seen', version));
+  }
+
   /// Synchronisation automatique via iCloud (iPhone, iPad, Mac). Active par
   /// defaut ; sans effet si iCloud est indisponible.
   bool _iCloudSyncEnabled = true;
@@ -641,6 +659,8 @@ class AppStateProvider extends ChangeNotifier {
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
         _iCloudSyncEnabled = settings['icloud_sync_enabled'] != 'false';
+        _onboardingDone = settings['onboarding_done'] == 'true';
+        _releaseNotesSeen = settings['release_notes_seen'];
         _reminderEnabled = settings['reminder_enabled'] == 'true';
         _reminderHour = int.tryParse(settings['reminder_hour'] ?? '') ?? _reminderHour;
         _reminderMinute = int.tryParse(settings['reminder_minute'] ?? '') ?? _reminderMinute;
