@@ -94,7 +94,15 @@ class CloudSyncController extends ChangeNotifier with WidgetsBindingObserver {
     // Une synchro automatique est peut-etre en cours : on l'attend, puis on
     // en relance une pour etre sur d'avoir le dernier etat d'iCloud.
     final running = _current;
-    if (running != null) await running;
+    if (running != null) {
+      // Pas d'attente sans fin si iCloud traine (telechargement lent).
+      await running.timeout(const Duration(seconds: 15),
+          onTimeout: () => CloudSyncOutcome(CloudSyncStatus.retryLater));
+      if (_syncing) {
+        return CloudSyncOutcome(CloudSyncStatus.retryLater,
+            message: 'Une synchronisation est déjà en cours.');
+      }
+    }
     if (needsAttention) return lastOutcome;
     return _run(() => _sync.sync());
   }

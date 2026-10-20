@@ -43,6 +43,9 @@ class HomeDashboardScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
+      // Defilable meme quand tout tient a l'ecran (peu d'observations du
+      // jour) : sinon « tirer pour actualiser » ne reagissait pas.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

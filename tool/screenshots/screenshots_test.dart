@@ -66,8 +66,10 @@ Future<void> _font(String family, List<String> paths) async {
 Future<void> _loadFonts() async {
   const win = r'C:\Windows\Fonts';
   final segoe = ['$win\\segoeui.ttf', '$win\\seguisb.ttf', '$win\\segoeuib.ttf'];
-  // Emojis des ateliers (repli kEmojiFontFallback du theme de l'app).
+  // Emojis des ateliers : repli du theme active seulement pour les captures.
   await _font('Segoe UI Emoji', ['$win\\seguiemj.ttf']);
+  // ignore: invalid_use_of_visible_for_testing_member (outil hors de test/)
+  debugThemeFontFallback = const ['Segoe UI Emoji'];
   // L'app demande « Outfit » (police systeme en pratique) ; certains
   // composants utilisent les polices systeme Apple : Segoe UI s'en approche.
   for (final family in [

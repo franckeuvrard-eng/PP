@@ -16,8 +16,13 @@ import 'screens/children_manager_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 
-/// Polices emoji des systemes cibles (iOS/macOS, Windows, autres).
-const kEmojiFontFallback = ['Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'];
+/// Polices de repli du theme : vide dans l'application (le systeme gere lui-
+/// meme les emojis ; mettre une police emoji en repli la faisait servir a tout
+/// le texte sur iPhone/Mac, avec des espaces geants entre les mots).
+/// Renseigne uniquement par le generateur de captures (moteur de test sans
+/// repli automatique).
+@visibleForTesting
+List<String>? debugThemeFontFallback;
 
 void main() {
   runApp(
@@ -51,8 +56,7 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
-        // Emojis des ateliers : police couleur de chaque systeme.
-        fontFamilyFallback: kEmojiFontFallback,
+        fontFamilyFallback: debugThemeFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF4E9F3D),
@@ -98,7 +102,7 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
-        fontFamilyFallback: kEmojiFontFallback,
+        fontFamilyFallback: debugThemeFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF66BB6A),
@@ -371,7 +375,15 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   /// suivie d'un message court sur ce qui s'est passe.
   Future<void> _refresh() async {
     final outcome = await context.read<CloudSyncController>().refreshNow();
-    if (!mounted || outcome == null) return;
+    if (!mounted) return;
+    if (outcome == null) {
+      final enabled = context.read<AppStateProvider>().iCloudSyncEnabled;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(enabled
+              ? 'Données en cours de chargement : réessayez dans un instant.'
+              : 'La synchronisation iCloud est désactivée (Paramètres › Sauvegarde & Sécurité).')));
+      return;
+    }
     final received = outcome.summary?.changes.where((c) => c.onLocal).length ?? 0;
     final text = switch (outcome.status) {
       CloudSyncStatus.synced =>
