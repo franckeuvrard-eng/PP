@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/photo_thumb.dart';
 import '../providers/app_provider.dart';
 import '../models/activity_type.dart';
 import '../data/eduscol_data.dart';
@@ -727,10 +728,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                       borderRadius: BorderRadius.circular(16),
                                       child: absPath != null &&
                                               File(absPath).existsSync()
-                                          ? Image.file(File(absPath),
-                                              width: 88,
-                                              height: 88,
-                                              fit: BoxFit.cover)
+                                          ? PhotoThumb(path: absPath, size: 88, radius: 16)
                                           : Container(
                                               width: 88,
                                               height: 88,

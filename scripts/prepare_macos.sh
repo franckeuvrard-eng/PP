@@ -50,6 +50,10 @@ if [ "$ICLOUD" = 1 ]; then
   echo "Droits iCloud ajoutes."
 fi
 
+# Icone de l'app (la meme que sur iPhone), au lieu de l'icone Flutter.
+flutter pub get
+dart run flutter_launcher_icons -f flutter_launcher_icons_macos.yaml
+
 # Cible macOS : celle du template Flutter (12.0), au-dessus du minimum du
 # plugin record (10.15).
 grep -m1 'MACOSX_DEPLOYMENT_TARGET' macos/Runner.xcodeproj/project.pbxproj

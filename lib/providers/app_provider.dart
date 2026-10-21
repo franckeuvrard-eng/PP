@@ -363,6 +363,16 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
+  /// Panneau lateral replie (Mac, PC, iPad en grand ecran) : icones seules.
+  bool _sidebarCollapsed = false;
+  bool get sidebarCollapsed => _sidebarCollapsed;
+
+  void toggleSidebar() {
+    _sidebarCollapsed = !_sidebarCollapsed;
+    _write(_db.setSetting('sidebar_collapsed', _sidebarCollapsed.toString()));
+    _notify();
+  }
+
   /// Prise en main deja vue (ou inutile : classe deja utilisee).
   bool _onboardingDone = false;
   bool get onboardingDone => _onboardingDone;
@@ -660,6 +670,7 @@ class AppStateProvider extends ChangeNotifier {
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
         _iCloudSyncEnabled = settings['icloud_sync_enabled'] != 'false';
         _onboardingDone = settings['onboarding_done'] == 'true';
+        _sidebarCollapsed = settings['sidebar_collapsed'] == 'true';
         _releaseNotesSeen = settings['release_notes_seen'];
         _reminderEnabled = settings['reminder_enabled'] == 'true';
         _reminderHour = int.tryParse(settings['reminder_hour'] ?? '') ?? _reminderHour;
@@ -1668,10 +1679,43 @@ class AppStateProvider extends ChangeNotifier {
 
   void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
 
+  /// Supprime l'atelier ET ses observations : elles restaient jusqu'ici
+  /// orphelines (« Atelier inconnu »), impossibles a rattacher ou a nettoyer.
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
     _write(_db.deleteActivityType(id));
+    for (final log in _activities.where((l) => l.activityTypeId == id).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
     _notify();
+  }
+
+  /// Nombre d'observations d'un atelier (pour prevenir avant suppression).
+  int activityCountForType(String id) => _activities.where((l) => l.activityTypeId == id).length;
+
+  /// Observations dont l'eleve ou l'atelier n'existe plus.
+  List<ActivityLog> get orphanActivities {
+    final childIds = {for (final c in _children) c.id};
+    final typeIds = {for (final t in _activityTypes) t.id};
+    return _activities
+        .where((l) => !childIds.contains(l.childId) || !typeIds.contains(l.activityTypeId))
+        .toList();
+  }
+
+  /// Supprime les observations orphelines, apres une sauvegarde automatique
+  /// (restaurable). Renvoie le nombre supprime, ou -1 si la sauvegarde a echoue.
+  Future<int> purgeOrphanActivities() async {
+    final orphans = orphanActivities;
+    if (orphans.isEmpty) return 0;
+    if (!await _writeAutoBackup()) return -1;
+    for (final log in orphans) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+    await purgeOrphanPhotos(); // leurs photos partent a la corbeille (60 jours)
+    return orphans.length;
   }
 
   /// Ateliers d'un espace, tries par position (mode progression).

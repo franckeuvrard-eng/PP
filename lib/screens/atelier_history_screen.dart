@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../widgets/photo_thumb.dart';
 import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
@@ -101,7 +102,7 @@ class AtelierHistoryScreen extends StatelessWidget {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: absPath != null && File(absPath).existsSync()
-                            ? Image.file(File(absPath), width: 72, height: 72, fit: BoxFit.cover)
+                            ? PhotoThumb(path: absPath, size: 72, radius: 8)
                             : Container(
                                 width: 72,
                                 height: 72,

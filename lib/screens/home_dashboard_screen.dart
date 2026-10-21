@@ -335,11 +335,15 @@ class HomeDashboardScreen extends StatelessWidget {
                                               margin: const EdgeInsets.only(right: 8),
                                               child: ClipRRect(
                                                 borderRadius: BorderRadius.circular(12),
-                                                child: Image.file(
-                                                  File(resolvedPath),
+                                                child: Container(
                                                   width: 90,
                                                   height: 90,
-                                                  fit: BoxFit.cover,
+                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  child: Image.file(
+                                                    File(resolvedPath),
+                                                    fit: BoxFit.contain, // photo entiere
+                                                    cacheWidth: 270,
+                                                  ),
                                                 ),
                                               ),
                                             ),

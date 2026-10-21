@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/photo_thumb.dart';
 import '../providers/app_provider.dart';
 import '../models/activity.dart';
 import '../models/child.dart';
@@ -328,15 +329,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     children: [
                       Stack(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.file(
-                              File(path.replaceFirst('file://', '')),
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+                          PhotoThumb(
+                              path: path.replaceFirst('file://', ''), size: 80, radius: 16),
                           Positioned(
                             top: 2,
                             right: 2,

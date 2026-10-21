@@ -145,10 +145,36 @@ class SpacesWorkshopsTab extends StatelessWidget {
                 children: [
                   // Ateliers in this space : glisser-deposer si l'espace impose
                   // un ordre de progression, sinon liste condensee simple.
-                  if (space.isProgression)
+                  if (space.isProgression) ...[
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 4, 16, 6),
+                      child: Row(children: [
+                        Icon(Icons.swap_vert, size: 18, color: Color(0xFF4E9F3D)),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Ordre de progression : maintenez la poignée ⠿ et glissez un '
+                            'atelier pour changer sa place.',
+                            style: TextStyle(fontSize: 12, color: kMutedTextColor),
+                          ),
+                        ),
+                      ]),
+                    ),
                     ReorderableListView(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
+                      // Une seule poignee, bien visible (cf. _buildAtelierTile).
+                      buildDefaultDragHandles: false,
+                      // L'atelier deplace se souleve, entoure de vert.
+                      proxyDecorator: (child, index, animation) => Material(
+                        elevation: 6,
+                        borderRadius: BorderRadius.circular(12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF4E9F3D), width: 2),
+                        ),
+                        child: child,
+                      ),
                       // newIndex deja corrige du decalage de l'element retire.
                       onReorderItem: (oldIndex, newIndex) {
                         final ordered = provider
@@ -168,7 +194,8 @@ class SpacesWorkshopsTab extends StatelessWidget {
                               key: ValueKey(entry.value.id),
                               dragIndex: entry.key),
                       ],
-                    )
+                    ),
+                  ]
                   else
                     ...ateliersInSpace.map((atelier) =>
                         _buildAtelierTile(context, provider, atelier)),
@@ -250,15 +277,29 @@ class SpacesWorkshopsTab extends StatelessWidget {
     Key? key,
     int? dragIndex,
   }) {
+    final avatar = CircleAvatar(
+      radius: 16,
+      backgroundColor: hexToColor(atelier.colorHex),
+      child: Icon(iconForName(atelier.iconName, fallback: Icons.palette),
+          size: 14, color: Colors.white),
+    );
     return ListTile(
       key: key,
       dense: true,
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: hexToColor(atelier.colorHex),
-        child: Icon(iconForName(atelier.iconName, fallback: Icons.palette),
-            size: 14, color: Colors.white),
-      ),
+      // En mode progression : numero d'ordre devant l'atelier.
+      leading: dragIndex == null
+          ? avatar
+          : Row(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(
+                width: 22,
+                child: Text('${dragIndex + 1}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4E9F3D))),
+              ),
+              const SizedBox(width: 4),
+              avatar,
+            ]),
       title: Row(
         children: [
           Expanded(
@@ -286,7 +327,17 @@ class SpacesWorkshopsTab extends StatelessWidget {
       trailing: dragIndex != null
           ? ReorderableDragStartListener(
               index: dragIndex,
-              child: const Icon(Icons.drag_handle, color: Colors.grey),
+              child: Tooltip(
+                message: "Glisser pour changer l'ordre",
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.drag_indicator, color: Color(0xFF4E9F3D), size: 24),
+                ),
+              ),
             )
           : const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: () => Navigator.push(

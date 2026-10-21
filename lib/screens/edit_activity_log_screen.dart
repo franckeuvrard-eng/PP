@@ -79,7 +79,11 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                             SnackBar(
                               content: const Text('Observation supprimée'),
                               backgroundColor: Colors.red,
-                              duration: const Duration(seconds: 8),
+                              duration: const Duration(seconds: 5),
+                              // Avec une action, Flutter garderait le bandeau indefiniment (et il
+                              // masquait des boutons) : disparition automatique, au-dessus du contenu.
+                              persist: false,
+                              behavior: SnackBarBehavior.floating,
                               action: SnackBarAction(
                                 label: 'Annuler',
                                 textColor: Colors.white,

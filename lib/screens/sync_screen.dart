@@ -18,8 +18,7 @@ import '../services/sync_service.dart';
 import '../utils/color_utils.dart';
 import '../utils/platform_support.dart';
 import '../widgets/sync_report_view.dart';
-import 'sync_confirm_screen.dart';
-import 'sync_conflicts_screen.dart';
+import 'sync_prompts.dart';
 
 /// Synchronisation locale Mac ⇄ iPhone/iPad, sans serveur ni compte.
 ///
@@ -83,44 +82,13 @@ class _SyncScreenState extends State<SyncScreen> {
 
   /// Apercu obligatoire avant d'ecrire (synchro Wi-Fi, ou iCloud quand des
   /// suppressions nombreuses sont en jeu).
-  Future<bool> _confirmChanges(SyncSummary preview) async {
-    if (!mounted) return false;
-    final ok = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => SyncConfirmScreen(preview: preview),
-      ),
-    );
-    return ok ?? false;
-  }
+  Future<bool> _confirmChanges(SyncSummary preview) => confirmSyncChanges(context, preview);
 
   Future<Map<String, Object?>?> _resolveConflicts(
-      List<MergeConflict> conflicts, String peerName, Map<String, dynamic> merged) async {
-    if (!mounted) return null;
-    return Navigator.push<Map<String, Object?>>(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) =>
-            SyncConflictsScreen(conflicts: conflicts, peerName: peerName, snapshot: merged),
-      ),
-    );
-  }
+          List<MergeConflict> conflicts, String peerName, Map<String, dynamic> merged) =>
+      resolveSyncConflicts(context, conflicts, peerName, merged);
 
-  Future<void> _syncICloudNow(CloudSyncController cloud) async {
-    final outcome = await cloud.syncInteractive(
-      resolveConflicts: _resolveConflicts,
-      confirmChanges: _confirmChanges,
-    );
-    if (!mounted || outcome == null) return;
-    final text = switch (outcome.status) {
-      CloudSyncStatus.synced => 'Synchronisé avec iCloud.',
-      CloudSyncStatus.upToDate => 'Déjà à jour avec iCloud.',
-      _ => outcome.message ?? 'Synchronisation iCloud non terminée.',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
+  Future<void> _syncICloudNow(CloudSyncController cloud) => syncICloudInteractively(context, cloud);
 
   Widget _buildICloudCard() {
     final cloud = context.watch<CloudSyncController>();

@@ -17,6 +17,7 @@ import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/whats_new_screen.dart';
+import 'screens/sync_prompts.dart';
 import 'data/release_notes.dart';
 import 'data/seed_ids.dart';
 import 'services/children_import_service.dart';
@@ -90,6 +91,9 @@ class PetitPasApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF2D3748)),
           bodySmall: TextStyle(fontSize: 12, color: Color(0xFF616161)),
         ),
+        // Bandeaux flottants : au-dessus des boutons flottants et de la barre
+        // d'onglets, au lieu de les masquer.
+        snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -159,6 +163,7 @@ class PetitPasApp extends StatelessWidget {
           contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),
         ),
         snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
           backgroundColor: Color(0xFF334155),
           contentTextStyle: TextStyle(color: Colors.white),
         ),
@@ -423,8 +428,40 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     }
   }
 
+  /// Synchro iCloud (absente hors iPhone/iPad/Mac et dans certains tests).
+  CloudSyncController? _cloud;
+
+  /// Situation en attente deja signalee : une seule fenetre par situation.
+  CloudSyncOutcome? _promptedFor;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_cloud != null) return;
+    try {
+      _cloud = Provider.of<CloudSyncController>(context, listen: false)
+        ..addListener(_onCloudChanged);
+    } on ProviderNotFoundException {
+      // Pas de synchro iCloud dans cet arbre.
+    }
+  }
+
+  /// La synchro automatique attend une decision (suppressions nombreuses,
+  /// modifications des deux cotes) : on previent au lieu d'attendre en silence.
+  void _onCloudChanged() {
+    final cloud = _cloud;
+    if (cloud == null || !cloud.needsAttention) return;
+    final outcome = cloud.lastOutcome;
+    if (identical(outcome, _promptedFor)) return;
+    _promptedFor = outcome;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) promptPendingCloudSync(context, cloud);
+    });
+  }
+
   @override
   void dispose() {
+    _cloud?.removeListener(_onCloudChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -519,6 +556,17 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             ),
         ],
       ),
+      PlatformMenu(
+        label: 'Présentation',
+        menus: [
+          PlatformMenuItem(
+            label: 'Afficher/Masquer la barre latérale',
+            // Raccourci standard de macOS pour la barre laterale.
+            shortcut: const SingleActivator(LogicalKeyboardKey.keyS, meta: true, control: true),
+            onSelected: () => context.read<AppStateProvider>().toggleSidebar(),
+          ),
+        ],
+      ),
       if (CloudSyncController.isSupported)
         PlatformMenu(
           label: 'Synchronisation',
@@ -551,6 +599,8 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       className: appProvider.classSettings.name,
       onHelp: _openHelp,
       body: _refreshable(IndexedStack(index: _currentIndex, children: _screens)),
+      collapsed: appProvider.sidebarCollapsed,
+      onToggleCollapsed: appProvider.toggleSidebar,
     );
     if (isMacOSPlatform) {
       return PlatformMenuBar(menus: _macMenus(), child: frame);

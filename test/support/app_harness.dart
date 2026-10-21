@@ -22,6 +22,7 @@ import 'sync_fakes.dart';
 Future<(AppStateProvider, CloudSyncController)> pumpPetitPas(
   WidgetTester tester, {
   void Function(AppStateProvider app)? prepare,
+  FakeCloud? cloud,
 }) async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
@@ -34,20 +35,7 @@ Future<(AppStateProvider, CloudSyncController)> pumpPetitPas(
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
-  // Lecteur et enregistreur audio (notes vocales) : pas de plugin en test.
-  final messenger = tester.binding.defaultBinaryMessenger;
-  void silentEvents(String channel) => messenger.setMockStreamHandler(
-      EventChannel(channel), MockStreamHandler.inline(onListen: (_, __) {}));
-  silentEvents('xyz.luan/audioplayers.global/events');
-  for (final name in ['xyz.luan/audioplayers.global', 'com.llfbandit.record/messages']) {
-    messenger.setMockMethodCallHandler(MethodChannel(name), (_) async => null);
-  }
-  messenger.setMockMethodCallHandler(const MethodChannel('xyz.luan/audioplayers'), (call) async {
-    if (call.method == 'create') {
-      silentEvents('xyz.luan/audioplayers/events/${(call.arguments as Map)['playerId']}');
-    }
-    return null;
-  });
+  mockAudioPlugins(tester);
 
   late AppStateProvider app;
   late CloudSyncController sync;
@@ -61,7 +49,7 @@ Future<(AppStateProvider, CloudSyncController)> pumpPetitPas(
     await app.initialize();
     app.setBiometricLockEnabled(false);
     prepare?.call(app);
-    sync = CloudSyncController(app, folder: FakeCloud());
+    sync = CloudSyncController(app, folder: cloud ?? FakeCloud());
     await Future<void>.delayed(const Duration(milliseconds: 500));
   });
 
@@ -86,4 +74,22 @@ Future<void> endPetitPas(WidgetTester tester, CloudSyncController sync) async {
   await tester.pump(const Duration(seconds: 11)); // delai de verrou sqflite
   sync.dispose();
   debugDefaultTargetPlatformOverride = null;
+}
+
+/// Lecteur et enregistreur audio (notes vocales) : pas de plugin en test.
+/// Chaque lecteur cree recoit son canal d'evenements simule a la volee.
+void mockAudioPlugins(WidgetTester tester) {
+  final messenger = tester.binding.defaultBinaryMessenger;
+  void silentEvents(String channel) => messenger.setMockStreamHandler(
+      EventChannel(channel), MockStreamHandler.inline(onListen: (_, __) {}));
+  silentEvents('xyz.luan/audioplayers.global/events');
+  for (final name in ['xyz.luan/audioplayers.global', 'com.llfbandit.record/messages']) {
+    messenger.setMockMethodCallHandler(MethodChannel(name), (_) async => null);
+  }
+  messenger.setMockMethodCallHandler(const MethodChannel('xyz.luan/audioplayers'), (call) async {
+    if (call.method == 'create') {
+      silentEvents('xyz.luan/audioplayers/events/${(call.arguments as Map)['playerId']}');
+    }
+    return null;
+  });
 }

@@ -23,6 +23,34 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.4.1',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.photo, 'Photos entières',
+          'Les vignettes montrent la photo en entier, sans la recadrer ; touchez-la pour '
+              'l\'afficher en grand et zoomer. Les PDF gardent aussi les photos entières.'),
+      ReleaseItem(Icons.sync_problem, 'Synchronisation : vous êtes prévenu',
+          'Si la synchronisation doit supprimer beaucoup d\'éléments ou vous demander un choix, '
+              'une fenêtre l\'annonce tout de suite, au lieu d\'attendre sans rien dire.'),
+      ReleaseItem(Icons.star_half, 'Ateliers obligatoires',
+          'Un atelier obligatoire pour une section reste accessible aux autres sections, '
+              'où il est simplement facultatif.'),
+      ReleaseItem(Icons.swap_vert, 'Ordre des ateliers plus clair',
+          'Dans un espace en progression, chaque atelier affiche son rang ; glissez la poignée '
+              'verte ⠿ pour changer l\'ordre.'),
+      ReleaseItem(Icons.link_off, 'Observations orphelines',
+          'Supprimer un atelier supprime aussi ses observations. Les anciennes observations '
+              'sans élève ou sans atelier se nettoient dans Sauvegarde & Sécurité.'),
+      ReleaseItem(Icons.view_sidebar, 'Panneau repliable sur Mac',
+          'Repliez le panneau de gauche pour gagner de la place (bouton en haut du panneau, '
+              'ou Ctrl+Cmd+S).'),
+      ReleaseItem(Icons.notifications_off, 'Bandeaux plus discrets',
+          'Les bandeaux « Annuler » disparaissent seuls et ne cachent plus les boutons.'),
+      ReleaseItem(Icons.laptop_mac, 'Icône sur Mac',
+          'L\'application porte la même icône que sur iPhone et iPad.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.4.0',
     date: 'Octobre 2026',
     items: [

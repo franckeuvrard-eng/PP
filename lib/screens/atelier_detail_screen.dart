@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/photo_thumb.dart';
 import '../models/activity_type.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_pdf_service.dart';
@@ -20,7 +21,11 @@ class AtelierDetailScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer cet atelier ?'),
-        content: Text('« ${current.name} » sera définitivement supprimé.'),
+        content: Text(() {
+          final n = provider.activityCountForType(current.id);
+          return '« ${current.name} » sera définitivement supprimé'
+              '${n == 0 ? '.' : ', ainsi que ses $n observation(s).'}';
+        }()),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           ElevatedButton(
@@ -146,7 +151,7 @@ class AtelierDetailScreen extends StatelessWidget {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: absPath != null && File(absPath).existsSync()
-                              ? Image.file(File(absPath), width: 96, height: 96, fit: BoxFit.cover)
+                              ? PhotoThumb(path: absPath, size: 96, radius: 12)
                               : Container(
                                   width: 96,
                                   height: 96,

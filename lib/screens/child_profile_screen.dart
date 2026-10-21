@@ -766,7 +766,11 @@ class ChildProfileScreen extends StatelessWidget {
                   SnackBar(
                     content: Text('${child.firstname} a été supprimé(e)'),
                     backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 8),
+                    duration: const Duration(seconds: 5),
+                    // Avec une action, Flutter garderait le bandeau indefiniment (et il
+                    // masquait des boutons) : disparition automatique, au-dessus du contenu.
+                    persist: false,
+                    behavior: SnackBarBehavior.floating,
                     action: SnackBarAction(
                       label: 'Annuler',
                       textColor: Colors.white,

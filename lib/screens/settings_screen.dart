@@ -818,6 +818,52 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
 
+          // Observations orphelines (eleve ou atelier supprime) : visible
+          // seulement s'il y en a, avec nettoyage apres sauvegarde.
+          if (provider.orphanActivities.isNotEmpty) ...[
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                leading: const Icon(Icons.link_off, color: Color(0xFFB26A00)),
+                title: Text('${provider.orphanActivities.length} observation(s) orpheline(s)',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                subtitle: const Text(
+                    'Leur élève ou leur atelier a été supprimé : elles apparaissent comme '
+                    '« inconnu ». Une sauvegarde est faite avant le nettoyage.',
+                    style: TextStyle(fontSize: 12)),
+                trailing: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB26A00)),
+                  onPressed: () async {
+                    final n = provider.orphanActivities.length;
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Supprimer les observations orphelines ?'),
+                        content: Text('$n observation(s) sans élève ou sans atelier seront '
+                            'supprimées. Une sauvegarde automatique est faite avant.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+                          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Supprimer')),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    final removed = await provider.purgeOrphanActivities();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(removed < 0
+                          ? 'Sauvegarde impossible : rien n\'a été supprimé.'
+                          : '$removed observation(s) orpheline(s) supprimée(s).'),
+                    ));
+                  },
+                  child: const Text('Nettoyer'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Sauvegardes automatiques
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

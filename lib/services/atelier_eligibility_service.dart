@@ -37,8 +37,8 @@ class AtelierEligibilityResult {
 
 /// Determine si un atelier peut etre propose a un eleve donne, en combinant
 /// deux regles independantes :
-///  - la section de l'eleve doit correspondre au ciblage de l'atelier
-///    (champ [ActivityType.obligatoryGroups] / [ActivityType.isObligatory]) ;
+///  - le ciblage par section ([ActivityType.obligatoryGroups]) dit pour qui
+///    l'atelier est obligatoire ; il reste accessible (facultatif) a tous ;
 ///  - si l'espace de l'atelier est en mode progression, les ateliers
 ///    precedents (par [ActivityType.position]) doivent deja avoir atteint
 ///    le niveau minimum choisi pour cet espace (Space.progressionMinStatusId).
@@ -74,13 +74,10 @@ class AtelierEligibilityService {
       // Configure explicitement pour toute la classe.
       return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
     }
-    if (child.group != null && atelier.obligatoryGroups.contains(child.group)) {
-      return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
-    }
-    return const AtelierEligibilityResult(
-      status: AtelierEligibility.blockedSection,
-      message: "Cet atelier n'est pas configuré pour la section de cet élève.",
-    );
+    // Obligatoire pour certaines sections seulement : pour les autres il reste
+    // accessible, simplement facultatif. Le reserver aux sections ciblees
+    // empechait jusqu'ici les autres eleves d'y etre observes.
+    return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
   }
 
   static AtelierEligibilityResult? _evaluateProgression(

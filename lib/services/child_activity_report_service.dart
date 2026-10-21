@@ -346,7 +346,7 @@ class ChildActivityReportService {
                                       borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
                                       color: PdfColors.grey100,
                                     ),
-                                    child: pw.Image(photo.image, fit: pw.BoxFit.cover),
+                                    child: pw.Image(photo.image, fit: pw.BoxFit.contain), // photo entiere
                                   ),
                                   if (photo.caption != null)
                                     pw.Padding(

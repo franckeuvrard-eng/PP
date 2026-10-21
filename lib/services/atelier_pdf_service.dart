@@ -56,7 +56,7 @@ class AtelierPdfService {
             child: pw.ClipRRect(
               horizontalRadius: 6,
               verticalRadius: 6,
-              child: pw.Image(image, fit: pw.BoxFit.cover),
+              child: pw.Image(image, fit: pw.BoxFit.contain), // photo entiere
             ),
           ),
           if (caption != null) ...[
