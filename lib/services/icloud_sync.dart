@@ -6,6 +6,7 @@ import 'package:petitpas_icloud/petitpas_icloud.dart';
 
 import '../data/seed_ids.dart';
 
+import 'progression_migration.dart';
 import 'sync_merge.dart';
 import 'sync_service.dart';
 
@@ -125,7 +126,14 @@ class CloudSync {
   final SyncHost host;
   final CloudFolder folder;
 
-  static const classFile = 'classe.json';
+  /// Fichier de classe depuis la 1.5 (progressions separees des espaces).
+  /// Un nom nouveau : une application 1.4, qui ne connait pas les
+  /// progressions, les effacerait en reecrivant le fichier.
+  static const classFile = 'classe_v2.json';
+
+  /// Fichier des versions <= 1.4, lu (et converti) tant que [classFile]
+  /// n'existe pas encore ; jamais reecrit.
+  static const legacyClassFile = 'classe.json';
   static const mediaDir = 'medias';
 
   /// Cle de la base dans [SyncHost.syncLoadBase] (distincte des bases Wi-Fi).
@@ -172,20 +180,23 @@ class CloudSync {
     }
 
     // 1. Etat dans iCloud, versions en conflit comprises.
-    final cloudRaw = await _readClassFile();
+    final (cloudRaw, readFile) = await _readClassFile();
     final cloud = cloudRaw == null ? null : _decode(cloudRaw);
+    // Fichier d'une version <= 1.4 : converti ici, ecrit sous le nouveau nom.
+    final fromLegacy = readFile == legacyClassFile;
     var lineage = cloud?['lineage'] as String? ?? _randomId();
     var remoteData = cloud == null
         ? <String, dynamic>{}
-        : Map<String, dynamic>.from(cloud['data'] as Map? ?? const {});
-    final conflictVersions = cloudRaw == null ? const <Uint8List>[] : await folder.conflictVersions(classFile);
+        : migrateSpaceProgressions(Map<String, dynamic>.from(cloud['data'] as Map? ?? const {}));
+    final conflictVersions =
+        cloudRaw == null || fromLegacy ? const <Uint8List>[] : await folder.conflictVersions(classFile);
     for (final v in conflictVersions) {
       // Ecritures simultanees : union prudente, rien n'est supprime.
       final other = _decode(v);
       if (other == null) continue;
       remoteData = SyncMerge.merge(
         local: remoteData,
-        remote: Map<String, dynamic>.from(other['data'] as Map? ?? const {}),
+        remote: migrateSpaceProgressions(Map<String, dynamic>.from(other['data'] as Map? ?? const {})),
       ).snapshot;
     }
 
@@ -227,7 +238,7 @@ class CloudSync {
     final changesHere = result.stats.changes.where((c) => c.onLocal).toList();
     final changesThere = result.stats.changes.where((c) => !c.onLocal).toList();
     if (changesHere.isEmpty && changesThere.isEmpty && toUpload.isEmpty &&
-        toDownload.isEmpty && cloud != null && conflictVersions.isEmpty) {
+        toDownload.isEmpty && cloud != null && !fromLegacy && conflictVersions.isEmpty) {
       await host.syncSaveBase(baseKey, _base(result, lineage));
       return CloudSyncOutcome(CloudSyncStatus.upToDate);
     }
@@ -269,9 +280,9 @@ class CloudSync {
     }
 
     // 7. Fichier de classe, si iCloud a quelque chose de nouveau a recevoir.
-    if (changesThere.isNotEmpty || cloud == null || conflictVersions.isNotEmpty) {
+    if (changesThere.isNotEmpty || cloud == null || fromLegacy || conflictVersions.isNotEmpty) {
       // Un autre appareil a-t-il ecrit pendant ce temps ? Alors on recommence.
-      final now = await _readClassFile();
+      final (now, _) = await _readClassFile();
       if (!_sameBytes(now, cloudRaw)) {
         return CloudSyncOutcome(CloudSyncStatus.retryLater,
             message: 'iCloud a changé pendant la synchronisation.');
@@ -288,12 +299,17 @@ class CloudSync {
         summary: _summary(result, downloaded, toUpload.length));
   }
 
-  Future<Uint8List?> _readClassFile() async {
-    if (!await folder.exists(classFile)) return null;
-    if (!await folder.ensureDownloaded(classFile)) {
-      throw SyncException('Le fichier iCloud n’a pas pu être téléchargé : réessayez plus tard.');
+  /// Contenu du fichier de classe, et le nom du fichier lu ([classFile], ou
+  /// a defaut celui d'une version <= 1.4).
+  Future<(Uint8List?, String?)> _readClassFile() async {
+    for (final name in const [classFile, legacyClassFile]) {
+      if (!await folder.exists(name)) continue;
+      if (!await folder.ensureDownloaded(name)) {
+        throw SyncException('Le fichier iCloud n’a pas pu être téléchargé : réessayez plus tard.');
+      }
+      return (await folder.read(name), name);
     }
-    return folder.read(classFile);
+    return (null, null);
   }
 
   static Map<String, dynamic>? _decode(Uint8List bytes) {

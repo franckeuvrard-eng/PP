@@ -68,6 +68,7 @@ const _tour = [
   _TourPage(Icons.tune, 'Paramètres', 'Votre classe, à votre façon.', [
     'Profil Classe : nom, enseignant, ATSEM, niveau, sections, logo.',
     'Espaces & Ateliers : vos coins de classe et les ateliers de chacun, avec leurs objectifs.',
+    'Progressions : des ateliers à faire dans l\'ordre, comme un chemin avec ses étapes.',
     'Apparence : mode clair ou sombre.',
     'Sauvegarde & Sécurité : Face ID, sauvegardes, synchronisation entre appareils.',
   ]),

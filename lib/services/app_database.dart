@@ -10,6 +10,7 @@ import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
+import '../models/progression.dart';
 import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../models/space.dart';
@@ -34,7 +35,7 @@ class AppDatabase {
   /// Version du schema. **Toute evolution passe par [_migrate]**, jamais par une
   /// retouche de [_createV1] : les installations deja deployees ne rejouent que
   /// les migrations manquantes.
-  static const _schemaVersion = 5;
+  static const _schemaVersion = 6;
 
   /// Tables « entite » : cle primaire texte + JSON.
   ///
@@ -161,6 +162,15 @@ class AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_referential_history_child '
           'ON referential_status_history (child_id, referential_id)',
         );
+      case 6:
+        // Progressions (parcours ordonnes d'ateliers), separees des espaces.
+        // Les espaces « mode progression » existants sont convertis au
+        // chargement par l'application (migrateSpaceProgressions), pas ici :
+        // la meme conversion sert aussi aux sauvegardes et a la synchro.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS progressions '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
       default:
         throw StateError('Migration manquante vers la version $version');
     }
@@ -199,6 +209,11 @@ class AppDatabase {
       (await _readAll('spaces')).map(Space.fromMap).toList();
   Future<void> saveSpace(Space s) => _upsert('spaces', s.id, s.toMap());
   Future<void> deleteSpace(String id) => _delete('spaces', id);
+
+  Future<List<Progression>> readProgressions() async =>
+      (await _readAll('progressions')).map(Progression.fromMap).toList();
+  Future<void> saveProgression(Progression p) => _upsert('progressions', p.id, p.toMap());
+  Future<void> deleteProgression(String id) => _delete('progressions', id);
 
   Future<List<ActivityType>> readActivityTypes() async =>
       (await _readAll('activity_types')).map(ActivityType.fromMap).toList();
@@ -472,6 +487,7 @@ class AppDatabase {
     required List<ActivityLog> activities,
     required List<EvaluationStatus> evaluationStatuses,
     required Map<String, Map<String, SonStatut>> sons,
+    List<Progression> progressions = const [],
   }) async {
     final db = await _database;
     // Une transaction unique : une restauration interrompue ne doit pas
@@ -493,6 +509,10 @@ class AppDatabase {
       }
       for (final l in activities) {
         await txn.insert('activities', {'id': l.id, 'data': json.encode(l.toMap())});
+      }
+      await txn.delete('progressions');
+      for (final p in progressions) {
+        await txn.insert('progressions', {'id': p.id, 'data': json.encode(p.toMap())});
       }
       sons.forEach((childId, entries) {
         entries.forEach((son, statut) {

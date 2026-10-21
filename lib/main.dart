@@ -13,6 +13,7 @@ import 'screens/help_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
+import 'screens/progressions_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -337,13 +338,21 @@ class MainNavigationFrame extends StatefulWidget {
 class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
+  /// Barre laterale (ordinateur, iPad), dans l'ordre affiche ; [_desktopOrder]
+  /// donne l'ecran de [_screens] correspondant.
   static const _destinations = [
     DesktopDestination(label: 'Accueil', icon: Icons.home_outlined, selectedIcon: Icons.home),
     DesktopDestination(label: 'Scan & Go', icon: Icons.qr_code_2, selectedIcon: Icons.qr_code_2),
     DesktopDestination(label: 'Élèves', icon: Icons.people_outline, selectedIcon: Icons.people),
+    DesktopDestination(label: 'Progressions', icon: Icons.timeline, selectedIcon: Icons.timeline),
     DesktopDestination(label: 'Badges QR', icon: Icons.print_outlined, selectedIcon: Icons.print),
     DesktopDestination(label: 'Paramètres', icon: Icons.tune, selectedIcon: Icons.tune),
   ];
+  static const _desktopOrder = [0, 1, 2, _progressionsIndex, 3, 4];
+
+  /// Les Progressions n'ont pas d'onglet sur telephone (barre du bas a cinq
+  /// entrees) : on y accede depuis l'accueil.
+  static const _progressionsIndex = 5;
 
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -351,7 +360,15 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     ChildrenManagerScreen(),
     QrGeneratorScreen(),
     SettingsScreen(),
+    ProgressionsScreen(),
   ];
+
+  int get _desktopIndex {
+    final i = _desktopOrder.indexOf(_currentIndex);
+    return i < 0 ? 0 : i;
+  }
+
+  void _selectDesktop(int i) => _select(_desktopOrder[i]);
 
   @override
   void initState() {
@@ -416,7 +433,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       case SetupTarget.spaces:
         settings(1);
       case SetupTarget.security:
-        settings(3);
+        settings(4);
       case SetupTarget.students:
         _select(2);
       case SetupTarget.badges:
@@ -536,6 +553,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       LogicalKeyboardKey.digit3,
       LogicalKeyboardKey.digit4,
       LogicalKeyboardKey.digit5,
+      LogicalKeyboardKey.digit6,
     ];
     return [
       const PlatformMenu(
@@ -552,7 +570,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             PlatformMenuItem(
               label: _destinations[i].label,
               shortcut: SingleActivator(digits[i], meta: true),
-              onSelected: () => _select(i),
+              onSelected: () => _selectDesktop(i),
             ),
         ],
       ),
@@ -594,8 +612,8 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   Widget _buildDesktop(AppStateProvider appProvider) {
     final frame = DesktopFrame(
       destinations: _destinations,
-      currentIndex: _currentIndex,
-      onSelected: _select,
+      currentIndex: _desktopIndex,
+      onSelected: _selectDesktop,
       className: appProvider.classSettings.name,
       onHelp: _openHelp,
       body: _refreshable(IndexedStack(index: _currentIndex, children: _screens)),
@@ -606,7 +624,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       return PlatformMenuBar(menus: _macMenus(), child: frame);
     }
     return CallbackShortcuts(
-      bindings: desktopNavigationShortcuts(_destinations.length, _select),
+      bindings: desktopNavigationShortcuts(_destinations.length, _selectDesktop),
       child: Focus(autofocus: true, child: frame),
     );
   }
@@ -619,7 +637,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     // second critere evite de rebasculer sur la barre d'onglets mobile quand
     // l'utilisateur reduit la fenetre un peu trop.
     final width = MediaQuery.sizeOf(context).width;
-    if (width >= kDesktopBreakpoint || (isDesktopPlatform && width >= 600)) {
+    if (usesDesktopLayout(width)) {
       return _buildDesktop(appProvider);
     }
 
@@ -666,11 +684,12 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
         ],
       ),
       body: _refreshable(IndexedStack(
-        index: _currentIndex,
+        index: _currentIndex < _progressionsIndex ? _currentIndex : 0,
         children: _screens,
       )),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+        // Progressions (ouvertes en mode ordinateur) : pas d'onglet ici.
+        currentIndex: _currentIndex < _progressionsIndex ? _currentIndex : 0,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF4E9F3D),

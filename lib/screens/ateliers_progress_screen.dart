@@ -145,14 +145,14 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
   ) {
     final bySpace = <String, List<MapEntry<ActivityType, AtelierEligibilityResult>>>{};
     for (final entry in entries) {
-      (bySpace[entry.key.spaceId] ??= []).add(entry);
+      (bySpace[provider.placeIdOf(entry.key)] ??= []).add(entry);
     }
     final spaceIds = bySpace.keys.toList()
-      ..sort((a, b) => (provider.spaceById(a)?.name ?? '').compareTo(provider.spaceById(b)?.name ?? ''));
+      ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
 
     return [
       for (final spaceId in spaceIds) ...[
-        _buildSpaceHeader(provider.spaceById(spaceId)),
+        _buildSpaceHeader(provider.placeById(spaceId)),
         ...bySpace[spaceId]!.map((e) => _buildAtelierRow(provider, e.key, e.value, snapshots[e.key.id])),
         const SizedBox(height: 8),
       ],

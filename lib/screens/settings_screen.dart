@@ -15,6 +15,7 @@ import '../widgets/school_year_card.dart';
 import 'sync_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'referentials_manager_screen.dart';
+import 'progressions_settings_tab.dart';
 import 'spaces_workshops_tab.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -47,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(length: 5, vsync: this, initialIndex: widget.initialTab);
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final settings = provider.classSettings;
 
@@ -88,6 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           tabs: const [
             Tab(icon: Icon(Icons.school), text: 'Profil Classe'),
             Tab(icon: Icon(Icons.space_dashboard), text: 'Espaces & Ateliers'),
+            Tab(icon: Icon(Icons.timeline), text: 'Progressions'),
             Tab(icon: Icon(Icons.brightness_6), text: 'Apparence'),
             Tab(icon: Icon(Icons.security), text: 'Sauvegarde & Sécurité'),
           ],
@@ -98,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         children: [
           _buildClassProfileTab(provider),
           const SpacesWorkshopsTab(),
+          const ProgressionsSettingsTab(),
           _buildAppearanceTab(provider),
           _buildSecurityBackupTab(provider),
         ],

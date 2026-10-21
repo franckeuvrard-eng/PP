@@ -94,7 +94,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       }
       final actType = provider.activityTypeById(act.activityTypeId) ??
           ActivityType(id: '', name: '', spaceId: '', colorHex: '#718096');
-      final space = provider.spaceById(actType.spaceId) ??
+      final space = provider.placeOf(actType) ??
           Space(id: '', name: 'Autre', colorHex: '#718096');
       final cat = space.name.isNotEmpty ? space.name : 'Autre';
       domainCounts[cat] = (domainCounts[cat] ?? 0) + 1;
@@ -456,7 +456,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     ),
                     title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      provider.spaces.firstWhere((s) => s.id == actType.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
+                      provider.placeOf(actType)?.name ?? '',
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: Text('$count fois', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -717,10 +717,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             itemCount: mandatoryTypes.length,
             itemBuilder: (context, index) {
               final actType = mandatoryTypes[index];
-              final space = provider.spaces.firstWhere(
-                (s) => s.id == actType.spaceId,
-                orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
-              );
+              final space = provider.placeOf(actType) ?? Space(id: '', name: 'Non défini', colorHex: '');
 
               final completedChildIds = logs
                   .where((l) => l.activityTypeId == actType.id)

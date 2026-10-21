@@ -105,7 +105,17 @@ class HelpScreen extends StatelessWidget {
               'Dans l\'édition d\'un atelier, activez « Atelier Obligatoire ».',
               'Sélectionnez ensuite les sections concernées. Si vous n\'en cochez aucune, l\'atelier est obligatoire pour toute la classe.',
               'Les statistiques et le rapport « Ateliers obligatoires » ne comptabilisent alors que les élèves des sections ciblées.',
-              'Un espace peut en plus être mis en « Mode progression » (Paramètres > Espaces & Ateliers, en modifiant l\'espace) : ses ateliers doivent alors être faits dans l\'ordre, glissé-déposé pour réordonner, et un atelier reste verrouillé pour un élève tant que les précédents n\'ont pas atteint le statut minimum choisi.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.timeline,
+            title: 'Progressions',
+            steps: [
+              'Une progression est une suite d\'ateliers à faire dans l\'ordre, ses « jalons » (par exemple : couper une bande, puis une ligne droite, puis une courbe).',
+              'Créez-la dans Paramètres > Progressions, choisissez le seuil de passage, puis ajoutez ses jalons. Glissez la poignée ⠿ pour changer leur ordre.',
+              'Un atelier est rangé soit dans un espace, soit dans une progression : choisissez-le dans « Rangé dans » en éditant l\'atelier.',
+              'Un jalon reste verrouillé pour un élève tant que le précédent n\'a pas atteint le seuil de passage.',
+              'L\'écran Progressions (barre latérale sur Mac et iPad, carte de l\'accueil sur iPhone) montre le fil : où en est la classe, ou un élève. L\'onglet Progressions de la fiche élève montre la même chose pour lui.',
             ],
           ),
           _HelpSection(

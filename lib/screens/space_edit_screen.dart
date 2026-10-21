@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/progression.dart';
 import '../models/space.dart';
 import '../providers/app_provider.dart';
 import '../utils/color_utils.dart';
 import '../widgets/color_swatch_picker.dart';
 import '../widgets/icon_swatch_picker.dart';
 
-/// Formulaire plein écran de création / édition d'un espace de la classe,
-/// accessible depuis l'onglet « Espaces & Ateliers » des Réglages.
+/// Formulaire plein écran de création / édition d'un espace de la classe
+/// (onglet « Espaces & Ateliers ») ou d'une progression (onglet
+/// « Progressions ») : memes champs, plus le seuil de passage pour une
+/// progression.
 ///
 /// Miroir de [AtelierEditScreen] : un espace et un atelier s'éditent
 /// désormais de la même façon (page dédiée), plutôt que l'un en popup et
 /// l'autre en page — l'incohérence n'avait pas de raison fonctionnelle.
 class SpaceEditScreen extends StatefulWidget {
   final Space? space;
+  final Progression? progression;
 
-  const SpaceEditScreen({super.key, this.space});
+  /// Edition d'une progression plutot que d'un espace.
+  final bool forProgression;
+
+  const SpaceEditScreen({super.key, this.space})
+      : progression = null,
+        forProgression = false;
+
+  const SpaceEditScreen.progression({super.key, this.progression})
+      : space = null,
+        forProgression = true;
 
   @override
   State<SpaceEditScreen> createState() => _SpaceEditScreenState();
@@ -26,21 +39,23 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
   late TextEditingController _descCtrl;
   late String _color;
   late String? _iconName;
-  late bool _isProgression;
   late String? _progressionMinStatusId;
+
+  bool get _p => widget.forProgression;
+  bool get _isNew => _p ? widget.progression == null : widget.space == null;
 
   @override
   void initState() {
     super.initState();
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final space = widget.space;
+    final prog = widget.progression;
 
-    _nameCtrl = TextEditingController(text: space?.name ?? '');
-    _descCtrl = TextEditingController(text: space?.description ?? '');
-    _color = space?.colorHex ?? '#4E9F3D';
-    _iconName = space?.iconName;
-    _isProgression = space?.isProgression ?? false;
-    _progressionMinStatusId = space?.progressionMinStatusId ??
+    _nameCtrl = TextEditingController(text: prog?.name ?? space?.name ?? '');
+    _descCtrl = TextEditingController(text: prog?.description ?? space?.description ?? '');
+    _color = prog?.colorHex ?? space?.colorHex ?? '#4E9F3D';
+    _iconName = prog?.iconName ?? space?.iconName;
+    _progressionMinStatusId = prog?.minStatusId ??
         (provider.evaluationStatuses.isNotEmpty
             ? provider.evaluationStatuses.last.id
             : null);
@@ -57,28 +72,31 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Veuillez saisir un nom d\'espace.'),
+            content: Text('Veuillez saisir un nom.'),
             backgroundColor: Colors.red),
       );
       return;
     }
 
     final provider = Provider.of<AppStateProvider>(context, listen: false);
-    final newSpace = Space(
-      id: widget.space?.id ?? 'space_${DateTime.now().millisecondsSinceEpoch}',
-      name: _nameCtrl.text.trim(),
-      colorHex: _color,
-      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-      iconName: _iconName,
-      isProgression: _isProgression,
-      progressionMinStatusId: _isProgression
-          ? _progressionMinStatusId
-          : widget.space?.progressionMinStatusId,
-    );
-    provider.addOrUpdateSpace(newSpace);
-    if (_isProgression) {
-      provider.setSpaceProgression(newSpace.id, true,
-          minStatusId: _progressionMinStatusId);
+    final description = _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim();
+    if (_p) {
+      provider.saveProgression(Progression(
+        id: widget.progression?.id ?? 'prog_${DateTime.now().millisecondsSinceEpoch}',
+        name: _nameCtrl.text.trim(),
+        colorHex: _color,
+        description: description,
+        iconName: _iconName,
+        minStatusId: _progressionMinStatusId,
+      ));
+    } else {
+      provider.addOrUpdateSpace(Space(
+        id: widget.space?.id ?? 'space_${DateTime.now().millisecondsSinceEpoch}',
+        name: _nameCtrl.text.trim(),
+        colorHex: _color,
+        description: description,
+        iconName: _iconName,
+      ));
     }
     Navigator.pop(context);
   }
@@ -90,7 +108,9 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title:
-            Text(widget.space == null ? 'Nouvel espace' : 'Modifier l\'espace'),
+            Text(_p
+                ? (_isNew ? 'Nouvelle progression' : 'Modifier la progression')
+                : (_isNew ? 'Nouvel espace' : 'Modifier l\'espace')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -127,11 +147,11 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom de l\'espace *',
-                        hintText: 'Ex: Coin Arts Visuels',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.space_dashboard),
+                      decoration: InputDecoration(
+                        labelText: _p ? 'Nom de la progression *' : 'Nom de l\'espace *',
+                        hintText: _p ? 'Ex: Découpage' : 'Ex: Coin Arts Visuels',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(_p ? Icons.timeline : Icons.space_dashboard),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -149,72 +169,61 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Section 2 : Mode progression
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🔒 Progression',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 4),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Mode progression (ordre imposé)',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: const Text(
-                        "Les ateliers de cet espace doivent être faits dans l'ordre : un atelier reste verrouillé tant que les précédents n'ont pas atteint le statut minimum choisi.",
+            // Section 2 : seuil de passage (progressions seulement)
+            if (_p) ...[
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Seuil de passage',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Les jalons se font dans l'ordre : un jalon reste verrouillé pour un élève "
+                        "tant que le précédent n'a pas atteint ce niveau.",
                         style: TextStyle(fontSize: 12),
                       ),
-                      value: _isProgression,
-                      activeThumbColor: const Color(0xFF4E9F3D),
-                      onChanged: (val) => setState(() => _isProgression = val),
-                    ),
-                    if (_isProgression && provider.evaluationStatuses.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          "⚠️ Aucun niveau d'évaluation n'existe : aucun atelier ne pourra jamais être débloqué. Créez-en au moins un dans Réglages.",
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold),
+                      if (provider.evaluationStatuses.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            "Aucun niveau d'évaluation n'existe : aucun jalon ne pourra être "
+                            "débloqué. Créez-en au moins un dans Réglages.",
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      else ...[
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          // Champ pilote par le code : initialValue ne suivrait pas ses
+                          // changements.
+                          // ignore: deprecated_member_use
+                          value: provider.evaluationStatuses
+                                  .any((s) => s.id == _progressionMinStatusId)
+                              ? _progressionMinStatusId
+                              : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Niveau à atteindre pour passer au jalon suivant',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: [
+                            for (final st in provider.evaluationStatuses)
+                              DropdownMenuItem(value: st.id, child: Text(st.label)),
+                          ],
+                          onChanged: (val) => setState(() => _progressionMinStatusId = val),
                         ),
-                      ),
-                    if (_isProgression &&
-                        provider.evaluationStatuses.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
-                        // ne suivrait pas ses changements.
-                        // ignore: deprecated_member_use
-                        value: provider.evaluationStatuses
-                                .any((s) => s.id == _progressionMinStatusId)
-                            ? _progressionMinStatusId
-                            : null,
-                        decoration: const InputDecoration(
-                          labelText: 'Statut minimum pour débloquer le suivant',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: provider.evaluationStatuses.map((s) {
-                          return DropdownMenuItem(
-                              value: s.id, child: Text(s.label));
-                        }).toList(),
-                        onChanged: (val) =>
-                            setState(() => _progressionMinStatusId = val),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Section 3 : Description & Identité Visuelle
             Card(
@@ -229,7 +238,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    const Text('Couleur de l\'espace :',
+                    Text(_p ? 'Couleur de la progression :' : 'Couleur de l\'espace :',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 8),

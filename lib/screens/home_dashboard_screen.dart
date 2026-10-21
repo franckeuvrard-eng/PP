@@ -10,7 +10,9 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
+import 'progressions_screen.dart';
 import 'reports_screen.dart';
+import '../widgets/desktop_frame.dart';
 import '../widgets/voice_note_play_button.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -100,6 +102,27 @@ class HomeDashboardScreen extends StatelessWidget {
             ),
           ),
 
+          // Ordinateur / iPad : les Progressions ont leur entree dans la barre
+          // laterale.
+          if (!usesDesktopLayout(MediaQuery.sizeOf(context).width)) ...[
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF42A5F5),
+                  child: Icon(Icons.timeline, color: Colors.white),
+                ),
+                title: const Text('Progressions', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(provider.progressions.isEmpty
+                    ? 'Des ateliers à faire dans l’ordre, comme un chemin.'
+                    : '${provider.progressions.length} progression(s) : où en est chaque élève.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressionsScreen())),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 20),
 
           // Header
@@ -138,7 +161,7 @@ class HomeDashboardScreen extends StatelessWidget {
                         Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?');
                     final actType = provider.activityTypeById(act.activityTypeId) ??
                         ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096');
-                    final space = provider.spaceById(actType.spaceId) ??
+                    final space = provider.placeOf(actType) ??
                         Space(id: '', name: '', colorHex: '#718096');
 
                     return Card(

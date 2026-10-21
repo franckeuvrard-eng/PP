@@ -27,10 +27,10 @@ class MandatoryAteliersPdfService {
       final mandatory = provider.activityTypes.where((a) => a.isObligatoryForGroup(child.group)).toList();
       final bySpace = <String, List<ActivityType>>{};
       for (final atelier in mandatory) {
-        (bySpace[atelier.spaceId] ??= []).add(atelier);
+        (bySpace[provider.placeIdOf(atelier)] ??= []).add(atelier);
       }
       final spaceIds = bySpace.keys.toList()
-        ..sort((a, b) => (provider.spaceById(a)?.name ?? '').compareTo(provider.spaceById(b)?.name ?? ''));
+        ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
 
       doc.addPage(
         pw.MultiPage(
@@ -67,7 +67,7 @@ class MandatoryAteliersPdfService {
                 for (final spaceId in spaceIds) ...[
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
-                    child: pw.Text(pdfSafe(provider.spaceById(spaceId)?.name ?? 'Sans espace'),
+                    child: pw.Text(pdfSafe(provider.placeById(spaceId)?.name ?? 'Sans espace'),
                         style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                   ),
                   for (final atelier in bySpace[spaceId]!)

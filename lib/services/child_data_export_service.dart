@@ -126,7 +126,7 @@ class ChildDataExportService {
         ...logs.map((log) {
           final actType = provider.activityTypeById(log.activityTypeId) ??
               ActivityType(id: '', name: 'Atelier supprimé', spaceId: '', colorHex: '');
-          final space = provider.spaceById(actType.spaceId) ??
+          final space = provider.placeOf(actType) ??
               Space(id: '', name: '', colorHex: '');
           final captions = log.photoPaths.map((p) => log.captionFor(p)).whereType<String>().toList();
           return pw.Padding(

@@ -2,9 +2,16 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/platform_support.dart';
+
 /// Largeur a partir de laquelle on bascule sur la mise en page ordinateur
 /// (barre laterale a la place de la barre d'onglets du bas).
 const double kDesktopBreakpoint = 840;
+
+/// Mise en page ordinateur (barre laterale) : fenetre large, ou plateforme
+/// de bureau pas trop etroite.
+bool usesDesktopLayout(double width) =>
+    width >= kDesktopBreakpoint || (isDesktopPlatform && width >= 600);
 
 /// Largeur maximale du contenu : au-dela, les listes et formulaires pensees
 /// pour un telephone deviennent illisibles (lignes de 1500 px).

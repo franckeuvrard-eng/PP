@@ -10,7 +10,8 @@ import 'atelier_edit_screen.dart';
 import 'space_edit_screen.dart';
 
 /// Onglet « Espaces & Ateliers » de l'écran Réglages : CRUD des espaces de la
-/// classe et de leurs ateliers, réordonnancement en mode progression.
+/// classe et de leurs ateliers. Les ateliers rangés dans une progression
+/// sont gérés dans l'onglet « Progressions ».
 class SpacesWorkshopsTab extends StatelessWidget {
   const SpacesWorkshopsTab({super.key});
 
@@ -18,7 +19,6 @@ class SpacesWorkshopsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final spaces = provider.spaces;
-    final allAteliers = provider.activityTypes;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -48,8 +48,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
 
           // Spaces list
           ...spaces.map((space) {
-            final ateliersInSpace =
-                allAteliers.where((a) => a.spaceId == space.id).toList();
+            final ateliersInSpace = provider.ateliersInSpace(space.id);
             final spaceColor = hexToColor(space.colorHex);
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -81,10 +80,8 @@ class SpacesWorkshopsTab extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          _badge('${ateliersInSpace.length} atelier(s)',
+                          settingsBadge('${ateliersInSpace.length} atelier(s)',
                               spaceColor),
-                          if (space.isProgression)
-                            _badge('🔒 Progression', Colors.deepOrange),
                         ],
                       ),
                       if (space.description != null &&
@@ -143,62 +140,8 @@ class SpacesWorkshopsTab extends StatelessWidget {
                   ],
                 ),
                 children: [
-                  // Ateliers in this space : glisser-deposer si l'espace impose
-                  // un ordre de progression, sinon liste condensee simple.
-                  if (space.isProgression) ...[
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 4, 16, 6),
-                      child: Row(children: [
-                        Icon(Icons.swap_vert, size: 18, color: Color(0xFF4E9F3D)),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Ordre de progression : maintenez la poignée ⠿ et glissez un '
-                            'atelier pour changer sa place.',
-                            style: TextStyle(fontSize: 12, color: kMutedTextColor),
-                          ),
-                        ),
-                      ]),
-                    ),
-                    ReorderableListView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      // Une seule poignee, bien visible (cf. _buildAtelierTile).
-                      buildDefaultDragHandles: false,
-                      // L'atelier deplace se souleve, entoure de vert.
-                      proxyDecorator: (child, index, animation) => Material(
-                        elevation: 6,
-                        borderRadius: BorderRadius.circular(12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color(0xFF4E9F3D), width: 2),
-                        ),
-                        child: child,
-                      ),
-                      // newIndex deja corrige du decalage de l'element retire.
-                      onReorderItem: (oldIndex, newIndex) {
-                        final ordered = provider
-                            .ateliersInSpaceOrdered(space.id)
-                            .map((a) => a.id)
-                            .toList();
-                        final id = ordered.removeAt(oldIndex);
-                        ordered.insert(newIndex, id);
-                        provider.reorderAteliersInSpace(space.id, ordered);
-                      },
-                      children: [
-                        for (final entry in provider
-                            .ateliersInSpaceOrdered(space.id)
-                            .asMap()
-                            .entries)
-                          _buildAtelierTile(context, provider, entry.value,
-                              key: ValueKey(entry.value.id),
-                              dragIndex: entry.key),
-                      ],
-                    ),
-                  ]
-                  else
-                    ...ateliersInSpace.map((atelier) =>
-                        _buildAtelierTile(context, provider, atelier)),
+                  ...ateliersInSpace.map((atelier) =>
+                      atelierSettingsTile(context, atelier)),
                   // Add atelier button inside expansion
                   Padding(
                     padding: const EdgeInsets.all(8),
@@ -251,103 +194,6 @@ class SpacesWorkshopsTab extends StatelessWidget {
     );
   }
 
-  /// Petite pastille arrondie (nombre d'ateliers, mode progression...) pour
-  /// distinguer les espaces d'un coup d'œil sans avoir à les déplier.
-  Widget _badge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-    );
-  }
-
-  /// Ligne condensee d'un atelier : le detail (domaine, objectifs, photos,
-  /// obligatoire) est dans AtelierDetailScreen, a un tap. [dragIndex] non nul
-  /// affiche une poignee de glisser-deposer au lieu du chevron (mode
-  /// progression) ; le tap reste dedie a l'ouverture du detail dans les deux cas.
-  Widget _buildAtelierTile(
-    BuildContext context,
-    AppStateProvider provider,
-    ActivityType atelier, {
-    Key? key,
-    int? dragIndex,
-  }) {
-    final avatar = CircleAvatar(
-      radius: 16,
-      backgroundColor: hexToColor(atelier.colorHex),
-      child: Icon(iconForName(atelier.iconName, fallback: Icons.palette),
-          size: 14, color: Colors.white),
-    );
-    return ListTile(
-      key: key,
-      dense: true,
-      // En mode progression : numero d'ordre devant l'atelier.
-      leading: dragIndex == null
-          ? avatar
-          : Row(mainAxisSize: MainAxisSize.min, children: [
-              SizedBox(
-                width: 22,
-                child: Text('${dragIndex + 1}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4E9F3D))),
-              ),
-              const SizedBox(width: 4),
-              avatar,
-            ]),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(atelier.name,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          ),
-          if (atelier.isObligatory)
-            const Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: Icon(Icons.stars, size: 15, color: Colors.orange),
-            ),
-        ],
-      ),
-      subtitle: atelier.domaine.isEmpty && atelier.objectifs.isEmpty
-          ? null
-          : Text(
-              [
-                if (atelier.domaine.isNotEmpty) '📚 ${atelier.domaine}',
-                if (atelier.objectifs.isNotEmpty)
-                  '🏁 ${atelier.objectifs.length} objectif(s)',
-              ].join('  •  '),
-              style: const TextStyle(fontSize: 12, color: kMutedTextColor),
-            ),
-      trailing: dragIndex != null
-          ? ReorderableDragStartListener(
-              index: dragIndex,
-              child: Tooltip(
-                message: "Glisser pour changer l'ordre",
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.drag_indicator, color: Color(0xFF4E9F3D), size: 24),
-                ),
-              ),
-            )
-          : const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => AtelierDetailScreen(atelier: atelier)),
-      ),
-    );
-  }
-
   void _openSpaceEditor(BuildContext context, {Space? space}) {
     Navigator.push(
       context,
@@ -367,4 +213,100 @@ class SpacesWorkshopsTab extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Petite pastille arrondie (nombre d'ateliers...) pour
+/// distinguer les espaces et progressions d'un coup d'œil sans avoir à les déplier.
+Widget settingsBadge(String label, Color color) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(label,
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+  );
+}
+
+/// Ligne condensee d'un atelier : le detail (domaine, objectifs, photos,
+/// obligatoire) est dans AtelierDetailScreen, a un tap. [dragIndex] non nul
+/// affiche une poignee de glisser-deposer au lieu du chevron (jalon
+/// de progression) ; le tap reste dedie a l'ouverture du detail dans les deux cas.
+Widget atelierSettingsTile(
+  BuildContext context,
+  ActivityType atelier, {
+  Key? key,
+  int? dragIndex,
+}) {
+  final avatar = CircleAvatar(
+    radius: 16,
+    backgroundColor: hexToColor(atelier.colorHex),
+    child: Icon(iconForName(atelier.iconName, fallback: Icons.palette),
+        size: 14, color: Colors.white),
+  );
+  return ListTile(
+    key: key,
+    dense: true,
+    // En mode progression : numero d'ordre devant l'atelier.
+    leading: dragIndex == null
+        ? avatar
+        : Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 22,
+              child: Text('${dragIndex + 1}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF4E9F3D))),
+            ),
+            const SizedBox(width: 4),
+            avatar,
+          ]),
+    title: Row(
+      children: [
+        Expanded(
+          child: Text(atelier.name,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        ),
+        if (atelier.isObligatory)
+          const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Icon(Icons.stars, size: 15, color: Colors.orange),
+          ),
+      ],
+    ),
+    subtitle: atelier.domaine.isEmpty && atelier.objectifs.isEmpty
+        ? null
+        : Text(
+            [
+              if (atelier.domaine.isNotEmpty) '📚 ${atelier.domaine}',
+              if (atelier.objectifs.isNotEmpty)
+                '🏁 ${atelier.objectifs.length} objectif(s)',
+            ].join('  •  '),
+            style: const TextStyle(fontSize: 12, color: kMutedTextColor),
+          ),
+    trailing: dragIndex != null
+        ? ReorderableDragStartListener(
+            index: dragIndex,
+            child: Tooltip(
+              message: "Glisser pour changer l'ordre",
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.drag_indicator, color: Color(0xFF4E9F3D), size: 24),
+              ),
+            ),
+          )
+        : const Icon(Icons.chevron_right, color: Colors.grey),
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => AtelierDetailScreen(atelier: atelier)),
+    ),
+  );
 }

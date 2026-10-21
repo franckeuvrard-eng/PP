@@ -47,7 +47,7 @@ class AtelierDetailScreen extends StatelessWidget {
     return Consumer<AppStateProvider>(
       builder: (context, provider, _) {
         final current = provider.activityTypeById(atelier.id) ?? atelier;
-        final space = provider.spaceById(current.spaceId);
+        final space = provider.placeOf(current);
         final color = hexToColor(current.colorHex);
 
         return Scaffold(

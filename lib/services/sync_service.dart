@@ -107,7 +107,8 @@ const int kSyncDefaultPort = 48765;
 /// la sienne) ne peut alors jamais faire passer son vide pour des suppressions.
 const String kSyncGenerationKey = '\u0002generation';
 // 2 : accord explicite de l'appareil qui recoit (/request + jeton de session).
-const int _protocol = 2;
+/// 3 : progressions separees des espaces (1.5).
+const int _protocol = 3;
 
 /// Delai laisse a l'appareil qui recoit pour accepter ou refuser.
 const kSyncConsentTimeout = Duration(seconds: 90);

@@ -38,9 +38,16 @@ class ActivityType {
   /// Vide alors que [isObligatory] est vrai : obligatoire pour toute la classe.
   final List<String> obligatoryGroups;
 
-  /// Rang de l'atelier dans son espace quand celui-ci est en mode
-  /// progression (voir [Space.isProgression]). -1 : jamais positionne.
+  /// Rang du jalon dans sa progression ([progressionId]). -1 : jamais
+  /// positionne.
   final int position;
+
+  /// Progression dont l'atelier est un jalon. Un atelier est soit dans un
+  /// espace ([spaceId]), soit dans une progression, jamais les deux : quand
+  /// [progressionId] est renseigne, [spaceId] est vide.
+  final String? progressionId;
+
+  bool get inProgression => progressionId != null && progressionId!.isNotEmpty;
 
   ActivityType({
     required this.id,
@@ -58,6 +65,7 @@ class ActivityType {
     this.photoCaptions = const {},
     this.obligatoryGroups = const [],
     this.position = -1,
+    this.progressionId,
   });
 
   /// Legende associee a une photo, ou null si aucune.
@@ -101,6 +109,7 @@ class ActivityType {
     Map<String, String>? photoCaptions,
     List<String>? obligatoryGroups,
     int? position,
+    Object? progressionId = kUndefined,
   }) {
     return ActivityType(
       id: id ?? this.id,
@@ -118,6 +127,8 @@ class ActivityType {
       photoCaptions: photoCaptions ?? this.photoCaptions,
       obligatoryGroups: obligatoryGroups ?? this.obligatoryGroups,
       position: position ?? this.position,
+      progressionId:
+          progressionId == kUndefined ? this.progressionId : progressionId as String?,
     );
   }
 
@@ -140,6 +151,7 @@ class ActivityType {
       'photoCaptions': photoCaptions,
       'obligatoryGroups': obligatoryGroups,
       'position': position,
+      'progressionId': progressionId,
     };
   }
 
@@ -160,6 +172,7 @@ class ActivityType {
       photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
       obligatoryGroups: List<String>.from(map['obligatoryGroups'] ?? []),
       position: map['position'] ?? -1,
+      progressionId: map['progressionId'],
     );
   }
 

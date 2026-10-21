@@ -19,7 +19,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petitpas/data/release_notes.dart';
 import 'package:petitpas/main.dart';
 import 'package:petitpas/models/activity.dart';
+import 'package:petitpas/models/activity_type.dart';
 import 'package:petitpas/models/child.dart';
+import 'package:petitpas/models/progression.dart';
 import 'package:petitpas/providers/app_provider.dart';
 import 'package:petitpas/services/app_database.dart';
 import 'package:provider/provider.dart';
@@ -129,6 +131,38 @@ Future<void> _demoClass(AppStateProvider app) async {
         timestamp: now.subtract(Duration(days: day, hours: rnd.nextInt(5))),
         evaluationStatusId: statuses.isEmpty ? null : statuses[rnd.nextInt(statuses.length)].id,
         note: rnd.nextInt(3) == 0 ? _notes[rnd.nextInt(_notes.length)] : null,
+      ));
+    }
+  }
+  // Progression « Découpage » : chaque eleve a une etape differente.
+  app.saveProgression(Progression(
+    id: 'demo_decoupage',
+    name: 'Découpage',
+    colorHex: '#3498DB',
+    iconName: 'ciseaux',
+    description: "Des ciseaux à la forme découpée, une étape après l'autre.",
+    minStatusId: statuses.isEmpty ? null : statuses.last.id,
+  ));
+  const jalons = ['Couper une bande', 'Couper une ligne droite', 'Couper une courbe', 'Découper une forme'];
+  for (var j = 0; j < jalons.length; j++) {
+    app.addOrUpdateActivityType(ActivityType(
+      id: 'demo_jalon_$j',
+      name: jalons[j],
+      spaceId: '',
+      progressionId: 'demo_decoupage',
+      colorHex: '#3498DB',
+      position: j,
+    ));
+  }
+  for (var i = 0; i < _prenoms.length; i++) {
+    final reached = (i * 7) % (jalons.length + 1);
+    for (var j = 0; j <= reached && j < jalons.length; j++) {
+      app.logActivity(ActivityLog(
+        id: 'demo_jalon_log_${i}_$j',
+        childId: 'demo_$i',
+        activityTypeId: 'demo_jalon_$j',
+        timestamp: now.subtract(Duration(days: 3 * (jalons.length - j) + i % 3)),
+        evaluationStatusId: statuses.isEmpty ? null : (j < reached ? statuses.last.id : statuses.first.id),
       ));
     }
   }
@@ -260,7 +294,7 @@ void main() {
           final image = await boundary.toImage(pixelRatio: device.ratio);
           final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
           final file = File(
-              'store/captures/${device.folder}/${index.toString().padLeft(2, '0')}_$name.png');
+              '${Platform.environment['CAPTURES_DIR'] ?? 'store/captures'}/${device.folder}/${index.toString().padLeft(2, '0')}_$name.png');
           await file.parent.create(recursive: true);
           await file.writeAsBytes(_pngRgb(rgba!.buffer.asUint8List(), image.width, image.height));
         });
@@ -284,6 +318,13 @@ void main() {
       await open('Accueil');
       await tester.tap(find.text('Statistiques').first);
       await shot('statistiques');
+      tester.state<NavigatorState>(find.byType(Navigator).last).pop();
+      await settle();
+      // Barre laterale sur Mac / iPad, carte de l'accueil sur iPhone.
+      await open('Progressions');
+      await shot('progressions');
+      await open('Un élève');
+      await shot('progression_eleve');
 
       // A remettre avant la fin du test (verifie par le framework).
       debugDefaultTargetPlatformOverride = null;

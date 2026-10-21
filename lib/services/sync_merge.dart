@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'progression_migration.dart';
+
 /// Fusion a trois voies de deux jeux de donnees (appareil local / appareil
 /// distant) a partir de leur dernier etat commun (la « base »).
 ///
@@ -20,6 +22,7 @@ class SyncMerge {
   static const listCollections = [
     'children',
     'spaces',
+    'progressions',
     'activity_types',
     'activities',
     'evaluation_statuses',
@@ -236,8 +239,10 @@ class SyncMerge {
     Map<String, String>? base,
     Map<String, Object?>? resolutions,
   }) {
-    final l = flatten(local);
-    final r = flatten(remote);
+    // Donnees d'une version <= 1.4 (sauvegarde, ancien fichier) : converties
+    // des deux cotes, de facon deterministe, avant de comparer.
+    final l = flatten(migrateSpaceProgressions(local));
+    final r = flatten(migrateSpaceProgressions(remote));
     final merged = <String, Map<String, Object?>>{};
     final stats = MergeStats();
     final conflicts = <MergeConflict>[];

@@ -39,7 +39,7 @@ class ExcelExportService {
       for (final log in logs) {
         final actType = provider.activityTypeById(log.activityTypeId) ??
             ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
-        final space = provider.spaceById(actType.spaceId) ??
+        final space = provider.placeOf(actType) ??
             Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
@@ -111,7 +111,7 @@ class ExcelExportService {
         final child = childMap[log.childId];
         final actType = provider.activityTypeById(log.activityTypeId) ??
             ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
-        final space = provider.spaceById(actType.spaceId) ??
+        final space = provider.placeOf(actType) ??
             Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),

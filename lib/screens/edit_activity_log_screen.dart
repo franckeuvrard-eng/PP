@@ -48,10 +48,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
 
-    final space = provider.spaces.firstWhere(
-      (s) => s.id == widget.actType.spaceId,
-      orElse: () => Space(id: '', name: 'Espace non défini', colorHex: '#718096'),
-    );
+    final space = provider.placeOf(widget.actType) ?? Space(id: '', name: 'Espace non défini', colorHex: '#718096');
 
     return Scaffold(
       appBar: AppBar(

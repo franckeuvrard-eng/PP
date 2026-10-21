@@ -67,7 +67,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
     // pour une section reste accessible (facultatif) aux autres.
     final ateliers = provider.activityTypes.toList()
       ..sort((a, b) {
-        final spaceCompare = (provider.spaceById(a.spaceId)?.name ?? '').compareTo(provider.spaceById(b.spaceId)?.name ?? '');
+        final spaceCompare = (provider.placeOf(a)?.name ?? '').compareTo(provider.placeOf(b)?.name ?? '');
         return spaceCompare != 0 ? spaceCompare : a.name.compareTo(b.name);
       });
 

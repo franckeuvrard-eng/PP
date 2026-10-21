@@ -21,7 +21,9 @@ import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
+import '../models/progression.dart';
 import '../services/app_database.dart';
+import '../services/progression_migration.dart';
 import '../services/reminder_service.dart';
 
 /// Suffixe des sauvegardes automatiques faites juste avant une synchronisation.
@@ -192,6 +194,55 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Espace correspondant a un identifiant, ou null.
   Space? spaceById(String? id) => id == null ? null : _spaceById[id];
+
+  /// Progressions (parcours ordonnes d'ateliers).
+  List<Progression> _progressions = [];
+  List<Progression> get progressions => List.unmodifiable(_progressions);
+
+  Progression? progressionById(String? id) {
+    if (id == null) return null;
+    for (final p in _progressions) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  /// Espace ou progression d'un atelier, sous forme d'espace pour
+  /// l'affichage (nom, couleur, icone). Null s'il n'est rattache a rien.
+  Space? placeOf(ActivityType atelier) => placeById(placeIdOf(atelier));
+
+  /// Identifiant du rangement d'un atelier (progression sinon espace), pour
+  /// regrouper les ateliers par espace / progression.
+  String placeIdOf(ActivityType atelier) =>
+      atelier.inProgression ? atelier.progressionId! : atelier.spaceId;
+
+  /// Espace, ou progression presentee comme un espace, par identifiant.
+  Space? placeById(String? id) {
+    final space = spaceById(id);
+    if (space != null) return space;
+    final p = progressionById(id);
+    return p == null
+        ? null
+        : Space(id: p.id, name: p.name, colorHex: p.colorHex, iconName: p.iconName,
+            description: p.description);
+  }
+
+  /// Ou se trouve un atelier : son espace, ou sa progression. Un atelier est
+  /// dans l'un ou l'autre, jamais les deux. Null s'il n'est rattache a rien.
+  AtelierContainer? containerOf(ActivityType atelier) {
+    if (atelier.inProgression) {
+      final p = progressionById(atelier.progressionId);
+      return p == null
+          ? null
+          : AtelierContainer(id: p.id, name: p.name, colorHex: p.colorHex,
+              iconName: p.iconName, isProgression: true);
+    }
+    final s = spaceById(atelier.spaceId);
+    return s == null
+        ? null
+        : AtelierContainer(id: s.id, name: s.name, colorHex: s.colorHex,
+            iconName: s.iconName, isProgression: false);
+  }
 
   /// Observations d'un eleve, de la plus recente a la plus ancienne.
   List<ActivityLog> activitiesForChild(String childId) =>
@@ -631,6 +682,7 @@ class AppStateProvider extends ChangeNotifier {
         _spaces = spaces;
         _activityTypes = types;
         _activities = activities;
+        _progressions = await _db.readProgressions();
         _sonsProgress = await _db.readSons();
         _referentials = await _db.readReferentials();
         _referentialStatus = await _db.readAllReferentialStatuses();
@@ -688,6 +740,7 @@ class AppStateProvider extends ChangeNotifier {
       _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       await _migrateStatusLabels();
       await _migrateDomainIds();
+      await _migrateLegacyProgressions();
 
       // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
       // l'affichage de l'application.
@@ -723,6 +776,7 @@ class AppStateProvider extends ChangeNotifier {
       activities: _activities,
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
+      progressions: _progressions,
     );
   }
 
@@ -769,6 +823,7 @@ class AppStateProvider extends ChangeNotifier {
         'class_settings': _classSettings.toMap(),
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'progressions': _progressions.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -835,6 +890,9 @@ class AppStateProvider extends ChangeNotifier {
   /// Remplace l'etat de l'application par une sauvegarde JSON (sans les
   /// medias). Partage par la restauration automatique et la synchronisation.
   Future<void> _applyBackupMap(Map<String, dynamic> data) async {
+    // Donnees d'une version <= 1.4 : espaces « mode progression » convertis.
+    data = migrateSpaceProgressions(data);
+    final progressions = _decodeProgressions(data);
     final classSettings = ClassSettings.fromMap(data['class_settings']);
     final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
     final spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
@@ -856,6 +914,7 @@ class AppStateProvider extends ChangeNotifier {
     _classSettings = classSettings;
     _children = children;
     _spaces = spaces;
+    _progressions = progressions;
     _activityTypes = activityTypes;
     _activities = activities;
     _evaluationStatuses = evaluationStatuses;
@@ -873,6 +932,7 @@ class AppStateProvider extends ChangeNotifier {
       activities: _activities,
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
+      progressions: _progressions,
     );
     await _restoreReferentialsFrom(data);
     // Photos des donnees restaurees, si elles etaient parties a la corbeille.
@@ -1315,6 +1375,7 @@ class AppStateProvider extends ChangeNotifier {
       'class_settings': _classSettings.toMap(),
       'children': _children.map((c) => c.toMap()).toList(),
       'spaces': _spaces.map((s) => s.toMap()).toList(),
+      'progressions': _progressions.map((p) => p.toMap()).toList(),
       'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
       'activities': _activities.map((l) => l.toMap()).toList(),
       'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1394,7 +1455,8 @@ class AppStateProvider extends ChangeNotifier {
       if (jsonFile == null) return 'invalid';
 
       final jsonStr = utf8.decode(jsonFile.content as Uint8List);
-      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      final data = migrateSpaceProgressions(json.decode(jsonStr) as Map<String, dynamic>);
+      final progressions = data['progressions'] != null ? _decodeProgressions(data) : _progressions;
 
       // Tout decoder dans des variables locales d'abord : si un champ attendu
       // manque (fichier partiel ou trafique a la main), l'exception part avant
@@ -1443,6 +1505,7 @@ class AppStateProvider extends ChangeNotifier {
       _classSettings = classSettings;
       _children = children;
       _spaces = spaces;
+      _progressions = progressions;
       _activityTypes = activityTypes;
       _activities = activities;
       _evaluationStatuses = evaluationStatuses;
@@ -1466,6 +1529,7 @@ class AppStateProvider extends ChangeNotifier {
         activities: _activities,
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
+        progressions: _progressions,
       );
       await _restoreReferentialsFrom(data);
       _notify();
@@ -1485,6 +1549,7 @@ class AppStateProvider extends ChangeNotifier {
         'class_settings': _classSettings.toMap(),
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'progressions': _progressions.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1657,11 +1722,16 @@ class AppStateProvider extends ChangeNotifier {
   void deleteSpace(String id) {
     _spaces.removeWhere((s) => s.id == id);
     // Also remove ateliers in this space
-    final orphanIds = _activityTypes.where((a) => a.spaceId == id).map((a) => a.id).toList();
+    final orphanIds = _activityTypes.where((a) => a.spaceId == id).map((a) => a.id).toSet();
     _activityTypes.removeWhere((a) => a.spaceId == id);
     _write(_db.deleteSpace(id));
     for (final atelierId in orphanIds) {
       _write(_db.deleteActivityType(atelierId));
+    }
+    // Leurs observations aussi : sinon elles resteraient orphelines.
+    for (final log in _activities.where((l) => orphanIds.contains(l.activityTypeId)).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
     }
     _notify();
   }
@@ -1718,69 +1788,30 @@ class AppStateProvider extends ChangeNotifier {
     return orphans.length;
   }
 
-  /// Ateliers d'un espace, tries par position (mode progression).
-  List<ActivityType> ateliersInSpaceOrdered(String spaceId) {
-    final list = _activityTypes.where((a) => a.spaceId == spaceId).toList();
+  /// Ateliers d'un espace, par ordre alphabetique.
+  List<ActivityType> ateliersInSpace(String spaceId) {
+    final list = _activityTypes.where((a) => !a.inProgression && a.spaceId == spaceId).toList();
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  }
+
+  /// Jalons d'une progression, dans l'ordre.
+  List<ActivityType> ateliersInProgressionOrdered(String progressionId) {
+    final list = _activityTypes.where((a) => a.progressionId == progressionId).toList();
     list.sort((a, b) => a.position.compareTo(b.position));
     return list;
   }
 
-  /// Position libre suivante dans un espace : permet a un atelier nouvellement
-  /// cree de s'ajouter en fin de liste plutot qu'en tete (-1).
-  int nextPositionForSpace(String spaceId) {
-    final positions = _activityTypes.where((a) => a.spaceId == spaceId).map((a) => a.position);
+  /// Rang libre suivant dans une progression (nouveau jalon en fin de fil).
+  int nextPositionInProgression(String progressionId) {
+    final positions =
+        _activityTypes.where((a) => a.progressionId == progressionId).map((a) => a.position);
     if (positions.isEmpty) return 0;
-    final maxPos = positions.reduce((a, b) => a > b ? a : b);
-    return maxPos + 1;
+    return positions.reduce((a, b) => a > b ? a : b) + 1;
   }
 
-  /// Active/desactive le mode progression d'un espace. A l'activation, les
-  /// ateliers encore sans position (-1) recoivent un rang sequentiel selon
-  /// leur ordre courant, pour donner un point de depart stable au tri manuel,
-  /// et le niveau minimum pour debloquer le suivant est fixe si aucun ne
-  /// l'etait deja (par defaut le dernier niveau configure, generalement le
-  /// plus abouti).
-  void setSpaceProgression(String spaceId, bool value, {String? minStatusId}) {
-    final space = _spaceById[spaceId];
-    if (space == null) return;
-    if (value) {
-      final unpositioned = _activityTypes.where((a) => a.spaceId == spaceId && a.position < 0).toList();
-      var next = nextPositionForSpace(spaceId);
-      if (next < 0) next = 0;
-      for (final atelier in unpositioned) {
-        final index = _activityTypes.indexWhere((a) => a.id == atelier.id);
-        final updated = atelier.copyWith(position: next);
-        _activityTypes[index] = updated;
-        _write(_db.saveActivityType(updated));
-        next++;
-      }
-    }
-    final resolvedMinStatusId = value
-        ? (minStatusId ??
-            space.progressionMinStatusId ??
-            (_evaluationStatuses.isNotEmpty ? _evaluationStatuses.last.id : null))
-        : space.progressionMinStatusId;
-    final updatedSpace = space.copyWith(isProgression: value, progressionMinStatusId: resolvedMinStatusId);
-    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
-    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
-    _write(_db.saveSpace(updatedSpace));
-    _notify();
-  }
-
-  /// Change le niveau minimum a atteindre pour debloquer l'atelier suivant
-  /// dans un espace en mode progression.
-  void setSpaceProgressionMinStatus(String spaceId, String? statusId) {
-    final space = _spaceById[spaceId];
-    if (space == null) return;
-    final updatedSpace = space.copyWith(progressionMinStatusId: statusId);
-    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
-    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
-    _write(_db.saveSpace(updatedSpace));
-    _notify();
-  }
-
-  /// Reordonne les ateliers d'un espace suite a un glisser-deposer.
-  void reorderAteliersInSpace(String spaceId, List<String> orderedActivityTypeIds) {
+  /// Reordonne les jalons d'une progression (glisser-deposer).
+  void reorderAteliersInProgression(String progressionId, List<String> orderedActivityTypeIds) {
     for (var i = 0; i < orderedActivityTypeIds.length; i++) {
       final index = _activityTypes.indexWhere((a) => a.id == orderedActivityTypeIds[i]);
       if (index < 0) continue;
@@ -1790,6 +1821,57 @@ class AppStateProvider extends ChangeNotifier {
     }
     _notify();
   }
+
+  void saveProgression(Progression progression) {
+    final index = _progressions.indexWhere((p) => p.id == progression.id);
+    if (index >= 0) {
+      _progressions[index] = progression;
+    } else {
+      _progressions.add(progression);
+    }
+    _write(_db.saveProgression(progression));
+    _notify();
+  }
+
+  /// Supprime une progression avec ses jalons et leurs observations (un
+  /// atelier de progression n'existe pas hors de sa progression).
+  void deleteProgression(String id) {
+    _progressions.removeWhere((p) => p.id == id);
+    _write(_db.deleteProgression(id));
+    final ateliers = _activityTypes.where((a) => a.progressionId == id).map((a) => a.id).toSet();
+    _activityTypes.removeWhere((a) => ateliers.contains(a.id));
+    for (final atelierId in ateliers) {
+      _write(_db.deleteActivityType(atelierId));
+    }
+    for (final log in _activities.where((l) => ateliers.contains(l.activityTypeId)).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+  }
+
+  /// Observations des jalons d'une progression (pour prevenir avant suppression).
+  int activityCountForProgression(String id) {
+    final ateliers = _activityTypes.where((a) => a.progressionId == id).map((a) => a.id).toSet();
+    return _activities.where((l) => ateliers.contains(l.activityTypeId)).length;
+  }
+
+  /// Convertit, une seule fois, les espaces « mode progression » d'une base
+  /// creee par une version <= 1.4. Sauvegarde automatique avant, restaurable.
+  Future<void> _migrateLegacyProgressions() async {
+    if (!_spaces.any((s) => s.isProgression)) return;
+    if (!await _writeAutoBackup()) {
+      debugPrint('Migration des progressions reportee : sauvegarde impossible.');
+      return;
+    }
+    await _applyBackupMap(buildSyncSnapshot());
+    debugPrint('Migration des progressions : ${_progressions.length} progression(s).');
+  }
+
+  List<Progression> _decodeProgressions(Map<String, dynamic> data) => [
+        for (final p in (data['progressions'] as List?) ?? const [])
+          if (p is Map) Progression.fromMap(Map<String, dynamic>.from(p)),
+      ];
 
   void logActivity(ActivityLog activity) {
     _activities.insert(0, activity);
@@ -1956,6 +2038,7 @@ class AppStateProvider extends ChangeNotifier {
       _evaluationStatuses = List<EvaluationStatus>.from(EvaluationStatus.defaults);
     }
     if (clearSpaces) {
+      _progressions = [];
       _spaces = [
         Space(id: 'space_1', name: 'Coin Arts Visuels', colorHex: '#FF7043', iconName: 'palette'),
         Space(id: 'space_2', name: 'Espace Motricité', colorHex: '#4E9F3D', iconName: 'fitness_center'),
@@ -1986,6 +2069,7 @@ class AppStateProvider extends ChangeNotifier {
         activities: _activities,
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
+        progressions: _progressions,
       );
     } catch (e) {
       debugPrint('Echec de la RAZ selective : $e');
@@ -2030,4 +2114,21 @@ class DeletedChild {
     required this.sons,
     this.referentialStatus = const {},
   });
+}
+
+/// Espace ou progression contenant un atelier (cf. AppStateProvider.containerOf).
+class AtelierContainer {
+  const AtelierContainer({
+    required this.id,
+    required this.name,
+    required this.colorHex,
+    required this.iconName,
+    required this.isProgression,
+  });
+
+  final String id;
+  final String name;
+  final String colorHex;
+  final String? iconName;
+  final bool isProgression;
 }

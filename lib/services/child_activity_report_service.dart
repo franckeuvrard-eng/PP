@@ -258,7 +258,7 @@ class ChildActivityReportService {
                 final actType = provider.activityTypeById(log.activityTypeId) ??
                     ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096');
 
-                final space = provider.spaceById(actType.spaceId) ??
+                final space = provider.placeOf(actType) ??
                     Space(id: '', name: '', colorHex: '');
 
                 // Chaque photo est accompagnee de sa legende quand elle en a une.

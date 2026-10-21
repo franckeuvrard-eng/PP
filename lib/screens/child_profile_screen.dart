@@ -12,6 +12,7 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import '../data/sons_data.dart';
 import '../models/referential.dart';
+import 'progressions_screen.dart';
 import '../services/child_data_export_service.dart';
 import 'atelier_history_screen.dart';
 import 'ateliers_progress_screen.dart';
@@ -36,7 +37,7 @@ class ChildProfileScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text('${currentChild.firstname} ${currentChild.lastname ?? ""}'),
@@ -45,6 +46,7 @@ class ChildProfileScreen extends StatelessWidget {
               Tab(icon: Icon(Icons.person), text: 'Profil'),
               Tab(icon: Icon(Icons.history), text: 'Activités'),
               Tab(icon: Icon(Icons.checklist), text: 'Acquis'),
+              Tab(icon: Icon(Icons.timeline), text: 'Progressions'),
             ],
           ),
           actions: [
@@ -82,6 +84,7 @@ class ChildProfileScreen extends StatelessWidget {
             _buildProfileTab(context, provider, currentChild, isDark),
             _buildActivitiesTab(context, provider, currentChild, childLogs, isDark),
             _buildAcquisTab(context, provider, currentChild),
+            _buildProgressionsTab(provider, currentChild),
           ],
         ),
       ),
@@ -256,6 +259,31 @@ class ChildProfileScreen extends StatelessWidget {
         SonStatut.enCours => const Color(0xFFF9A825),
         SonStatut.acquis => const Color(0xFF388E3C),
       };
+
+  /// Où en est l'élève dans chaque progression (fil et jalons).
+  Widget _buildProgressionsTab(AppStateProvider provider, Child child) {
+    if (provider.progressions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Aucune progression. Créez-en dans Paramètres › Progressions.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: kMutedTextColor),
+          ),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final p in provider.progressions) ...[
+          ProgressionCard(progression: p, child: child),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
 
   Widget _buildAcquisTab(BuildContext context, AppStateProvider provider, Child child) {
     final tous = SonsData.tous;
@@ -592,10 +620,7 @@ class ChildProfileScreen extends StatelessWidget {
           (a) => a.id == log.activityTypeId,
           orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
         );
-        final space = provider.spaces.firstWhere(
-          (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: 'Espace inconnu', colorHex: '#718096'),
-        );
+        final space = provider.placeOf(actType) ?? Space(id: '', name: 'Espace inconnu', colorHex: '#718096');
 
         return Card(
           margin: const EdgeInsets.only(bottom: 10),

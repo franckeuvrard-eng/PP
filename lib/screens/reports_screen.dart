@@ -38,11 +38,24 @@ class ReportsScreen extends StatelessWidget {
               const SizedBox(height: 12),
               for (final space in provider.spaces) ...[
                 Text(space.name, style: const TextStyle(fontWeight: FontWeight.bold, color: kAccessibleGreenText)),
-                ...provider.ateliersInSpaceOrdered(space.id).map(
+                ...provider.ateliersInSpace(space.id).map(
                       (a) => ListTile(
                         dense: true,
                         title: Text(a.name),
                         onTap: () => Navigator.pop(sheetContext, a),
+                      ),
+                    ),
+                const SizedBox(height: 8),
+              ],
+              for (final progression in provider.progressions) ...[
+                Text('Progression · ${progression.name}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: kAccessibleGreenText)),
+                ...provider.ateliersInProgressionOrdered(progression.id).indexed.map(
+                      (e) => ListTile(
+                        dense: true,
+                        leading: Text('${e.$1 + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text(e.$2.name),
+                        onTap: () => Navigator.pop(sheetContext, e.$2),
                       ),
                     ),
                 const SizedBox(height: 8),

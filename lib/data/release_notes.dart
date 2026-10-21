@@ -23,6 +23,25 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.5.0',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.timeline, 'Les progressions ont leur place',
+          'Les progressions ne sont plus un mode des espaces : elles ont leur propre onglet dans '
+              'Paramètres. Une progression est une suite d\'ateliers (ses jalons) à faire dans '
+              'l\'ordre. Un atelier est rangé soit dans un espace, soit dans une progression.'),
+      ReleaseItem(Icons.route, 'Le fil de la progression',
+          'Le nouvel écran Progressions montre le chemin et ses jalons : combien d\'élèves ont '
+              'validé chaque étape et qui en est où, ou, pour un élève, ce qu\'il a validé, où il '
+              'est, et ce qui reste verrouillé. Aussi dans la fiche élève.'),
+      ReleaseItem(Icons.auto_fix_high, 'Rien à refaire',
+          'Vos espaces en « mode progression » sont devenus des progressions, avec leurs ateliers, '
+              'leur ordre, leur seuil et toutes les observations. Une sauvegarde est faite avant.'),
+      ReleaseItem(Icons.system_update, 'Mettez à jour tous vos appareils',
+          'La synchronisation (iCloud ou Wi-Fi) ne se fait qu\'entre appareils en version 1.5.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.4.1',
     date: 'Octobre 2026',
     items: [

@@ -11,15 +11,19 @@ import '../widgets/color_swatch_picker.dart';
 import '../widgets/icon_swatch_picker.dart';
 
 /// Formulaire plein écran de création / édition d'un atelier, accessible
-/// depuis l'onglet « Espaces & Ateliers » des Réglages.
+/// depuis les onglets « Espaces & Ateliers » et « Progressions » des
+/// Réglages. Un atelier est rangé soit dans un espace, soit dans une
+/// progression (jalon), jamais les deux.
 class AtelierEditScreen extends StatefulWidget {
   final ActivityType? activityType;
   final String? preselectedSpaceId;
+  final String? preselectedProgressionId;
 
   const AtelierEditScreen({
     super.key,
     this.activityType,
     this.preselectedSpaceId,
+    this.preselectedProgressionId,
   });
 
   @override
@@ -33,6 +37,10 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   late TextEditingController _customObjectiveCtrl;
 
   late String _spaceId;
+  late String _progressionId;
+
+  /// Rangé dans une progression (jalon) plutôt que dans un espace.
+  late bool _inProgression;
   late String _color;
   late String? _selectedDomainId;
   late String _selectedLevelFilter;
@@ -63,9 +71,14 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _customDomaineCtrl = TextEditingController();
     _customObjectiveCtrl = TextEditingController();
 
+    _inProgression = widget.preselectedProgressionId != null ||
+        (widget.preselectedSpaceId == null && (act?.inProgression ?? false));
     _spaceId = widget.preselectedSpaceId ??
-        act?.spaceId ??
+        (act != null && act.spaceId.isNotEmpty ? act.spaceId : null) ??
         (provider.spaces.isNotEmpty ? provider.spaces.first.id : '');
+    _progressionId = widget.preselectedProgressionId ??
+        act?.progressionId ??
+        (provider.progressions.isNotEmpty ? provider.progressions.first.id : '');
     _color = act?.colorHex ?? '#4E9F3D';
     _isObligatory = act?.isObligatory ?? false;
 
@@ -269,26 +282,77 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
-                      // ne suivrait pas ses changements.
-                      // ignore: deprecated_member_use
-                      value: provider.spaces.any((s) => s.id == _spaceId)
-                          ? _spaceId
-                          : null,
-                      decoration: const InputDecoration(
-                        labelText: 'Espace de la classe *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.space_dashboard),
-                      ),
-                      items: provider.spaces
-                          .map((s) => DropdownMenuItem(
-                              value: s.id, child: Text(s.name)))
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _spaceId = val);
-                      },
+                    const Text('Rangé dans :',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.space_dashboard),
+                            label: Text('Un espace')),
+                        ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.timeline),
+                            label: Text('Une progression')),
+                      ],
+                      selected: {_inProgression},
+                      onSelectionChanged: (sel) =>
+                          setState(() => _inProgression = sel.first),
                     ),
+                    const SizedBox(height: 12),
+                    if (!_inProgression)
+                      DropdownButtonFormField<String>(
+                        // Champ pilote par le code : initialValue ne suivrait pas
+                        // ses changements.
+                        // ignore: deprecated_member_use
+                        value: provider.spaces.any((s) => s.id == _spaceId)
+                            ? _spaceId
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Espace de la classe *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.space_dashboard),
+                        ),
+                        items: provider.spaces
+                            .map((s) => DropdownMenuItem(
+                                value: s.id, child: Text(s.name)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _spaceId = val);
+                        },
+                      )
+                    else if (provider.progressions.isEmpty)
+                      const Text(
+                        "Aucune progression : créez-en une dans l'onglet « Progressions » des Réglages.",
+                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                      )
+                    else ...[
+                      DropdownButtonFormField<String>(
+                        // ignore: deprecated_member_use
+                        value: provider.progressions.any((p) => p.id == _progressionId)
+                            ? _progressionId
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Progression *',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.timeline),
+                        ),
+                        items: provider.progressions
+                            .map((p) => DropdownMenuItem(
+                                value: p.id, child: Text(p.name)))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _progressionId = val);
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Un nouveau jalon s'ajoute en fin de progression ; l'ordre se règle "
+                        "dans l'onglet « Progressions ».",
+                        style: TextStyle(fontSize: 11, color: kMutedTextColor),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -825,22 +889,30 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     }
 
     final provider = Provider.of<AppStateProvider>(context, listen: false);
-    // Un atelier existant garde sa position tant qu'il reste dans le meme
-    // espace ; un atelier nouveau (ou deplace vers un autre espace) en mode
-    // progression s'ajoute en fin de liste plutot que de garder un rang
-    // hors contexte.
-    final keepsPreviousPosition =
-        widget.activityType != null && widget.activityType!.spaceId == _spaceId;
-    final position =
-        (keepsPreviousPosition ? widget.activityType?.position : null) ??
-            (provider.spaceById(_spaceId)?.isProgression == true
-                ? provider.nextPositionForSpace(_spaceId)
-                : -1);
+    final inProgression = _inProgression && provider.progressionById(_progressionId) != null;
+    if (_inProgression && !inProgression) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Choisissez une progression.'),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
+    // Un jalon garde son rang tant qu'il reste dans la meme progression ; un
+    // nouveau (ou venu d'ailleurs) s'ajoute en fin de fil.
+    final keepsPreviousPosition = inProgression &&
+        widget.activityType?.progressionId == _progressionId;
+    final position = !inProgression
+        ? -1
+        : (keepsPreviousPosition
+            ? widget.activityType!.position
+            : provider.nextPositionInProgression(_progressionId));
     final newType = ActivityType(
       id: widget.activityType?.id ??
           'act_${DateTime.now().millisecondsSinceEpoch}',
       name: _nameCtrl.text.trim(),
-      spaceId: _spaceId,
+      spaceId: inProgression ? '' : _spaceId,
+      progressionId: inProgression ? _progressionId : null,
       colorHex: _color,
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
       // imagePath n'etait pas repris : modifier un atelier effacait jusqu'ici

@@ -32,6 +32,7 @@ class SyncReport {
     'activities': 'Observations',
     'activity_types': 'Ateliers',
     'spaces': 'Espaces',
+    'progressions': 'Progressions',
     'sons_progress': 'Sons',
     'referential_status': 'Compétences',
     'referentials': 'Référentiels',
@@ -95,6 +96,8 @@ class SyncReport {
     'audioPath': 'Note vocale',
     'name': 'Nom',
     'spaceId': 'Espace',
+    'progressionId': 'Progression',
+    'minStatusId': 'Seuil de passage',
     'description': 'Description',
     'domaine': 'Domaine',
     'domaineId': 'Domaine',
@@ -142,7 +145,10 @@ class SyncReport {
         return n.activityType(text);
       case 'spaceId':
         return n.space(text);
+      case 'progressionId':
+        return n.progression(text);
       case 'evaluationStatusId':
+      case 'minStatusId':
       case 'progressionMinStatusId':
         return n.status(text);
       case 'imagePath':
@@ -177,6 +183,7 @@ class SyncReport {
         return [who, what].join(' · ') + (when.isEmpty ? '' : ' ($when)');
       case 'activity_types':
       case 'spaces':
+      case 'progressions':
         return _str(v['name'], 'Sans nom');
       case 'referentials':
         return _str(v['name'], 'Sans nom');
@@ -216,15 +223,20 @@ class _Names {
         _types = _index(snapshot['activity_types']),
         _refs = _index(snapshot['referentials']),
         _spaces = _index(snapshot['spaces']),
+        _progressions = _index(snapshot['progressions']),
         _statuses = _index(snapshot['evaluation_statuses']);
 
   final Map<String, Map> _children;
   final Map<String, Map> _types;
   final Map<String, Map> _refs;
   final Map<String, Map> _spaces;
+  final Map<String, Map> _progressions;
   final Map<String, Map> _statuses;
 
   String space(String? id) => SyncReport._str(_spaces[id]?['name'], 'Espace supprimé');
+
+  String progression(String? id) =>
+      SyncReport._str(_progressions[id]?['name'], 'Progression supprimée');
 
   String status(String? id) => SyncReport._str(_statuses[id]?['label'], 'Statut supprimé');
 

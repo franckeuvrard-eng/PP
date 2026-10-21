@@ -77,10 +77,7 @@ class AtelierPdfService {
     required PdfPageFormat format,
   }) async {
     final settings = provider.classSettings;
-    final space = provider.spaces.firstWhere(
-      (s) => s.id == atelier.spaceId,
-      orElse: () => Space(id: '', name: 'Non défini', colorHex: '#718096'),
-    );
+    final space = provider.placeOf(atelier) ?? Space(id: '', name: 'Non défini', colorHex: '#718096');
 
     // La fiche decrit l'atelier seul : les realisations des eleves relevent
     // du rapport individuel, pas de ce support.
