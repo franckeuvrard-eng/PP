@@ -26,6 +26,10 @@ const kReleaseNotes = [
     version: '1.4.1',
     date: 'Octobre 2026',
     items: [
+      ReleaseItem(Icons.alternate_email, 'Deux emails de parents',
+          'Chaque fiche élève accepte un second email (l\'autre parent, un tuteur). Les deux '
+              'sont proposés lors du partage d\'un bilan, et le modèle d\'import Excel a une '
+              'colonne « Email parent 2 ».'),
       ReleaseItem(Icons.photo, 'Photos entières',
           'Les vignettes montrent la photo en entier, sans la recadrer ; touchez-la pour '
               'l\'afficher en grand et zoomer. Les PDF gardent aussi les photos entières.'),

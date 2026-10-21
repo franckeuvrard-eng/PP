@@ -125,8 +125,8 @@ class ChildProfileScreen extends StatelessWidget {
           _buildInfoCard(
             context,
             icon: Icons.email,
-            label: 'Email des parents',
-            value: child.email ?? 'Non renseigné',
+            label: child.parentEmails.length > 1 ? 'Emails des parents' : 'Email des parents',
+            value: child.parentEmails.isEmpty ? 'Non renseigné' : child.parentEmails.join('\n'),
             isDark: isDark,
           ),
           _buildInfoCard(

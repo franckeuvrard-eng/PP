@@ -218,8 +218,8 @@ class ChildActivityReportService {
                     if (child.group != null && child.group!.isNotEmpty)
                       pw.Text('Groupe/Section : ${pdfSafe(child.group!)}',
                           style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
-                    if (child.email != null && child.email!.isNotEmpty)
-                      pw.Text('Email de contact : ${pdfSafe(child.email ?? "")}',
+                    if (child.parentEmails.isNotEmpty)
+                      pw.Text('Email de contact : ${pdfSafe(child.parentEmails.join(' ; '))}',
                           style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
                     if (child.notes != null && child.notes!.isNotEmpty) ...[
                       pw.SizedBox(height: 6),

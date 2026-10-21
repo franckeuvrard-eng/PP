@@ -16,7 +16,8 @@ class ChildrenImportService {
     'Nom',
     'Date de naissance (jj/mm/aaaa)',
     'Section / Groupe',
-    'Email des parents',
+    'Email parent 1',
+    'Email parent 2 (facultatif)',
     'Autorisation image (oui/non)',
     'Notes',
   ];
@@ -46,7 +47,8 @@ class ChildrenImportService {
         xl.TextCellValue('Martin'),
         xl.TextCellValue('12/04/2023'),
         xl.TextCellValue(exempleSection),
-        xl.TextCellValue('parents.leo@example.com'),
+        xl.TextCellValue('parent1.leo@example.com'),
+        xl.TextCellValue(''),
         xl.TextCellValue('Non'),
         xl.TextCellValue('Exemple à remplacer ou supprimer'),
       ]);
@@ -134,6 +136,7 @@ class ChildrenImportService {
             : null;
         final group = _cellText(row, columns['group']).trim();
         final email = _cellText(row, columns['email']).trim();
+        final email2 = _cellText(row, columns['email2']).trim();
         final notes = _cellText(row, columns['notes']).trim();
         // Toute valeur autre que "oui" (y compris vide ou illisible) laisse
         // l'autorisation a son defaut prudent : non accordee.
@@ -166,6 +169,7 @@ class ChildrenImportService {
           colorHex: '#4E9F3D',
           avatarText: firstname[0].toUpperCase(),
           email: email.isEmpty ? null : email,
+          email2: email2.isEmpty ? null : email2,
           imageAuthorized: imageAuthorized,
         );
         newChildren.add(child);
@@ -250,7 +254,9 @@ class ChildrenImportService {
       } else if (header.contains('section') || header.contains('groupe')) {
         columns['group'] = col;
       } else if (header.contains('mail')) {
-        columns['email'] = col;
+        // Premiere colonne d'email : parent 1 ; la suivante : parent 2.
+        // Les anciens modeles (une seule colonne) restent lisibles.
+        columns[columns.containsKey('email') ? 'email2' : 'email'] = col;
       } else if (header.contains('autorisation')) {
         columns['imageAuthorized'] = col;
       } else if (header.contains('note') || header.contains('remarque')) {

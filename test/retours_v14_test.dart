@@ -80,4 +80,21 @@ void main() {
     expect(pourMs.isObligatoryForGroup('PS'), isFalse, reason: 'facultatif pour la PS');
     expect(pourMs.isObligatoryForGroup('MS'), isTrue);
   });
+
+  test('deux emails de parents : enregistres, relus, sans doublon ni vide', () {
+    final lea = Child(
+        id: 'lea',
+        firstname: 'Léa',
+        colorHex: '#4E9F3D',
+        avatarText: 'L',
+        email: 'maman@exemple.fr',
+        email2: 'papa@exemple.fr');
+    final relue = Child.fromMap(lea.toMap());
+    expect(relue.email2, 'papa@exemple.fr');
+    expect(relue.parentEmails, ['maman@exemple.fr', 'papa@exemple.fr']);
+    expect(lea.copyWith(email2: null).parentEmails, ['maman@exemple.fr']);
+    expect(lea.copyWith(email2: ' maman@exemple.fr ').parentEmails, ['maman@exemple.fr']);
+    expect(Child.fromMap({'id': 'x', 'firstname': 'X', 'email': ''}).parentEmails, isEmpty,
+        reason: "fiche d'une version precedente sans second email");
+  });
 }

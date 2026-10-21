@@ -32,7 +32,7 @@ class ChildDataExportService {
       build: (format) => _buildBytes(child, provider, format),
       shareSubject: 'Export RGPD - ${child.firstname}',
       shareBody: 'Export des données personnelles conservées par A petits pas pour ${child.firstname}.',
-      shareEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
+      shareEmails: child.parentEmails.isEmpty ? null : child.parentEmails,
     );
   }
 
@@ -82,7 +82,8 @@ class ChildDataExportService {
                   _field('Nom', child.lastname),
                   _field('Date de naissance', _formatBirthdate(child.birthdate)),
                   _field('Groupe / Section', child.group),
-                  _field('Email des parents', child.email),
+                  _field('Email parent 1', child.email),
+                  _field('Email parent 2', child.email2),
                   _field('Notes', child.notes),
                   _field('Autorisation droit à l\'image',
                       child.imageAuthorized ? 'Accordée' : 'Non accordée'),

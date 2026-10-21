@@ -420,7 +420,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
       ),
       shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
       shareSubject: 'Rapport d\'activités - ${child.firstname}',
-      shareEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
+      shareEmails: child.parentEmails.isEmpty ? null : child.parentEmails,
     );
   }
 
@@ -443,6 +443,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   late final TextEditingController _groupController;
   late final TextEditingController _notesController;
   late final TextEditingController _emailController;
+  late final TextEditingController _email2Controller;
   String? _relativeImagePath;
   String? _selectedImagePath;
   DateTime? _birthdate;
@@ -460,6 +461,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     );
     _notesController = TextEditingController(text: child?.notes ?? '');
     _emailController = TextEditingController(text: child?.email ?? '');
+    _email2Controller = TextEditingController(text: child?.email2 ?? '');
     _relativeImagePath = child?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
     _birthdate = child?.birthdate != null ? DateTime.tryParse(child!.birthdate!) : null;
@@ -485,6 +487,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _groupController.dispose();
     _notesController.dispose();
     _emailController.dispose();
+    _email2Controller.dispose();
     super.dispose();
   }
 
@@ -642,7 +645,18 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
               },
             ),
             const SizedBox(height: 12),
-            TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Email parent 1'),
+            ),
+            TextField(
+              controller: _email2Controller,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Email parent 2 (facultatif)'),
+            ),
             const SizedBox(height: 10),
             TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes')),
             const SizedBox(height: 30),
@@ -661,6 +675,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                     group: _groupController.text.trim(),
                     notes: _notesController.text.trim(),
                     email: _emailController.text.trim(),
+                    email2: _email2Controller.text.trim().isEmpty ? null : _email2Controller.text.trim(),
                     colorHex: child?.colorHex ?? '#4E9F3D',
                     avatarText: _firstnameController.text.trim()[0].toUpperCase(),
                     imagePath: _relativeImagePath,
