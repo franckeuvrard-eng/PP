@@ -67,7 +67,7 @@ class HelpScreen extends StatelessWidget {
             title: 'Pour bien démarrer',
             steps: [
               'Paramètres > Profil Classe : renseignez le nom de la classe, l\'enseignant et le niveau.',
-              'Paramètres > Espaces & Ateliers : créez vos espaces (coin lecture, motricité...), puis un ou plusieurs ateliers dans chacun.',
+              'Espaces & Ateliers (menu principal) : créez vos espaces (coin lecture, motricité...), puis un ou plusieurs ateliers dans chacun.',
               'Paramètres > Profil Classe > Sections : définissez vos sections (PS, MS, Groupe Rouge...).',
               'Élèves > Ajouter Élève : saisissez-les un par un, ou en une fois via Paramètres > Importer des élèves (Excel).',
               'Badges QR : imprimez les étiquettes des élèves et des ateliers.',
@@ -100,22 +100,23 @@ class HelpScreen extends StatelessWidget {
           ),
           _HelpSection(
             icon: Icons.stars,
-            title: 'Ateliers obligatoires et progression',
+            title: 'Plan de travail',
             steps: [
-              'Dans l\'édition d\'un atelier, activez « Atelier Obligatoire ».',
-              'Sélectionnez ensuite les sections concernées. Si vous n\'en cochez aucune, l\'atelier est obligatoire pour toute la classe.',
-              'Les statistiques et le rapport « Ateliers obligatoires » ne comptabilisent alors que les élèves des sections ciblées.',
+              'Dans l\'édition d\'un atelier, activez « Plan de travail ».',
+              'Sélectionnez ensuite les sections concernées. Si vous n\'en cochez aucune, l\'atelier est dans le plan de travail de toute la classe.',
+              'Les statistiques et le rapport « Plan de travail » ne comptabilisent alors que les élèves des sections ciblées.',
             ],
           ),
           _HelpSection(
             icon: Icons.timeline,
-            title: 'Progressions',
+            title: 'Parcours',
             steps: [
-              'Une progression est une suite d\'ateliers à faire dans l\'ordre, ses « jalons » (par exemple : couper une bande, puis une ligne droite, puis une courbe).',
-              'Créez-la dans Paramètres > Progressions, choisissez le seuil de passage, puis ajoutez ses jalons. Glissez la poignée ⠿ pour changer leur ordre.',
-              'Un atelier est rangé soit dans un espace, soit dans une progression : choisissez-le dans « Rangé dans » en éditant l\'atelier.',
-              'Un jalon reste verrouillé pour un élève tant que le précédent n\'a pas atteint le seuil de passage.',
-              'L\'écran Progressions (barre latérale sur Mac et iPad, carte de l\'accueil sur iPhone) montre le fil : où en est la classe, ou un élève. L\'onglet Progressions de la fiche élève montre la même chose pour lui.',
+              'Un parcours est une suite d\'étapes à faire dans l\'ordre (par exemple : couper une bande, puis une ligne droite, puis une courbe). Ce n\'est pas un atelier : il n\'est rangé dans aucun espace.',
+              'Créez-le dans Paramètres > Parcours, choisissez le seuil de passage, les sections qui le suivent, puis ajoutez ses étapes avec « Ajouter une étape ». Glissez la poignée ⠿ pour changer leur ordre.',
+              'Sections : sans section cochée, toute la classe suit le parcours. Sinon seuls les élèves de ces sections apparaissent dans le suivi, le plan de travail et le rapport des parcours.',
+              'Une étape reste verrouillée pour un élève tant que la précédente n\'a pas atteint le seuil de passage.',
+              'L\'écran Parcours (barre latérale sur Mac et iPad, carte de l\'accueil sur iPhone) montre le fil : où en est la classe, ou un élève. L\'onglet Parcours de la fiche élève montre la même chose pour lui.',
+              'Frise : le bouton frise de l\'écran Parcours (ou Rapports > Frise d\'un parcours) imprime le parcours en grand, trois étapes par page à mettre bout à bout, vierge pour les pinces des élèves ou avec leurs prénoms.',
             ],
           ),
           _HelpSection(
@@ -132,7 +133,8 @@ class HelpScreen extends StatelessWidget {
             title: 'Rapports et exports',
             steps: [
               'Onglet Rapports : point d\'entrée unique pour tous les documents.',
-              'Ateliers obligatoires (PDF) : liste et statut, pour un ou plusieurs élèves choisis à la fois.',
+              'Plan de travail (PDF) : liste des ateliers et statut, pour un ou plusieurs élèves choisis à la fois. Les parcours de l\'élève sont sur une page à part.',
+              'Suivi des parcours (PDF ou Excel) : tableau croisé élèves × parcours, avec l\'étape où en est chacun. Le fichier Excel contient aussi une feuille « Données » prête pour un tableau croisé dynamique.',
               'Fiche atelier (PDF) : description, objectifs et photos légendées d\'un atelier.',
               'Export RGPD élève : toutes les données personnelles conservées pour un élève choisi.',
               'Bilan classe (Excel) : toutes les observations de la classe, au format tableur.',

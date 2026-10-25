@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/photo_thumb.dart';
+import '../widgets/age_chip.dart';
+import '../data/eduscol_data.dart';
 import '../models/activity_type.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_pdf_service.dart';
@@ -20,7 +22,7 @@ class AtelierDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer cet atelier ?'),
+        title: Text(current.inProgression ? 'Supprimer cette étape ?' : 'Supprimer cet atelier ?'),
         content: Text(() {
           final n = provider.activityCountForType(current.id);
           return '« ${current.name} » sera définitivement supprimé'
@@ -67,6 +69,19 @@ class AtelierDetailScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => AtelierEditScreen(activityType: current)),
                 ),
               ),
+              if (!current.inProgression) IconButton(
+                icon: Icon(current.isDisabled ? Icons.visibility : Icons.visibility_off),
+                tooltip: current.isDisabled ? "Réactiver l'atelier" : "Désactiver l'atelier",
+                onPressed: () {
+                  final disable = !current.isDisabled;
+                  provider.setActivityTypeDisabled(current.id, disable);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(disable
+                        ? "« ${current.name} » est désactivé : il n'apparaît plus dans Espaces & Ateliers."
+                        : '« ${current.name} » est réactivé.'),
+                  ));
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.delete_forever, color: Colors.red),
                 tooltip: 'Supprimer',
@@ -100,6 +115,20 @@ class AtelierDetailScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (current.isDisabled) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '🚫 Désactivé · masqué dans Espaces & Ateliers',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: kMutedTextColor),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (current.isObligatory)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -109,8 +138,8 @@ class AtelierDetailScreen extends StatelessWidget {
                     ),
                     child: Text(
                       current.obligatoryGroups.isEmpty
-                          ? '⭐ Obligatoire · toute la classe'
-                          : '⭐ Obligatoire · ${current.obligatoryGroups.join(', ')}',
+                          ? '⭐ Plan de travail · toute la classe'
+                          : '⭐ Plan de travail · ${current.obligatoryGroups.join(', ')}',
                       style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
                     ),
                   ),
@@ -125,8 +154,18 @@ class AtelierDetailScreen extends StatelessWidget {
                   const Text('Objectifs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   ...current.objectifs.map((o) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text('• $o'),
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text('• $o'),
+                            // Tranche d'age du programme (absente pour un
+                            // objectif personnalise ou d'un ancien programme).
+                            for (final l in EduscolData.levelsForText(o)) AgeChip(level: l),
+                          ],
+                        ),
                       )),
                 ],
                 if (current.description != null && current.description!.trim().isNotEmpty) ...[

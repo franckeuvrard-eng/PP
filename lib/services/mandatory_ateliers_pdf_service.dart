@@ -9,6 +9,8 @@ import '../models/child.dart';
 import '../providers/app_provider.dart';
 import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
+import 'atelier_eligibility_service.dart';
+import 'atelier_pdf_service.dart';
 import 'atelier_status_resolver.dart';
 
 /// Genere, pour un ou plusieurs eleves, la liste des ateliers obligatoires
@@ -24,63 +26,110 @@ class MandatoryAteliersPdfService {
     final doc = pw.Document();
 
     for (final child in children) {
-      final mandatory = provider.activityTypes.where((a) => a.isObligatoryForGroup(child.group)).toList();
+      // Ateliers des espaces coches « plan de travail » pour la section.
+      final inSpaces = provider.activityTypes
+          .where((a) => !a.inProgression && a.isObligatoryForGroup(child.group))
+          .toList();
+      // Les parcours ont leur propre page, dans l'ordre de leurs etapes :
+      // tous ceux que suit la section de l'eleve.
+      final byProgression = <String, List<ActivityType>>{
+        for (final p in provider.progressions)
+          if (p.concernsGroup(child.group) && provider.ateliersInProgressionOrdered(p.id).isNotEmpty)
+            p.id: provider.ateliersInProgressionOrdered(p.id),
+      };
+      final mandatory = [...inSpaces, for (final l in byProgression.values) ...l];
+
       final bySpace = <String, List<ActivityType>>{};
-      for (final atelier in mandatory) {
-        (bySpace[provider.placeIdOf(atelier)] ??= []).add(atelier);
+      for (final atelier in inSpaces) {
+        (bySpace[atelier.spaceId] ??= []).add(atelier);
       }
       final spaceIds = bySpace.keys.toList()
         ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
+      for (final list in bySpace.values) {
+        list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      }
 
-      doc.addPage(
-        pw.MultiPage(
-          pageFormat: format,
-          build: (context) {
-            return [
-              pw.Header(
-                level: 0,
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Ateliers obligatoires - A petits pas',
-                        style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                    pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                        style: const pw.TextStyle(fontSize: 11)),
-                  ],
-                ),
-              ),
-              pw.Text(
-                '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
-                style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
-              ),
-              pw.SizedBox(height: 14),
-              pw.Text(pdfSafe('${child.firstname} ${child.lastname ?? ''}'.trim()),
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-              if (child.group != null && child.group!.isNotEmpty)
-                pw.Text('Section : ${pdfSafe(child.group!)}', style: const pw.TextStyle(fontSize: 11)),
-              pw.SizedBox(height: 10),
+      final progressionIds = byProgression.keys.toList()
+        ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
 
+      List<pw.Widget> header(String title) => [
+            pw.Header(
+              level: 0,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('$title - A petits pas',
+                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
+                      style: const pw.TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+            pw.Text(
+              '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
+              style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text(pdfSafe('${child.firstname} ${child.lastname ?? ''}'.trim()),
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+            if (child.group != null && child.group!.isNotEmpty)
+              pw.Text('Section : ${pdfSafe(child.group!)}', style: const pw.TextStyle(fontSize: 11)),
+            pw.SizedBox(height: 10),
+          ];
+
+      pw.Widget groupTitle(String id, String fallback) => pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
+            child: pw.Text(pdfSafe(provider.placeById(id)?.name ?? fallback),
+                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+          );
+
+      // Page des ateliers d'espaces, toujours presente (meme vide, elle dit
+      // qu'il n'y a rien a faire). La page des progressions n'existe que si
+      // la section a des jalons obligatoires.
+      if (inSpaces.isNotEmpty || byProgression.isEmpty) {
+        doc.addPage(
+          pw.MultiPage(
+            pageFormat: format,
+            build: (context) => [
+              ...header('Plan de travail'),
               if (mandatory.isEmpty)
-                pw.Text('Aucun atelier obligatoire configuré pour cette section.',
+                pw.Text('Aucun atelier dans le plan de travail de cette section.',
                     style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700))
               else
                 for (final spaceId in spaceIds) ...[
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
-                    child: pw.Text(pdfSafe(provider.placeById(spaceId)?.name ?? 'Sans espace'),
-                        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-                  ),
+                  groupTitle(spaceId, 'Sans espace'),
                   for (final atelier in bySpace[spaceId]!)
-                    _atelierPlanBlock(
-                      provider: provider,
-                      child: child,
-                      atelier: atelier,
-                    ),
+                    _atelierPlanBlock(provider: provider, child: child, atelier: atelier),
                 ],
-            ];
-          },
-        ),
-      );
+            ],
+          ),
+        );
+      }
+
+      if (byProgression.isNotEmpty) {
+        doc.addPage(
+          pw.MultiPage(
+            pageFormat: format,
+            build: (context) => [
+              ...header('Plan de travail - Parcours'),
+              for (final progressionId in progressionIds) ...[
+                groupTitle(progressionId, 'Parcours'),
+                for (final (i, step) in byProgression[progressionId]!.indexed)
+                  _atelierPlanBlock(
+                    provider: provider,
+                    child: child,
+                    atelier: step,
+                    stepLabel: 'Étape ${i + 1}',
+                    // Une etape est cochee des qu'elle atteint le seuil de
+                    // passage du parcours, comme sur l'ecran Parcours.
+                    done: AtelierEligibilityService.meetsThreshold(provider, child.id, step.id,
+                        provider.progressionById(progressionId)?.minStatusId),
+                  ),
+              ],
+            ],
+          ),
+        );
+      }
     }
 
     return doc.save();
@@ -95,14 +144,22 @@ class MandatoryAteliersPdfService {
     required AppStateProvider provider,
     required Child child,
     required ActivityType atelier,
+    String? stepLabel,
+    bool? done,
   }) {
     final snapshot = AtelierStatusResolver.resolve(
       provider: provider,
       childId: child.id,
       activityTypeId: atelier.id,
     );
-    final acquis = snapshot.statusId == 'acquis';
+    final acquis = done ?? snapshot.statusId == 'acquis';
     final statusColor = PdfColor.fromInt(int.parse(snapshot.colorHex.replaceFirst('#', '0xff')));
+    final photoTiles = <pw.Widget>[];
+    for (final relPath in atelier.allPhotoPaths) {
+      final image = AtelierPdfService.imageAt(provider, relPath);
+      if (image == null) continue;
+      photoTiles.add(AtelierPdfService.photoTile(image, atelier.captionFor(relPath), width: 110));
+    }
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 10),
@@ -134,7 +191,8 @@ class MandatoryAteliersPdfService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(pdfSafe(atelier.name), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                pw.Text(pdfSafe(stepLabel == null ? atelier.name : '$stepLabel - ${atelier.name}'),
+                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
                 if (atelier.domaine.isNotEmpty)
                   pw.Padding(
                     padding: const pw.EdgeInsets.only(top: 2),
@@ -151,6 +209,10 @@ class MandatoryAteliersPdfService {
                   ...atelier.objectifs.map(
                     (o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 9)),
                   ),
+                ],
+                if (photoTiles.isNotEmpty) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Wrap(spacing: 8, runSpacing: 8, children: photoTiles),
                 ],
                 pw.SizedBox(height: 4),
                 pw.Text(
@@ -179,11 +241,11 @@ class MandatoryAteliersPdfService {
 
     openPdfViewer(
       context,
-      title: 'Ateliers obligatoires',
-      fileName: 'Ateliers_obligatoires_${safeLabel.isEmpty ? 'eleves' : safeLabel}.pdf',
+      title: 'Plan de travail',
+      fileName: 'Plan_de_travail_${safeLabel.isEmpty ? 'eleves' : safeLabel}.pdf',
       build: (format) => buildBytes(provider: provider, children: children, format: format),
-      shareSubject: 'Ateliers obligatoires - A petits pas',
-      shareBody: 'Veuillez trouver ci-joint la liste des ateliers obligatoires.',
+      shareSubject: 'Plan de travail - A petits pas',
+      shareBody: 'Veuillez trouver ci-joint le plan de travail.',
     );
   }
 }

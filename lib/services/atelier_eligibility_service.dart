@@ -51,7 +51,7 @@ class AtelierEligibilityService {
     required Child child,
     required ActivityType atelier,
   }) {
-    final sectionResult = _evaluateSection(child, atelier);
+    final sectionResult = _evaluateSection(provider, child, atelier);
     if (sectionResult.status == AtelierEligibility.blockedSection) {
       return sectionResult;
     }
@@ -62,7 +62,19 @@ class AtelierEligibilityService {
     return sectionResult;
   }
 
-  static AtelierEligibilityResult _evaluateSection(Child child, ActivityType atelier) {
+  static AtelierEligibilityResult _evaluateSection(
+      AppStateProvider provider, Child child, ActivityType atelier) {
+    // Etape d'un parcours : les sections se reglent sur le parcours. Hors
+    // section l'etape reste proposee, avec un avertissement.
+    final parcours = provider.progressionById(atelier.progressionId);
+    if (parcours != null) {
+      return parcours.concernsGroup(child.group)
+          ? const AtelierEligibilityResult(status: AtelierEligibility.allowed)
+          : AtelierEligibilityResult(
+              status: AtelierEligibility.allowedWithWarning,
+              message: "Le parcours « ${parcours.name} » n'est pas prévu pour la section de cet élève.",
+            );
+    }
     if (!atelier.isObligatory) {
       return const AtelierEligibilityResult(
         status: AtelierEligibility.allowedWithWarning,

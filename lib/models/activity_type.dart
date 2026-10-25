@@ -49,6 +49,11 @@ class ActivityType {
 
   bool get inProgression => progressionId != null && progressionId!.isNotEmpty;
 
+  /// Atelier mis de cote : il disparait de l'onglet Espaces & Ateliers mais
+  /// reste partout ailleurs (observations, rapports, statistiques). Rien
+  /// n'est supprime, il suffit de le reactiver.
+  final bool isDisabled;
+
   ActivityType({
     required this.id,
     required this.name,
@@ -66,6 +71,7 @@ class ActivityType {
     this.obligatoryGroups = const [],
     this.position = -1,
     this.progressionId,
+    this.isDisabled = false,
   });
 
   /// Legende associee a une photo, ou null si aucune.
@@ -110,6 +116,7 @@ class ActivityType {
     List<String>? obligatoryGroups,
     int? position,
     Object? progressionId = kUndefined,
+    bool? isDisabled,
   }) {
     return ActivityType(
       id: id ?? this.id,
@@ -129,6 +136,7 @@ class ActivityType {
       position: position ?? this.position,
       progressionId:
           progressionId == kUndefined ? this.progressionId : progressionId as String?,
+      isDisabled: isDisabled ?? this.isDisabled,
     );
   }
 
@@ -152,6 +160,7 @@ class ActivityType {
       'obligatoryGroups': obligatoryGroups,
       'position': position,
       'progressionId': progressionId,
+      'isDisabled': isDisabled,
     };
   }
 
@@ -173,6 +182,7 @@ class ActivityType {
       obligatoryGroups: List<String>.from(map['obligatoryGroups'] ?? []),
       position: map['position'] ?? -1,
       progressionId: map['progressionId'],
+      isDisabled: map['isDisabled'] ?? false,
     );
   }
 

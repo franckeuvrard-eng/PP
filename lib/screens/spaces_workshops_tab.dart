@@ -9,9 +9,24 @@ import 'atelier_detail_screen.dart';
 import 'atelier_edit_screen.dart';
 import 'space_edit_screen.dart';
 
-/// Onglet « Espaces & Ateliers » de l'écran Réglages : CRUD des espaces de la
-/// classe et de leurs ateliers. Les ateliers rangés dans une progression
-/// sont gérés dans l'onglet « Progressions ».
+/// Page « Espaces & Ateliers » du menu principal (barre laterale sur
+/// ordinateur / iPad, carte de l'accueil sur telephone), sortie des
+/// Parametres pour etre a portee de main comme les Parcours.
+class SpacesWorkshopsScreen extends StatelessWidget {
+  const SpacesWorkshopsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Espaces & Ateliers')),
+      body: const SpacesWorkshopsTab(),
+    );
+  }
+}
+
+/// Contenu de la page Espaces & Ateliers : CRUD des espaces de la classe et
+/// de leurs ateliers. Les ateliers rangés dans un parcours sont gérés dans
+/// l'onglet « Parcours » des Paramètres.
 class SpacesWorkshopsTab extends StatelessWidget {
   const SpacesWorkshopsTab({super.key});
 
@@ -19,6 +34,12 @@ class SpacesWorkshopsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final spaces = provider.spaces;
+    // Les ateliers desactives ne sont plus listes dans leur espace : ils sont
+    // regroupes en bas de l'onglet, d'ou on peut les reactiver.
+    final disabled = provider.activityTypes
+        .where((a) => a.isDisabled && !a.inProgression)
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -49,6 +70,8 @@ class SpacesWorkshopsTab extends StatelessWidget {
           // Spaces list
           ...spaces.map((space) {
             final ateliersInSpace = provider.ateliersInSpace(space.id);
+            final activeInSpace =
+                ateliersInSpace.where((a) => !a.isDisabled).toList();
             final spaceColor = hexToColor(space.colorHex);
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -80,8 +103,12 @@ class SpacesWorkshopsTab extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 4,
                         children: [
-                          settingsBadge('${ateliersInSpace.length} atelier(s)',
+                          settingsBadge('${activeInSpace.length} atelier(s)',
                               spaceColor),
+                          if (activeInSpace.length < ateliersInSpace.length)
+                            settingsBadge(
+                                '${ateliersInSpace.length - activeInSpace.length} désactivé(s)',
+                                kMutedTextColor),
                         ],
                       ),
                       if (space.description != null &&
@@ -140,7 +167,7 @@ class SpacesWorkshopsTab extends StatelessWidget {
                   ],
                 ),
                 children: [
-                  ...ateliersInSpace.map((atelier) =>
+                  ...activeInSpace.map((atelier) =>
                       atelierSettingsTile(context, atelier)),
                   // Add atelier button inside expansion
                   Padding(
@@ -157,6 +184,41 @@ class SpacesWorkshopsTab extends StatelessWidget {
               ),
             );
           }),
+
+          if (disabled.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.only(top: 8, bottom: 12),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              ),
+              child: ExpansionTile(
+                leading: const Icon(Icons.visibility_off, color: kMutedTextColor),
+                title: Text('Ateliers désactivés (${disabled.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text(
+                    'Masqués ici, toujours visibles dans les observations, rapports et statistiques.',
+                    style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+                children: [
+                  for (final atelier in disabled)
+                    Row(
+                      children: [
+                        Expanded(child: atelierSettingsTile(context, atelier)),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton.icon(
+                            onPressed: () =>
+                                provider.setActivityTypeDisabled(atelier.id, false),
+                            icon: const Icon(Icons.visibility, size: 16),
+                            label: const Text('Réactiver'),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
 
           if (spaces.isEmpty)
             Padding(

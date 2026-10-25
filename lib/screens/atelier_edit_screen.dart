@@ -7,6 +7,7 @@ import '../providers/app_provider.dart';
 import '../models/activity_type.dart';
 import '../data/eduscol_data.dart';
 import '../utils/color_utils.dart';
+import '../widgets/age_chip.dart';
 import '../widgets/color_swatch_picker.dart';
 import '../widgets/icon_swatch_picker.dart';
 
@@ -43,6 +44,12 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   late bool _inProgression;
   late String _color;
   late String? _selectedDomainId;
+
+  /// Cycle du programme dont on parcourt les domaines.
+  late int _cycle;
+
+  /// Null : tous les sous-domaines du domaine choisi.
+  String? _selectedSubdomainId;
   late String _selectedLevelFilter;
   late bool _isObligatory;
   late List<String> _selectedObjectives;
@@ -85,9 +92,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     // L'identifiant enregistre fait foi ; la recherche par titre ne sert plus
     // que pour un atelier anterieur a la migration.
     _selectedDomainId = act?.domaineId ??
-        (EduscolData.domains.any((d) => d.title == act?.domaine)
-            ? EduscolData.domains.firstWhere((d) => d.title == act?.domaine).id
-            : (act?.domaine.isNotEmpty == true ? 'custom' : 'none'));
+        EduscolData.domainByTitle(act?.domaine ?? '')?.id ??
+        (act?.domaine.isNotEmpty == true ? 'custom' : 'none');
+    _cycle = EduscolData.domainById(_selectedDomainId)?.cycle ?? EduscolData.cycles.first;
 
     if (_selectedDomainId == 'custom') {
       _customDomaineCtrl.text = act?.domaine ?? '';
@@ -226,18 +233,32 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     final query = _objectiveQuery.trim().toLowerCase();
     final availableEduscolObjectives = EduscolData.objectives.where((obj) {
       final matchDomain = obj.domainId == _selectedDomainId;
+      final matchSub = _selectedSubdomainId == null || obj.subdomainId == _selectedSubdomainId;
       final matchLevel =
           _selectedLevelFilter == 'Tous' || obj.level == _selectedLevelFilter;
       final matchQuery =
           query.isEmpty || obj.text.toLowerCase().contains(query);
-      return matchDomain && matchLevel && matchQuery;
+      return matchDomain && matchSub && matchLevel && matchQuery;
     }).toList();
+
+    // Liste affichee : un en-tete (String) a chaque changement de
+    // sous-domaine ou de theme, puis les objectifs (EduscolObjective).
+    final objectiveRows = <Object>[];
+    String? lastHeader;
+    for (final obj in availableEduscolObjectives) {
+      final sub = EduscolData.subdomains.firstWhere((s) => s.id == obj.subdomainId).title;
+      final header = [if (_selectedSubdomainId == null) sub, if (obj.theme != null) obj.theme!]
+          .join(' › ');
+      if (header.isNotEmpty && header != lastHeader) objectiveRows.add(header);
+      lastHeader = header;
+      objectiveRows.add(obj);
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.activityType == null
-            ? 'Nouveau type d\'atelier'
-            : 'Modifier l\'atelier'),
+        title: Text(_inProgression
+            ? (widget.activityType == null ? 'Nouvelle étape' : "Modifier l'étape")
+            : (widget.activityType == null ? 'Nouvel atelier' : "Modifier l'atelier")),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -274,31 +295,12 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom de l\'atelier *',
-                        hintText: 'Ex: Peinture à la gouache',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.palette),
+                      decoration: InputDecoration(
+                        labelText: _inProgression ? "Nom de l'étape *" : "Nom de l'atelier *",
+                        hintText: _inProgression ? 'Ex: Couper une ligne droite' : 'Ex: Peinture à la gouache',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(_inProgression ? Icons.flag : Icons.palette),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Rangé dans :',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(
-                            value: false,
-                            icon: Icon(Icons.space_dashboard),
-                            label: Text('Un espace')),
-                        ButtonSegment(
-                            value: true,
-                            icon: Icon(Icons.timeline),
-                            label: Text('Une progression')),
-                      ],
-                      selected: {_inProgression},
-                      onSelectionChanged: (sel) =>
-                          setState(() => _inProgression = sel.first),
                     ),
                     const SizedBox(height: 12),
                     if (!_inProgression)
@@ -324,7 +326,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       )
                     else if (provider.progressions.isEmpty)
                       const Text(
-                        "Aucune progression : créez-en une dans l'onglet « Progressions » des Réglages.",
+                        "Aucun parcours : créez-en un dans l'onglet « Parcours » des Paramètres.",
                         style: TextStyle(fontSize: 12, color: Colors.orange),
                       )
                     else ...[
@@ -334,7 +336,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                             ? _progressionId
                             : null,
                         decoration: const InputDecoration(
-                          labelText: 'Progression *',
+                          labelText: 'Parcours *',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.timeline),
                         ),
@@ -348,11 +350,14 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        "Un nouveau jalon s'ajoute en fin de progression ; l'ordre se règle "
-                        "dans l'onglet « Progressions ».",
+                        "Une nouvelle étape s'ajoute en fin de parcours ; l'ordre se règle "
+                        "dans l'onglet « Parcours ».",
                         style: TextStyle(fontSize: 11, color: kMutedTextColor),
                       ),
                     ],
+                    // Les sections d'un parcours se choisissent sur le parcours,
+                    // pas sur chacune de ses étapes.
+                    if (!_inProgression) ...[
                     const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
@@ -360,7 +365,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         children: [
                           Icon(Icons.stars, color: Colors.orange),
                           SizedBox(width: 8),
-                          Text('Atelier Obligatoire',
+                          Text('Plan de travail',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 14)),
                         ],
@@ -381,8 +386,8 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _obligatoryGroups.isEmpty
-                            ? 'Aucune section sélectionnée : obligatoire pour toute la classe.'
-                            : 'Obligatoire uniquement pour ${_obligatoryGroups.length} section(s).',
+                            ? 'Aucune section sélectionnée : dans le plan de travail de toute la classe.'
+                            : 'Dans le plan de travail de ${_obligatoryGroups.length} section(s) uniquement.',
                         style:
                             const TextStyle(fontSize: 12, color: kMutedTextColor),
                       ),
@@ -426,6 +431,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         },
                       ),
                     ],
+                    ],
                   ],
                 ),
               ),
@@ -441,22 +447,40 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                 expandedCrossAxisAlignment: CrossAxisAlignment.start,
                 expandedAlignment: Alignment.centerLeft,
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                title: const Text('📚 Domaine & Objectifs Éduscol (Cycle 1)',
+                title: const Text('📚 Domaine & Objectifs Éduscol',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 children: [
+                  // Le cycle en premier : il determine les domaines proposes.
+                  SegmentedButton<int>(
+                    segments: [
+                      for (final c in EduscolData.cycles)
+                        ButtonSegment(value: c, label: Text(EduscolData.cycleLabel(c))),
+                      if (!EduscolData.cycles.contains(2))
+                        const ButtonSegment(
+                            value: 2, enabled: false, label: Text('Cycle 2 · bientôt')),
+                    ],
+                    selected: {_cycle},
+                    onSelectionChanged: (sel) => setState(() {
+                      _cycle = sel.first;
+                      if (EduscolData.domainById(_selectedDomainId)?.cycle != _cycle) {
+                        _selectedDomainId = 'none';
+                        _selectedSubdomainId = null;
+                      }
+                    }),
+                  ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
-                    // ne suivrait pas ses changements.
+                    // Champ pilote par le code : initialValue ne suivrait pas
+                    // ses changements.
                     // ignore: deprecated_member_use
                     value: (_selectedDomainId == 'custom' ||
                             _selectedDomainId == 'none' ||
-                            EduscolData.domains
-                                .any((d) => d.id == _selectedDomainId))
+                            EduscolData.domainById(_selectedDomainId) != null)
                         ? _selectedDomainId
                         : 'none',
                     decoration: const InputDecoration(
-                      labelText: 'Domaine d\'apprentissage Éduscol (Optionnel)',
+                      labelText: 'Domaine d\'apprentissage (optionnel)',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.school),
                     ),
@@ -467,12 +491,24 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                         child: Text('-- Aucun domaine sélectionné --',
                             style: TextStyle(fontSize: 13, color: kMutedTextColor)),
                       ),
-                      ...EduscolData.domains.map((d) => DropdownMenuItem(
-                            value: d.id,
-                            child: Text(d.title,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13)),
-                          )),
+                      for (final d in EduscolData.domainsForCycle(_cycle))
+                        DropdownMenuItem(
+                          value: d.id,
+                          child: Text(d.title,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13)),
+                        ),
+                      // Domaine d'un ancien programme deja choisi : il reste
+                      // affiche tant qu'on ne le change pas.
+                      if (EduscolData.domainById(_selectedDomainId)?.legacy ?? false)
+                        DropdownMenuItem(
+                          value: _selectedDomainId,
+                          child: Text(
+                              '${EduscolData.domainById(_selectedDomainId)!.title} (ancien programme)',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 13, fontStyle: FontStyle.italic)),
+                        ),
                       const DropdownMenuItem(
                         value: 'custom',
                         child: Text('➕ Autre (Saisie personnalisée)',
@@ -482,7 +518,10 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setState(() => _selectedDomainId = val);
+                        setState(() {
+                          _selectedDomainId = val;
+                          _selectedSubdomainId = null;
+                        });
                       }
                     },
                   ),
@@ -496,30 +535,57 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       ),
                     ),
                   ],
+                  if (EduscolData.domainById(_selectedDomainId)?.legacy ?? false) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Ce domaine vient d\'un ancien programme. Choisissez un domaine actuel '
+                      'pour voir ses objectifs ; les objectifs déjà retenus restent sur l\'atelier.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                  ],
                   const SizedBox(height: 16),
-                  if (_selectedDomainId != 'custom' &&
-                      _selectedDomainId != 'none') ...[
+                  if (EduscolData.subdomainsOf(_selectedDomainId ?? '').isNotEmpty) ...[
+                    DropdownButtonFormField<String?>(
+                      // ignore: deprecated_member_use
+                      value: _selectedSubdomainId,
+                      decoration: const InputDecoration(
+                        labelText: 'Sous-domaine',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.subdirectory_arrow_right),
+                      ),
+                      isExpanded: true,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Tous les sous-domaines', style: TextStyle(fontSize: 13)),
+                        ),
+                        for (final s in EduscolData.subdomainsOf(_selectedDomainId!))
+                          DropdownMenuItem<String?>(
+                            value: s.id,
+                            child: Text(s.title,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13)),
+                          ),
+                      ],
+                      onChanged: (val) => setState(() => _selectedSubdomainId = val),
+                    ),
+                    const SizedBox(height: 16),
                     // Le libelle sur sa propre ligne et un Wrap plutot qu'un
                     // defilement horizontal : sur telephone, partager la Row
                     // avec le titre ne laissait qu'une bande etroite.
-                    const Text('🎯 Tranche d\'âge / Niveau :',
+                    const Text('🎯 Âge / niveau :',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: ['Tous', 'PS', 'MS', 'GS'].map((lvl) {
+                      children: ['Tous', ...EduscolData.levels[_cycle] ?? const <String>[]].map((lvl) {
                         final isSelected = _selectedLevelFilter == lvl;
+                        final age = EduscolData.ageLabel(lvl);
                         return ChoiceChip(
                           label: Text(
-                            lvl == 'PS'
-                                ? 'PS (2-4 ans)'
-                                : lvl == 'MS'
-                                    ? 'MS (4-5 ans)'
-                                    : lvl == 'GS'
-                                        ? 'GS (5-6 ans)'
-                                        : 'Tous',
+                            age == null ? lvl : '$age ($lvl)',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.w600),
                           ),
@@ -529,7 +595,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                 : Theme.of(context).colorScheme.onSurface,
                           ),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF4E9F3D),
+                          selectedColor: lvl == 'Tous'
+                              ? const Color(0xFF4E9F3D)
+                              : AgeChip.colorFor(lvl),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 8),
                           onSelected: (sel) {
@@ -562,13 +630,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       // Liste plus haute et barre de defilement toujours
                       // visible : a 220 px sans ascenseur, on ne voyait pas
                       // ou l'on se situait dans le referentiel.
-                      constraints: const BoxConstraints(maxHeight: 380),
+                      constraints: const BoxConstraints(maxHeight: 420),
                       decoration: BoxDecoration(
                         border:
                             Border.all(color: Theme.of(context).dividerColor),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: availableEduscolObjectives.isEmpty
+                      child: objectiveRows.isEmpty
                           ? const Padding(
                               padding: EdgeInsets.all(16),
                               child: Text(
@@ -579,15 +647,27 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                           : Scrollbar(
                               controller: _objectivesScrollCtrl,
                               thumbVisibility: true,
-                              child: ListView.separated(
+                              child: ListView.builder(
                                 controller: _objectivesScrollCtrl,
                                 shrinkWrap: true,
                                 padding: const EdgeInsets.only(right: 8),
-                                itemCount: availableEduscolObjectives.length,
-                                separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
+                                itemCount: objectiveRows.length,
                                 itemBuilder: (context, idx) {
-                                  final obj = availableEduscolObjectives[idx];
+                                  final row = objectiveRows[idx];
+                                  // En-tete de sous-domaine / theme.
+                                  if (row is String) {
+                                    return Container(
+                                      width: double.infinity,
+                                      color: const Color(0xFF4E9F3D).withValues(alpha: 0.08),
+                                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                                      child: Text(row,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: kAccessibleGreenText)),
+                                    );
+                                  }
+                                  final obj = row as EduscolObjective;
                                   final isChecked =
                                       _selectedObjectives.contains(obj.text);
                                   return CheckboxListTile(
@@ -596,10 +676,13 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                         style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500)),
-                                    subtitle: Text(
-                                        'Niveau Éduscol : ${obj.level}',
-                                        style: const TextStyle(
-                                            fontSize: 12, color: kMutedTextColor)),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: AgeChip(level: obj.level),
+                                      ),
+                                    ),
                                     value: isChecked,
                                     activeColor: const Color(0xFF4E9F3D),
                                     onChanged: (val) {
@@ -636,9 +719,21 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       spacing: 8,
                       runSpacing: 8,
                       children: _selectedObjectives.map((objText) {
+                        final levels = EduscolData.levelsForText(objText);
                         return Chip(
-                          label: Text(objText,
-                              style: const TextStyle(fontSize: 12)),
+                          label: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final l in levels) ...[
+                                AgeChip(level: l, compact: true),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(objText,
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
                           deleteIcon: const Icon(Icons.close, size: 16),
                           onDeleted: () {
                             setState(() {
@@ -870,7 +965,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Veuillez saisir un nom d\'atelier.'),
+            content: Text('Veuillez saisir un nom.'),
             backgroundColor: Colors.red),
       );
       return;
@@ -881,11 +976,11 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     if (_selectedDomainId == 'custom') {
       finalDomaine = _customDomaineCtrl.text.trim();
     } else if (_selectedDomainId != null && _selectedDomainId != 'none') {
-      final dom = EduscolData.domains.firstWhere(
-          (d) => d.id == _selectedDomainId,
-          orElse: () => EduscolData.domains.first);
-      finalDomaine = dom.title;
-      finalDomaineId = dom.id;
+      // Domaine inconnu de cette version (donnee venue d'un appareil plus
+      // recent) : on le garde tel quel plutot que de le remplacer.
+      final dom = EduscolData.domainById(_selectedDomainId);
+      finalDomaine = dom?.title ?? widget.activityType?.domaine ?? '';
+      finalDomaineId = dom?.id ?? _selectedDomainId;
     }
 
     final provider = Provider.of<AppStateProvider>(context, listen: false);
@@ -893,7 +988,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     if (_inProgression && !inProgression) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Choisissez une progression.'),
+            content: Text('Choisissez un parcours.'),
             backgroundColor: Colors.red),
       );
       return;
@@ -927,6 +1022,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       photoCaptions: _photoCaptions,
       obligatoryGroups: _isObligatory ? _obligatoryGroups : const [],
       position: position,
+      isDisabled: widget.activityType?.isDisabled ?? false,
     );
 
     provider.saveActivityType(newType);

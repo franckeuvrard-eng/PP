@@ -46,7 +46,7 @@ class ChildProfileScreen extends StatelessWidget {
               Tab(icon: Icon(Icons.person), text: 'Profil'),
               Tab(icon: Icon(Icons.history), text: 'Activités'),
               Tab(icon: Icon(Icons.checklist), text: 'Acquis'),
-              Tab(icon: Icon(Icons.timeline), text: 'Progressions'),
+              Tab(icon: Icon(Icons.timeline), text: 'Parcours'),
             ],
           ),
           actions: [
@@ -267,7 +267,7 @@ class ChildProfileScreen extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'Aucune progression. Créez-en dans Paramètres › Progressions.',
+            'Aucun parcours. Créez-en dans Paramètres › Parcours.',
             textAlign: TextAlign.center,
             style: TextStyle(color: kMutedTextColor),
           ),
@@ -684,7 +684,7 @@ class ChildProfileScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
-                            '⭐ Obligatoire',
+                            '⭐ Plan de travail',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                         ),

@@ -28,13 +28,13 @@ class ProgressionsSettingsTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Expanded(
-                child: Text('🧭 Progressions',
+                child: Text('🧭 Parcours',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               ElevatedButton.icon(
                 onPressed: () => _openEditor(context),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Progression'),
+                label: const Text('Parcours'),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4E9F3D),
                     foregroundColor: Colors.white),
@@ -43,8 +43,8 @@ class ProgressionsSettingsTab extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            "Une progression est une suite d'ateliers (jalons) à faire dans l'ordre : "
-            "un jalon se débloque quand le précédent atteint le seuil de passage.",
+            "Un parcours est une suite d'étapes à faire dans l'ordre : "
+            "une étape se débloque quand la précédente atteint le seuil de passage.",
             style: TextStyle(fontSize: 12, color: kMutedTextColor),
           ),
           const SizedBox(height: 12),
@@ -57,7 +57,7 @@ class ProgressionsSettingsTab extends StatelessWidget {
                 children: [
                   Icon(Icons.timeline, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 12),
-                  const Text('Aucune progression',
+                  const Text('Aucun parcours',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 8),
@@ -71,7 +71,7 @@ class ProgressionsSettingsTab extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () => _openEditor(context),
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Créer ma première progression'),
+                    label: const Text('Créer mon premier parcours'),
                     style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4E9F3D),
                         foregroundColor: Colors.white),
@@ -130,7 +130,10 @@ class _ProgressionCard extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
-              settingsBadge('${jalons.length} jalon(s)', color),
+              settingsBadge('${jalons.length} étape(s)', color),
+              settingsBadge(
+                  progression.targetGroups.isEmpty ? 'Toute la classe' : progression.targetGroups.join(', '),
+                  kMutedTextColor),
               if (threshold != null) settingsBadge('Seuil : $threshold', Colors.deepOrange),
             ],
           ),
@@ -140,12 +143,12 @@ class _ProgressionCard extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.grey, size: 20),
-              tooltip: 'Modifier la progression',
+              tooltip: 'Modifier le parcours',
               onPressed: () => _openEditor(context, progression: progression),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-              tooltip: 'Supprimer la progression',
+              tooltip: 'Supprimer le parcours',
               onPressed: () => _confirmDelete(context, provider, jalons.length),
             ),
           ],
@@ -159,7 +162,7 @@ class _ProgressionCard extends StatelessWidget {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Maintenez la poignée ⠿ et glissez un jalon pour changer sa place.',
+                    'Maintenez la poignée ⠿ et glissez une étape pour changer sa place.',
                     style: TextStyle(fontSize: 12, color: kMutedTextColor),
                   ),
                 ),
@@ -202,7 +205,7 @@ class _ProgressionCard extends StatelessWidget {
                 ),
               ),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Ajouter un jalon'),
+              label: const Text('Ajouter une étape'),
             ),
           ),
         ],
@@ -215,9 +218,9 @@ class _ProgressionCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer cette progression ?'),
+        title: const Text('Supprimer ce parcours ?'),
         content: Text(
-          'Cela supprimera aussi ses $jalonCount jalon(s)'
+          'Cela supprimera aussi ses $jalonCount étape(s)'
           '${obs > 0 ? ' et leurs $obs observation(s)' : ''}.',
         ),
         actions: [

@@ -8,6 +8,8 @@ import '../models/evaluation_status.dart';
 import '../models/progression.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_eligibility_service.dart';
+import '../services/parcours_progress.dart';
+import '../services/parcours_frise_pdf_service.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'atelier_detail_screen.dart';
@@ -45,7 +47,7 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
 
     if (progressions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Progressions')),
+        appBar: AppBar(title: const Text('Parcours')),
         body: _EmptyProgressions(onCreate: () => _openSettings(context)),
       );
     }
@@ -57,11 +59,17 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Progressions'),
+        title: const Text('Parcours'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.view_carousel_outlined),
+            tooltip: 'Imprimer la frise de ce parcours',
+            onPressed: () => ParcoursFrisePdfService.export(
+                context: context, provider: provider, parcours: progression),
+          ),
+          IconButton(
             icon: const Icon(Icons.edit_road),
-            tooltip: 'Gérer les progressions',
+            tooltip: 'Gérer les parcours',
             onPressed: () => _openSettings(context),
           ),
         ],
@@ -138,7 +146,7 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
   void _openSettings(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen(initialTab: 2, standalone: true)),
+      MaterialPageRoute(builder: (_) => const SettingsScreen(initialTab: 1, standalone: true)),
     );
   }
 }
@@ -160,11 +168,11 @@ class _EmptyProgressions extends StatelessWidget {
           children: [
             Icon(Icons.timeline, size: 56, color: Colors.grey[400]),
             const SizedBox(height: 12),
-            const Text('Aucune progression',
+            const Text('Aucun parcours',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             const Text(
-              "Une progression est une suite d'ateliers à faire dans l'ordre, comme un "
+              "Un parcours est une suite d'étapes à faire dans l'ordre, comme un "
               'chemin : couper une bande, puis une ligne droite, puis une courbe…',
               textAlign: TextAlign.center,
               style: TextStyle(color: kMutedTextColor),
@@ -173,7 +181,7 @@ class _EmptyProgressions extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onCreate,
               icon: const Icon(Icons.add),
-              label: const Text('Créer une progression'),
+              label: const Text('Créer un parcours'),
               style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4E9F3D), foregroundColor: Colors.white),
             ),
@@ -233,7 +241,7 @@ class ProgressionCard extends StatelessWidget {
                       ),
                       Text(
                         [
-                          '${jalons.length} jalon(s)',
+                          '${jalons.length} étape(s)',
                           if (threshold != null) 'on passe au suivant à « $threshold »',
                         ].join(' · '),
                         style: const TextStyle(fontSize: 12, color: kMutedTextColor),
@@ -250,8 +258,8 @@ class ProgressionCard extends StatelessWidget {
             const SizedBox(height: 16),
             if (jalons.isEmpty)
               const Text(
-                "Aucun jalon pour l'instant : ajoutez des ateliers à cette progression dans "
-                'Paramètres › Progressions.',
+                "Aucune étape pour l'instant : ajoutez-en à ce parcours dans "
+                'Paramètres › Parcours.',
                 style: TextStyle(color: kMutedTextColor),
               )
             else
@@ -535,7 +543,7 @@ class ProgressionTrack extends StatelessWidget {
       );
     }
     final finished = data.stepOf(child!.id) >= jalons.length;
-    return Text(finished ? 'Progression terminée !' : 'Arrivée',
+    return Text(finished ? 'Parcours terminé !' : 'Arrivée',
         style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 13,
@@ -577,8 +585,8 @@ class ProgressionTrack extends StatelessWidget {
 /// Calculs du fil, faits une fois par affichage.
 class _TrackData {
   _TrackData(this.provider, this.progression, this.jalons)
-      : children = provider.children.toList()
-          ..sort((a, b) => a.firstname.toLowerCase().compareTo(b.firstname.toLowerCase()));
+      // Vue classe : seuls les eleves des sections qui suivent le parcours.
+      : children = ParcoursProgress.childrenFollowing(provider, progression);
 
   final AppStateProvider provider;
   final Progression progression;

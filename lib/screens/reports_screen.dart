@@ -9,6 +9,9 @@ import '../services/child_activity_report_service.dart';
 import '../services/child_data_export_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/mandatory_ateliers_pdf_service.dart';
+import '../services/parcours_frise_pdf_service.dart';
+import '../services/parcours_report_service.dart';
+import '../models/progression.dart';
 import '../utils/color_utils.dart';
 import '../utils/pdf_viewer.dart';
 import '../widgets/child_multi_select_dialog.dart';
@@ -48,7 +51,7 @@ class ReportsScreen extends StatelessWidget {
                 const SizedBox(height: 8),
               ],
               for (final progression in provider.progressions) ...[
-                Text('Progression · ${progression.name}',
+                Text('Parcours · ${progression.name}',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: kAccessibleGreenText)),
                 ...provider.ateliersInProgressionOrdered(progression.id).indexed.map(
                       (e) => ListTile(
@@ -99,6 +102,27 @@ class ReportsScreen extends StatelessWidget {
     );
     if (child != null && context.mounted) {
       ChildDataExportService.exportChild(context: context, provider: provider, child: child);
+    }
+  }
+
+  Future<void> _pickParcoursAndExportFrise(BuildContext context, AppStateProvider provider) async {
+    final parcours = provider.progressions.length == 1
+        ? provider.progressions.first
+        : await showDialog<Progression>(
+            context: context,
+            builder: (ctx) => SimpleDialog(
+              title: const Text('Choisir un parcours'),
+              children: [
+                for (final p in provider.progressions)
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(ctx, p),
+                    child: Text(p.name),
+                  ),
+              ],
+            ),
+          );
+    if (parcours != null && context.mounted) {
+      await ParcoursFrisePdfService.export(context: context, provider: provider, parcours: parcours);
     }
   }
 
@@ -251,12 +275,67 @@ class ReportsScreen extends StatelessWidget {
                 backgroundColor: Color(0xFF4E9F3D),
                 child: Icon(Icons.assignment_turned_in, color: Colors.white),
               ),
-              title: const Text('Ateliers obligatoires (PDF)', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: const Text('Plan de travail (PDF)', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text(
-                "Liste des ateliers obligatoires et leur statut, pour un ou plusieurs élèves à la fois.",
+                "Les ateliers du plan de travail et leur statut (parcours sur une page à part), pour un ou plusieurs élèves à la fois.",
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _exportMandatoryAteliers(context, provider),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF42A5F5),
+                    child: Icon(Icons.grid_on, color: Colors.white),
+                  ),
+                  title: const Text('Suivi des parcours', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text(
+                    'Tableau croisé élèves × parcours : l\'étape où en est chaque élève.',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                        label: const Text('PDF'),
+                        onPressed: provider.progressions.isEmpty
+                            ? null
+                            : () => ParcoursReportService.exportPdf(context: context, provider: provider),
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.table_chart, size: 18),
+                        label: const Text('Excel (TCD)'),
+                        onPressed: provider.progressions.isEmpty
+                            ? null
+                            : () => ParcoursReportService.exportExcel(context: context, provider: provider),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF5C6BC0),
+                child: Icon(Icons.view_carousel, color: Colors.white),
+              ),
+              title: const Text('Frise d\'un parcours (PDF)'),
+              subtitle: const Text('En grand, à afficher en classe pour que les élèves suivent eux-mêmes.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: provider.progressions.isEmpty ? null : () => _pickParcoursAndExportFrise(context, provider),
             ),
           ),
           const SizedBox(height: 12),

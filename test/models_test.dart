@@ -181,6 +181,16 @@ void main() {
     });
   });
 
+  test('atelier désactivé : conservé à la sauvegarde, actif par défaut', () {
+    final a = ActivityType(id: 'a1', name: 'Pâte à sel', spaceId: 's1', colorHex: '#4E9F3D');
+    expect(a.isDisabled, isFalse);
+    // Donnees d'une version anterieure, sans le champ.
+    expect(ActivityType.fromMap(a.toMap()..remove('isDisabled')).isDisabled, isFalse);
+    final off = a.copyWith(isDisabled: true);
+    expect(ActivityType.fromMap(off.toMap()).isDisabled, isTrue);
+    expect(off.copyWith(name: 'Pâte à modeler').isDisabled, isTrue);
+  });
+
   test('allPhotoPaths place l\'illustration en tête', () {
     final a = ActivityType(
       id: 'a1',

@@ -1,12 +1,13 @@
 import 'undefined.dart';
 
-/// Parcours d'apprentissage : une suite ordonnee d'ateliers (les jalons).
+/// Parcours d'apprentissage : une suite ordonnee d'etapes.
 ///
-/// Distincte d'un espace (un coin de la classe) : un atelier appartient soit
-/// a un espace, soit a une progression ([ActivityType.progressionId]), jamais
-/// aux deux. Les jalons sont les ateliers de la progression, ranges par
-/// [ActivityType.position] ; un jalon reste verrouille pour un eleve tant que
-/// le precedent n'a pas atteint [minStatusId].
+/// Distinct d'un espace (un coin de la classe) : un atelier est toujours dans
+/// un espace, une etape toujours dans un parcours. Techniquement une etape
+/// est un [ActivityType] dont [ActivityType.progressionId] designe le
+/// parcours (ce qui garde les observations, le scan et la synchro communs),
+/// rangee par [ActivityType.position] ; elle reste verrouillee pour un eleve
+/// tant que la precedente n'a pas atteint [minStatusId].
 class Progression {
   final String id;
   final String name;
@@ -18,6 +19,13 @@ class Progression {
   /// debloquer le suivant. Null : le niveau « acquis » par defaut.
   final String? minStatusId;
 
+  /// Sections qui suivent ce parcours. Vide : toute la classe.
+  final List<String> targetGroups;
+
+  /// Vrai si un eleve de cette section suit le parcours.
+  bool concernsGroup(String? group) =>
+      targetGroups.isEmpty || (group != null && targetGroups.contains(group));
+
   Progression({
     required this.id,
     required this.name,
@@ -25,6 +33,7 @@ class Progression {
     this.iconName,
     this.description,
     this.minStatusId,
+    this.targetGroups = const [],
   });
 
   /// Copie modifiee. Les champs non fournis restent inchanges ; passer
@@ -35,6 +44,7 @@ class Progression {
     Object? iconName = kUndefined,
     Object? description = kUndefined,
     Object? minStatusId = kUndefined,
+    List<String>? targetGroups,
   }) {
     return Progression(
       id: id,
@@ -43,6 +53,7 @@ class Progression {
       iconName: iconName == kUndefined ? this.iconName : iconName as String?,
       description: description == kUndefined ? this.description : description as String?,
       minStatusId: minStatusId == kUndefined ? this.minStatusId : minStatusId as String?,
+      targetGroups: targetGroups ?? this.targetGroups,
     );
   }
 
@@ -53,6 +64,7 @@ class Progression {
         'iconName': iconName,
         'description': description,
         'minStatusId': minStatusId,
+        'targetGroups': targetGroups,
       };
 
   factory Progression.fromMap(Map<String, dynamic> map) => Progression(
@@ -62,5 +74,6 @@ class Progression {
         iconName: map['iconName'],
         description: map['description'],
         minStatusId: map['minStatusId'],
+        targetGroups: List<String>.from(map['targetGroups'] ?? const []),
       );
 }

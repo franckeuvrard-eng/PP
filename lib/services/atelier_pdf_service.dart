@@ -16,7 +16,7 @@ import '../utils/pdf_viewer.dart';
 ///
 /// Sert de support a remettre a l'enfant ou aux familles.
 class AtelierPdfService {
-  static pw.MemoryImage? _imageAt(AppStateProvider provider, String? relPath) {
+  static pw.MemoryImage? imageAt(AppStateProvider provider, String? relPath) {
     final abs = provider.getAbsolutePath(relPath);
     if (abs == null) return null;
     final file = File(abs);
@@ -39,16 +39,16 @@ class AtelierPdfService {
   }
 
   /// Vignette d'une photo, surmontant sa legende quand elle en a une.
-  static pw.Widget _photoTile(pw.MemoryImage image, String? caption) {
+  static pw.Widget photoTile(pw.MemoryImage image, String? caption, {double width = 165}) {
     return pw.Container(
-      width: 165,
+      width: width,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         mainAxisSize: pw.MainAxisSize.min,
         children: [
           pw.Container(
-            width: 165,
-            height: 124,
+            width: width,
+            height: width * 0.75,
             decoration: pw.BoxDecoration(
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
               border: pw.Border.all(color: PdfColors.grey400),
@@ -83,9 +83,9 @@ class AtelierPdfService {
     // du rapport individuel, pas de ce support.
     final photoTiles = <pw.Widget>[];
     for (final relPath in atelier.allPhotoPaths) {
-      final image = _imageAt(provider, relPath);
+      final image = imageAt(provider, relPath);
       if (image == null) continue;
-      photoTiles.add(_photoTile(image, atelier.captionFor(relPath)));
+      photoTiles.add(photoTile(image, atelier.captionFor(relPath)));
     }
 
     final doc = pw.Document();
@@ -122,8 +122,8 @@ class AtelierPdfService {
             if (atelier.isObligatory)
               pw.Text(
                 atelier.obligatoryGroups.isEmpty
-                    ? 'Atelier obligatoire pour toute la classe'
-                    : 'Atelier obligatoire pour : ${atelier.obligatoryGroups.map(pdfSafe).join(', ')}',
+                    ? 'Plan de travail de toute la classe'
+                    : 'Plan de travail : ${atelier.obligatoryGroups.map(pdfSafe).join(', ')}',
                 style: pw.TextStyle(
                     fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800),
               ),

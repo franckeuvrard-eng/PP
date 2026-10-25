@@ -349,8 +349,9 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
-  /// Renomme une section et reporte le changement sur les eleves et les
-  /// ateliers concernes, pour ne pas laisser de references orphelines.
+  /// Renomme une section et reporte le changement sur les eleves, les
+  /// ateliers et les parcours concernes, pour ne pas laisser de references
+  /// orphelines.
   void renameSection(String from, String to) {
     final target = to.trim();
     if (target.isEmpty || from == target) return;
@@ -375,6 +376,16 @@ class AppStateProvider extends ChangeNotifier {
       );
       _activityTypes[i] = updated;
       _write(_db.saveActivityType(updated));
+    }
+
+    for (var i = 0; i < _progressions.length; i++) {
+      final p = _progressions[i];
+      if (!p.targetGroups.contains(from)) continue;
+      final updated = p.copyWith(
+        targetGroups: [for (final g in p.targetGroups) if (g == from) target else g],
+      );
+      _progressions[i] = updated;
+      _write(_db.saveProgression(updated));
     }
 
     _write(_db.setSetting('sections', json.encode(_sections)));
@@ -1749,6 +1760,13 @@ class AppStateProvider extends ChangeNotifier {
 
   void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
 
+  /// Desactive (ou reactive) un atelier sans toucher a ses observations.
+  void setActivityTypeDisabled(String id, bool disabled) {
+    final current = activityTypeById(id);
+    if (current == null || current.isDisabled == disabled) return;
+    saveActivityType(current.copyWith(isDisabled: disabled));
+  }
+
   /// Supprime l'atelier ET ses observations : elles restaient jusqu'ici
   /// orphelines (« Atelier inconnu »), impossibles a rattacher ou a nettoyer.
   void deleteActivityType(String id) {
@@ -1949,7 +1967,7 @@ class AppStateProvider extends ChangeNotifier {
     for (var i = 0; i < _activityTypes.length; i++) {
       final a = _activityTypes[i];
       if (a.domaineId != null || a.domaine.isEmpty) continue;
-      final match = EduscolData.domains.where((d) => d.title == a.domaine).firstOrNull;
+      final match = EduscolData.domainByTitle(a.domaine);
       if (match == null) continue;
       final updated = a.copyWith(domaineId: match.id);
       _activityTypes[i] = updated;

@@ -45,7 +45,8 @@ const _tour = [
   _TourPage(Icons.home, 'Accueil', 'Votre journée en un coup d\'œil.', [
     'Le fil du jour liste les observations saisies aujourd\'hui ; touchez le crayon pour en modifier une.',
     '« Aujourd\'hui » compte les observations du jour, « Analyses » ouvre les statistiques.',
-    '« Rapports » regroupe les ateliers obligatoires, les fiches PDF et les exports.',
+    'Espaces & Ateliers et Parcours s\'ouvrent depuis l\'accueil sur iPhone, depuis la barre latérale sur Mac et iPad.',
+    '« Rapports » (icône en haut sur iPhone, barre latérale sur Mac et iPad) regroupe le plan de travail, les fiches PDF et les exports.',
     'Tirez vers le bas pour synchroniser avec vos autres appareils.',
   ]),
   _TourPage(Icons.qr_code_2, 'Scan & Go', 'Enregistrer une observation.', [
@@ -67,8 +68,7 @@ const _tour = [
   ]),
   _TourPage(Icons.tune, 'Paramètres', 'Votre classe, à votre façon.', [
     'Profil Classe : nom, enseignant, ATSEM, niveau, sections, logo.',
-    'Espaces & Ateliers : vos coins de classe et les ateliers de chacun, avec leurs objectifs.',
-    'Progressions : des ateliers à faire dans l\'ordre, comme un chemin avec ses étapes.',
+    'Parcours : des ateliers à faire dans l\'ordre, comme un chemin avec ses étapes.',
     'Apparence : mode clair ou sombre.',
     'Sauvegarde & Sécurité : Face ID, sauvegardes, synchronisation entre appareils.',
   ]),

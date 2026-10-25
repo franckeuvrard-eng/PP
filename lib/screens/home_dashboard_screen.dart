@@ -11,7 +11,7 @@ import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
 import 'progressions_screen.dart';
-import 'reports_screen.dart';
+import 'spaces_workshops_tab.dart';
 import '../widgets/desktop_frame.dart';
 import '../widgets/voice_note_play_button.dart';
 
@@ -86,25 +86,25 @@ class HomeDashboardScreen extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 12),
-
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF4E9F3D),
-                child: Icon(Icons.description, color: Colors.white),
-              ),
-              title: const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Ateliers obligatoires, fiches PDF, exports RGPD et Excel.'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
-            ),
-          ),
-
-          // Ordinateur / iPad : les Progressions ont leur entree dans la barre
-          // laterale.
+          // Ordinateur / iPad : Espaces & Ateliers et Parcours ont leur entree
+          // dans la barre laterale.
           if (!usesDesktopLayout(MediaQuery.sizeOf(context).width)) ...[
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF4E9F3D),
+                  child: Icon(Icons.space_dashboard, color: Colors.white),
+                ),
+                title: const Text('Espaces & Ateliers', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(provider.spaces.isEmpty
+                    ? 'Les coins de la classe et leurs ateliers.'
+                    : '${provider.spaces.length} espace(s) et leurs ateliers.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SpacesWorkshopsScreen())),
+              ),
+            ),
             const SizedBox(height: 12),
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -113,10 +113,10 @@ class HomeDashboardScreen extends StatelessWidget {
                   backgroundColor: Color(0xFF42A5F5),
                   child: Icon(Icons.timeline, color: Colors.white),
                 ),
-                title: const Text('Progressions', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('Parcours', style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(provider.progressions.isEmpty
                     ? 'Des ateliers à faire dans l’ordre, comme un chemin.'
-                    : '${provider.progressions.length} progression(s) : où en est chaque élève.'),
+                    : '${provider.progressions.length} parcours : où en est chaque élève.'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressionsScreen())),
               ),
@@ -259,7 +259,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: const Text(
-                                            '⭐ Obligatoire',
+                                            '⭐ Plan de travail',
                                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                                           ),
                                         ),

@@ -40,6 +40,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
   late String _color;
   late String? _iconName;
   late String? _progressionMinStatusId;
+  late List<String> _targetGroups;
 
   bool get _p => widget.forProgression;
   bool get _isNew => _p ? widget.progression == null : widget.space == null;
@@ -59,6 +60,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
         (provider.evaluationStatuses.isNotEmpty
             ? provider.evaluationStatuses.last.id
             : null);
+    _targetGroups = List<String>.from(prog?.targetGroups ?? const []);
   }
 
   @override
@@ -88,6 +90,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
         description: description,
         iconName: _iconName,
         minStatusId: _progressionMinStatusId,
+        targetGroups: _targetGroups,
       ));
     } else {
       provider.addOrUpdateSpace(Space(
@@ -109,7 +112,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
       appBar: AppBar(
         title:
             Text(_p
-                ? (_isNew ? 'Nouvelle progression' : 'Modifier la progression')
+                ? (_isNew ? 'Nouveau parcours' : 'Modifier le parcours')
                 : (_isNew ? 'Nouvel espace' : 'Modifier l\'espace')),
         actions: [
           Padding(
@@ -148,7 +151,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                     TextField(
                       controller: _nameCtrl,
                       decoration: InputDecoration(
-                        labelText: _p ? 'Nom de la progression *' : 'Nom de l\'espace *',
+                        labelText: _p ? 'Nom du parcours *' : 'Nom de l\'espace *',
                         hintText: _p ? 'Ex: Découpage' : 'Ex: Coin Arts Visuels',
                         border: const OutlineInputBorder(),
                         prefixIcon: Icon(_p ? Icons.timeline : Icons.space_dashboard),
@@ -182,16 +185,16 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 4),
                       const Text(
-                        "Les jalons se font dans l'ordre : un jalon reste verrouillé pour un élève "
-                        "tant que le précédent n'a pas atteint ce niveau.",
+                        "Les étapes se font dans l'ordre : une étape reste verrouillée pour un élève "
+                        "tant que la précédente n'a pas atteint ce niveau.",
                         style: TextStyle(fontSize: 12),
                       ),
                       if (provider.evaluationStatuses.isEmpty)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
                           child: Text(
-                            "Aucun niveau d'évaluation n'existe : aucun jalon ne pourra être "
-                            "débloqué. Créez-en au moins un dans Réglages.",
+                            "Aucun niveau d'évaluation n'existe : aucune étape ne pourra être "
+                            "débloquée. Créez-en au moins un dans Paramètres.",
                             style: TextStyle(
                                 fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
                           ),
@@ -207,7 +210,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                               ? _progressionMinStatusId
                               : null,
                           decoration: const InputDecoration(
-                            labelText: 'Niveau à atteindre pour passer au jalon suivant',
+                            labelText: "Niveau à atteindre pour passer à l'étape suivante",
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -222,6 +225,8 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              _sectionsCard(provider),
               const SizedBox(height: 16),
             ],
 
@@ -238,7 +243,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    Text(_p ? 'Couleur de la progression :' : 'Couleur de l\'espace :',
+                    Text(_p ? 'Couleur du parcours :' : 'Couleur de l\'espace :',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 8),
@@ -247,14 +252,14 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                       onChanged: (hex) => setState(() => _color = hex),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Icône de l\'espace :',
-                        style: TextStyle(
+                    Text(_p ? 'Icône du parcours :' : 'Icône de l\'espace :',
+                        style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 8),
                     IconSwatchPicker(
                       iconName: _iconName,
                       previewColor: hexToColor(_color),
-                      fallback: Icons.space_dashboard,
+                      fallback: _p ? Icons.timeline : Icons.space_dashboard,
                       onChanged: (val) {
                         if (!mounted) return;
                         setState(() => _iconName = val);
@@ -265,6 +270,59 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
               ),
             ),
             const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Sections qui suivent le parcours. Celles qui n'existent plus dans les
+  /// Parametres restent affichees pour pouvoir etre decochees.
+  Widget _sectionsCard(AppStateProvider provider) {
+    final groups = List<String>.from(provider.sections);
+    for (final g in _targetGroups) {
+      if (!groups.contains(g)) groups.add(g);
+    }
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Sections concernées',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(
+              _targetGroups.isEmpty
+                  ? 'Aucune section cochée : toute la classe suit ce parcours.'
+                  : 'Seules ces ${_targetGroups.length} section(s) suivent ce parcours '
+                      '(plan de travail, suivi et rapport des parcours).',
+              style: const TextStyle(fontSize: 12, color: kMutedTextColor),
+            ),
+            const SizedBox(height: 8),
+            if (groups.isEmpty)
+              const Text(
+                'Aucune section définie. Ajoutez-en dans Paramètres > Profil Classe.',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: kMutedTextColor),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final g in groups)
+                    FilterChip(
+                      label: Text(g, style: const TextStyle(fontSize: 13)),
+                      selected: _targetGroups.contains(g),
+                      selectedColor: const Color(0xFF4E9F3D).withValues(alpha: 0.2),
+                      checkmarkColor: const Color(0xFF4E9F3D),
+                      onSelected: (sel) => setState(() {
+                        sel ? _targetGroups.add(g) : _targetGroups.remove(g);
+                      }),
+                    ),
+                ],
+              ),
           ],
         ),
       ),

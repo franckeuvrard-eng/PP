@@ -14,6 +14,8 @@ import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
 import 'screens/progressions_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/spaces_workshops_tab.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -344,15 +346,20 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     DesktopDestination(label: 'Accueil', icon: Icons.home_outlined, selectedIcon: Icons.home),
     DesktopDestination(label: 'Scan & Go', icon: Icons.qr_code_2, selectedIcon: Icons.qr_code_2),
     DesktopDestination(label: 'Élèves', icon: Icons.people_outline, selectedIcon: Icons.people),
-    DesktopDestination(label: 'Progressions', icon: Icons.timeline, selectedIcon: Icons.timeline),
+    DesktopDestination(label: 'Espaces & Ateliers', icon: Icons.space_dashboard_outlined, selectedIcon: Icons.space_dashboard),
+    DesktopDestination(label: 'Parcours', icon: Icons.timeline, selectedIcon: Icons.timeline),
+    DesktopDestination(label: 'Rapports', icon: Icons.description_outlined, selectedIcon: Icons.description),
     DesktopDestination(label: 'Badges QR', icon: Icons.print_outlined, selectedIcon: Icons.print),
     DesktopDestination(label: 'Paramètres', icon: Icons.tune, selectedIcon: Icons.tune),
   ];
-  static const _desktopOrder = [0, 1, 2, _progressionsIndex, 3, 4];
+  static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _reportsIndex, 3, 4];
 
-  /// Les Progressions n'ont pas d'onglet sur telephone (barre du bas a cinq
-  /// entrees) : on y accede depuis l'accueil.
+  /// Les Espaces & Ateliers, Parcours et Rapports n'ont pas d'onglet sur
+  /// telephone (barre du bas a cinq entrees) : les deux premiers s'ouvrent
+  /// depuis l'accueil, les Rapports depuis la barre du haut.
   static const _progressionsIndex = 5;
+  static const _reportsIndex = 6;
+  static const _spacesIndex = 7;
 
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -361,6 +368,8 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     QrGeneratorScreen(),
     SettingsScreen(),
     ProgressionsScreen(),
+    ReportsScreen(),
+    SpacesWorkshopsScreen(),
   ];
 
   int get _desktopIndex {
@@ -431,9 +440,13 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       case SetupTarget.classProfile:
         settings(0);
       case SetupTarget.spaces:
-        settings(1);
+        if (usesDesktopLayout(MediaQuery.sizeOf(context).width)) {
+          _select(_spacesIndex);
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SpacesWorkshopsScreen()));
+        }
       case SetupTarget.security:
-        settings(4);
+        settings(3);
       case SetupTarget.students:
         _select(2);
       case SetupTarget.badges:
@@ -543,7 +556,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     );
   }
 
-  /// Barre de menus de macOS : Cmd+1..5 pour changer de page, Cmd+? pour l'aide.
+  /// Barre de menus de macOS : Cmd+1..8 pour changer de page, Cmd+? pour l'aide.
   /// Sur les autres plateformes, `PlatformMenuBar` ne fait rien et les memes
   /// raccourcis passent par Ctrl+1..5 ([desktopNavigationShortcuts]).
   List<PlatformMenuItem> _macMenus() {
@@ -554,6 +567,8 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       LogicalKeyboardKey.digit4,
       LogicalKeyboardKey.digit5,
       LogicalKeyboardKey.digit6,
+      LogicalKeyboardKey.digit7,
+      LogicalKeyboardKey.digit8,
     ];
     return [
       const PlatformMenu(
@@ -654,15 +669,22 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
               child: const Icon(Icons.child_care, color: Colors.white, size: 22),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('A petits pas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text(
-                  appProvider.classSettings.name,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
-                ),
-              ],
+            // Flexible : avec l'icone Rapports, la barre du haut d'un petit
+            // telephone ne laisse plus la place au titre entier.
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('A petits pas',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(
+                    appProvider.classSettings.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -673,6 +695,13 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
               setState(() => _currentIndex = 1);
             },
             tooltip: 'Scan Express',
+          ),
+          IconButton(
+            icon: const Icon(Icons.description_outlined),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
+            },
+            tooltip: 'Rapports',
           ),
           IconButton(
             icon: const Icon(Icons.help_outline),
@@ -688,7 +717,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
         children: _screens,
       )),
       bottomNavigationBar: BottomNavigationBar(
-        // Progressions (ouvertes en mode ordinateur) : pas d'onglet ici.
+        // Pages de la barre laterale seulement : pas d'onglet ici.
         currentIndex: _currentIndex < _progressionsIndex ? _currentIndex : 0,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,

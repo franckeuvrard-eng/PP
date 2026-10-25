@@ -482,7 +482,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   ) {
     final typeById = {for (final t in types) t.id: t};
     final counts = <String, int>{
-      for (final d in EduscolData.domains) d.title: 0,
+      // Domaines actuels a zero ; un ancien domaine n'apparait que s'il sert.
+      for (final d in EduscolData.domainsForCycle(1)) d.title: 0,
     };
     var sansDomaine = 0;
 
@@ -492,7 +493,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       // le libelle ne sert que pour les domaines personnalises.
       final domain = type?.domaineId == null
           ? null
-          : EduscolData.domains.where((d) => d.id == type!.domaineId).firstOrNull;
+          : EduscolData.domainById(type!.domaineId);
       final key = domain?.title ?? type?.domaine ?? '';
       if (key.isEmpty) {
         sansDomaine++;
@@ -528,11 +529,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             children: [
               ...entries.map((entry) {
                 final ratio = total == 0 ? 0.0 : entry.value / total;
-                final domain = EduscolData.domains.firstWhere(
-                  (d) => d.title == entry.key,
-                  orElse: () => EduscolData.domains.first,
-                );
-                final couleur = hexToColor(domain.colorHex);
+                final domain = EduscolData.domainByTitle(entry.key);
+                // Domaine personnalise : couleur neutre.
+                final couleur = hexToColor(domain?.colorHex ?? '#718096');
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
@@ -684,7 +683,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           children: [
             Icon(Icons.stars, color: Colors.orange, size: 22),
             SizedBox(width: 8),
-            Text('Ateliers Obligatoires & Suivi des Retards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Plan de travail & Suivi des Retards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 12),
@@ -703,7 +702,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Aucun atelier n\'est configuré comme obligatoire.\nPour rendre un atelier obligatoire, allez dans Paramètres > Espaces & Ateliers et cochez "Atelier Obligatoire".',
+                    'Aucun atelier n\'est dans le plan de travail.\nPour en ajouter un, ouvrez Espaces & Ateliers, modifiez l\'atelier et cochez "Plan de travail".',
                     style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFE2E8F0) : Colors.black87),
                   ),
                 ),
@@ -801,7 +800,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           ),
                           const SizedBox(height: 8),
                           if (missingChildren.isEmpty)
-                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier obligatoire.', style: TextStyle(fontSize: 12, color: kAccessibleGreenText, fontWeight: FontWeight.bold))
+                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier du plan de travail.', style: TextStyle(fontSize: 12, color: kAccessibleGreenText, fontWeight: FontWeight.bold))
                           else
                             Wrap(
                               spacing: 6,

@@ -32,7 +32,7 @@ class SyncReport {
     'activities': 'Observations',
     'activity_types': 'Ateliers',
     'spaces': 'Espaces',
-    'progressions': 'Progressions',
+    'progressions': 'Parcours',
     'sons_progress': 'Sons',
     'referential_status': 'Compétences',
     'referentials': 'Référentiels',
@@ -96,18 +96,20 @@ class SyncReport {
     'audioPath': 'Note vocale',
     'name': 'Nom',
     'spaceId': 'Espace',
-    'progressionId': 'Progression',
+    'progressionId': 'Parcours',
     'minStatusId': 'Seuil de passage',
     'description': 'Description',
     'domaine': 'Domaine',
     'domaineId': 'Domaine',
     'objectifs': 'Objectifs',
-    'isObligatory': 'Obligatoire',
+    'isObligatory': 'Plan de travail',
     'obligatoryGroups': 'Groupes concernés',
+    'isDisabled': 'Désactivé',
+    'targetGroups': 'Sections',
     'iconName': 'Icône',
     'position': 'Ordre',
-    'isProgression': 'Suivi de progression',
-    'progressionMinStatusId': 'Seuil de progression',
+    'isProgression': 'Mode parcours',
+    'progressionMinStatusId': 'Seuil du parcours',
     'label': 'Libellé',
     'teacher': 'Enseignant(e)',
     'atsem': 'ATSEM',
@@ -236,7 +238,7 @@ class _Names {
   String space(String? id) => SyncReport._str(_spaces[id]?['name'], 'Espace supprimé');
 
   String progression(String? id) =>
-      SyncReport._str(_progressions[id]?['name'], 'Progression supprimée');
+      SyncReport._str(_progressions[id]?['name'], 'Parcours supprimé');
 
   String status(String? id) => SyncReport._str(_statuses[id]?['label'], 'Statut supprimé');
 
