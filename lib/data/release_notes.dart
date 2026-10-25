@@ -23,6 +23,25 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.6.1',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.qr_code_scanner, 'Scan & Go en deux modes',
+          'Choisissez d\'abord : scanner les QR codes, ou sélection manuelle. Après chaque '
+              'observation, on enchaîne avec l\'élève suivant (la caméra se rouvre en mode QR).'),
+      ReleaseItem(Icons.search, 'Retrouver vite un élève et un atelier',
+          'En manuel, tapez quelques lettres du prénom ou du nom. Les ateliers sont rangés par '
+              'domaine et sous-domaine, les étapes par parcours, et la recherche les trouve tous.'),
+      ReleaseItem(Icons.qr_code_2, 'Les QR codes bien rangés',
+          'Les étiquettes des ateliers s\'impriment par domaine, celles des étapes depuis '
+              'Parcours, une ou plusieurs pages par parcours.'),
+      ReleaseItem(Icons.space_dashboard, 'Une navigation plus simple',
+          'Sur iPhone, l\'onglet Ateliers ouvre Espaces & Ateliers et Parcours ; le menu « ⋯ » '
+              'en haut ouvre Badges QR, Rapports et l\'Aide. Sur Mac et iPad, tout est dans la '
+              'barre latérale. Les parcours se gèrent depuis leur page, onglet Gérer.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.6.0',
     date: 'Octobre 2026',
     items: [

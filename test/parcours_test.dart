@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/pdf.dart';
+import 'package:petitpas/data/eduscol_data.dart';
 import 'package:petitpas/models/activity.dart';
 import 'package:petitpas/models/activity_type.dart';
 import 'package:petitpas/models/child.dart';
@@ -13,6 +14,8 @@ import 'package:petitpas/services/mandatory_ateliers_pdf_service.dart';
 import 'package:petitpas/services/parcours_frise_pdf_service.dart';
 import 'package:petitpas/services/parcours_progress.dart';
 import 'package:petitpas/services/parcours_report_service.dart';
+import 'package:petitpas/services/qr_sheets_pdf_service.dart';
+import 'package:petitpas/services/atelier_grouping.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -102,6 +105,29 @@ void main() {
           await MandatoryAteliersPdfService.buildBytes(
               provider: app, children: app.children, format: PdfPageFormat.a4),
           isNotEmpty);
+    });
+
+    test('planches QR : badges, ateliers par domaine, etapes par parcours', () async {
+      expect(await QrSheetsPdfService.badgesBytes(app, PdfPageFormat.a4), isNotEmpty);
+      expect(await QrSheetsPdfService.ateliersBytes(app, PdfPageFormat.a4), isNotEmpty);
+      expect(await QrSheetsPdfService.parcoursBytes(app, app.progressions, PdfPageFormat.a4), isNotEmpty);
+    });
+
+    test('ateliers ranges par domaine puis sous-domaine', () {
+      final sub = EduscolData.subdomains.firstWhere((s) => s.title == 'Découvrir le monde de la matière et des objets');
+      final obj = EduscolData.objectives.firstWhere((o) => o.subdomainId == sub.id);
+      app.addOrUpdateActivityType(ActivityType(
+          id: 'aimants', name: 'Aimants', spaceId: 's', colorHex: '#00BCD4',
+          domaineId: obj.domainId, objectifs: [obj.text]));
+      app.addOrUpdateActivityType(ActivityType(id: 'libre', name: 'Jeu libre', spaceId: 's', colorHex: '#00BCD4'));
+      final groups = AtelierGrouping.byDomain(app.activityTypes.where((a) => !a.inProgression));
+      final vivant = groups.firstWhere((g) => g.key == EduscolData.domainById(obj.domainId)!.title);
+      expect(AtelierGrouping.bySubdomain(vivant.value).map((e) => e.key), contains(sub.title));
+      // Sans domaine : en dernier.
+      expect(groups.last.key, AtelierGrouping.noDomain);
+      expect(groups.last.value.map((a) => a.id), contains('libre'));
+      // Les etapes de parcours ne sont pas des ateliers d'espace.
+      expect(groups.expand((g) => g.value).any((a) => a.inProgression), isFalse);
     });
   });
 }

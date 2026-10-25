@@ -16,6 +16,7 @@ import 'screens/children_manager_screen.dart';
 import 'screens/progressions_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/spaces_workshops_tab.dart';
+import 'screens/ateliers_hub_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -354,12 +355,16 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   ];
   static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _reportsIndex, 3, 4];
 
-  /// Les Espaces & Ateliers, Parcours et Rapports n'ont pas d'onglet sur
-  /// telephone (barre du bas a cinq entrees) : les deux premiers s'ouvrent
-  /// depuis l'accueil, les Rapports depuis la barre du haut.
+  /// Barre du bas (iPhone), dans l'ordre affiche. Espaces & Ateliers et
+  /// Parcours y sont reunis dans l'onglet Ateliers ; Badges QR et Rapports
+  /// s'ouvrent depuis le menu « ⋯ » de la barre du haut.
+  static const _phoneOrder = [0, 1, 2, _hubIndex, 4];
+
+  static const _badgesIndex = 3;
   static const _progressionsIndex = 5;
   static const _reportsIndex = 6;
   static const _spacesIndex = 7;
+  static const _hubIndex = 8;
 
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -370,6 +375,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     ProgressionsScreen(),
     ReportsScreen(),
     SpacesWorkshopsScreen(),
+    AteliersHubScreen(),
   ];
 
   int get _desktopIndex {
@@ -446,11 +452,15 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
           Navigator.push(context, MaterialPageRoute(builder: (_) => const SpacesWorkshopsScreen()));
         }
       case SetupTarget.security:
-        settings(3);
+        settings(2);
       case SetupTarget.students:
         _select(2);
       case SetupTarget.badges:
-        _select(3);
+        if (usesDesktopLayout(MediaQuery.sizeOf(context).width)) {
+          _select(_badgesIndex);
+        } else {
+          _openPhonePage(const QrGeneratorScreen(standalone: true));
+        }
       case SetupTarget.importStudents:
         _select(2);
         await ChildrenImportService.pickAndImport(
@@ -507,6 +517,9 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   }
 
   void _select(int index) => setState(() => _currentIndex = index);
+
+  void _openPhonePage(Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
   Future<void> _openHelp() async {
     final target = await Navigator.push<SetupTarget>(
@@ -689,37 +702,38 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Color(0xFFFF7043)),
-            onPressed: () {
-              setState(() => _currentIndex = 1);
-            },
-            tooltip: 'Scan Express',
-          ),
-          IconButton(
-            icon: const Icon(Icons.description_outlined),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
-            },
-            tooltip: 'Rapports',
-          ),
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
-            },
-            tooltip: 'Aide',
+          // Un seul menu : les pages qui n'ont pas d'onglet en bas.
+          PopupMenuButton<VoidCallback>(
+            icon: const Icon(Icons.more_horiz),
+            tooltip: 'Plus',
+            onSelected: (open) => open(),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: () => _openPhonePage(const QrGeneratorScreen(standalone: true)),
+                child: const ListTile(
+                    leading: Icon(Icons.print_outlined), title: Text('Badges QR élèves')),
+              ),
+              PopupMenuItem(
+                value: () => _openPhonePage(const ReportsScreen()),
+                child: const ListTile(
+                    leading: Icon(Icons.description_outlined), title: Text('Rapports')),
+              ),
+              PopupMenuItem(
+                value: () => _openPhonePage(const HelpScreen()),
+                child: const ListTile(leading: Icon(Icons.help_outline), title: Text('Aide')),
+              ),
+            ],
           ),
         ],
       ),
       body: _refreshable(IndexedStack(
-        index: _currentIndex < _progressionsIndex ? _currentIndex : 0,
+        // Page de la barre laterale sans onglet ici : retour a l'accueil.
+        index: _phoneOrder.contains(_currentIndex) ? _currentIndex : 0,
         children: _screens,
       )),
       bottomNavigationBar: BottomNavigationBar(
-        // Pages de la barre laterale seulement : pas d'onglet ici.
-        currentIndex: _currentIndex < _progressionsIndex ? _currentIndex : 0,
-        onTap: (index) => setState(() => _currentIndex = index),
+        currentIndex: _phoneOrder.contains(_currentIndex) ? _phoneOrder.indexOf(_currentIndex) : 0,
+        onTap: (i) => setState(() => _currentIndex = _phoneOrder[i]),
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF4E9F3D),
         unselectedItemColor: const Color(0xFF718096),
@@ -741,9 +755,9 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             label: 'Élèves',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.print_outlined),
-            activeIcon: Icon(Icons.print),
-            label: 'Badges QR',
+            icon: Icon(Icons.space_dashboard_outlined),
+            activeIcon: Icon(Icons.space_dashboard),
+            label: 'Ateliers',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.tune),

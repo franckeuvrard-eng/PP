@@ -45,13 +45,13 @@ const _tour = [
   _TourPage(Icons.home, 'Accueil', 'Votre journée en un coup d\'œil.', [
     'Le fil du jour liste les observations saisies aujourd\'hui ; touchez le crayon pour en modifier une.',
     '« Aujourd\'hui » compte les observations du jour, « Analyses » ouvre les statistiques.',
-    'Espaces & Ateliers et Parcours s\'ouvrent depuis l\'accueil sur iPhone, depuis la barre latérale sur Mac et iPad.',
-    '« Rapports » (icône en haut sur iPhone, barre latérale sur Mac et iPad) regroupe le plan de travail, les fiches PDF et les exports.',
+    'Sur iPhone, l\'onglet Ateliers ouvre Espaces & Ateliers et Parcours ; le menu « ⋯ » en haut ouvre Badges QR, Rapports et l\'Aide. Sur Mac et iPad, tout est dans la barre latérale.',
+    '« Rapports » regroupe le plan de travail, le suivi des parcours, les fiches PDF et les exports.',
     'Tirez vers le bas pour synchroniser avec vos autres appareils.',
   ]),
   _TourPage(Icons.qr_code_2, 'Scan & Go', 'Enregistrer une observation.', [
-    'Scannez le badge de l\'élève et celui de l\'atelier, dans n\'importe quel ordre.',
-    'Pas de badge sous la main ? Choisissez l\'élève et l\'atelier dans les listes.',
+    'Choisissez le mode : scanner les QR codes, ou sélection manuelle.',
+    'En manuel, tapez quelques lettres du nom de l\'élève, puis choisissez l\'atelier par domaine ou l\'étape par parcours.',
     'Indiquez le niveau (non acquis, en cours, acquis…), ajoutez une note écrite ou vocale et des photos.',
     '« Enregistrer aussi pour » crée la même observation pour plusieurs élèves.',
   ]),
@@ -62,7 +62,7 @@ const _tour = [
     'Ajoutez les élèves un par un, ou tous d\'un coup depuis un fichier Excel.',
   ]),
   _TourPage(Icons.print, 'Badges QR', 'Les étiquettes à imprimer.', [
-    'Un badge par élève, une étiquette par atelier.',
+    'Un badge par élève, une étiquette par atelier, rangées par domaine. Les QR des étapes sont dans Parcours.',
     '« Exporter PDF » prépare une planche prête à imprimer et à plastifier.',
     'Réimprimez un badge à tout moment, il reste valable.',
   ]),

@@ -10,9 +10,6 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'edit_activity_log_screen.dart';
-import 'progressions_screen.dart';
-import 'spaces_workshops_tab.dart';
-import '../widgets/desktop_frame.dart';
 import '../widgets/voice_note_play_button.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -85,43 +82,6 @@ class HomeDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
-
-          // Ordinateur / iPad : Espaces & Ateliers et Parcours ont leur entree
-          // dans la barre laterale.
-          if (!usesDesktopLayout(MediaQuery.sizeOf(context).width)) ...[
-            const SizedBox(height: 12),
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF4E9F3D),
-                  child: Icon(Icons.space_dashboard, color: Colors.white),
-                ),
-                title: const Text('Espaces & Ateliers', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(provider.spaces.isEmpty
-                    ? 'Les coins de la classe et leurs ateliers.'
-                    : '${provider.spaces.length} espace(s) et leurs ateliers.'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SpacesWorkshopsScreen())),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF42A5F5),
-                  child: Icon(Icons.timeline, color: Colors.white),
-                ),
-                title: const Text('Parcours', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(provider.progressions.isEmpty
-                    ? 'Des ateliers à faire dans l’ordre, comme un chemin.'
-                    : '${provider.progressions.length} parcours : où en est chaque élève.'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressionsScreen())),
-              ),
-            ),
-          ],
 
           const SizedBox(height: 20),
 

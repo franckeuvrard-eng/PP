@@ -267,7 +267,7 @@ class ChildProfileScreen extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'Aucun parcours. Créez-en dans Paramètres › Parcours.',
+            'Aucun parcours. Créez-en dans Parcours › Gérer.',
             textAlign: TextAlign.center,
             style: TextStyle(color: kMutedTextColor),
           ),

@@ -13,11 +13,12 @@ import '../services/parcours_frise_pdf_service.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'atelier_detail_screen.dart';
-import 'settings_screen.dart';
+import 'progressions_settings_tab.dart';
+import '../services/qr_sheets_pdf_service.dart';
 
-/// Écran « Progressions » : chaque progression est un fil, ses ateliers en
-/// sont les jalons. Vue classe (où en sont les élèves) ou vue d'un élève
-/// (statut de chaque jalon, « est ici », jalons verrouillés).
+/// Écran « Parcours » : onglet Suivi (chaque parcours est un fil, ses étapes
+/// en sont les jalons ; vue classe ou vue d'un élève) et onglet Gérer
+/// (création des parcours et de leurs étapes).
 class ProgressionsScreen extends StatefulWidget {
   const ProgressionsScreen({super.key, this.initialChildId});
 
@@ -44,37 +45,87 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
     final progressions = provider.progressions;
+    final progression = progressions.isEmpty
+        ? null
+        : provider.progressionById(_progressionId) ?? progressions.first;
 
-    if (progressions.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Parcours')),
-        body: _EmptyProgressions(onCreate: () => _openSettings(context)),
-      );
-    }
+    // Deux onglets : le suivi (le fil) et la gestion des parcours, sortie
+    // des Parametres pour que tout ce qui touche aux parcours soit ici.
+    return DefaultTabController(
+      length: 2,
+      // Sans parcours, on arrive sur la gestion pour en creer un.
+      initialIndex: progressions.isEmpty ? 1 : 0,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Parcours'),
+          actions: [
+            if (progression != null) ...[
+              IconButton(
+                icon: const Icon(Icons.qr_code_2),
+                tooltip: 'QR codes des étapes',
+                onPressed: () => _exportQr(context, provider, progression),
+              ),
+              IconButton(
+                icon: const Icon(Icons.view_carousel_outlined),
+                tooltip: 'Imprimer la frise de ce parcours',
+                onPressed: () => ParcoursFrisePdfService.export(
+                    context: context, provider: provider, parcours: progression),
+              ),
+            ],
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.route), text: 'Suivi'),
+              Tab(icon: Icon(Icons.edit_road), text: 'Gérer'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            progression == null
+                ? Builder(
+                    builder: (context) => _EmptyProgressions(
+                        onCreate: () => DefaultTabController.of(context).animateTo(1)),
+                  )
+                : _buildTrack(provider, progressions, progression),
+            const ProgressionsSettingsTab(),
+          ],
+        ),
+      ),
+    );
+  }
 
-    final progression = provider.progressionById(_progressionId) ?? progressions.first;
+  /// QR codes des etapes : ce parcours ou tous, une ou plusieurs pages par
+  /// parcours.
+  Future<void> _exportQr(BuildContext context, AppStateProvider provider, Progression current) async {
+    final all = provider.progressions.length > 1
+        ? await showDialog<bool>(
+            context: context,
+            builder: (ctx) => SimpleDialog(
+              title: const Text('QR codes des étapes'),
+              children: [
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text('Parcours « ${current.name} »'),
+                ),
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text('Tous les parcours (${provider.progressions.length})'),
+                ),
+              ],
+            ),
+          )
+        : false;
+    if (all == null || !context.mounted) return;
+    QrSheetsPdfService.openParcours(context, provider, all ? provider.progressions : [current]);
+  }
+
+  Widget _buildTrack(AppStateProvider provider, List<Progression> progressions, Progression progression) {
     final child = _childId == null ? null : provider.childById(_childId!);
     final children = provider.children.toList()
       ..sort((a, b) => a.firstname.toLowerCase().compareTo(b.firstname.toLowerCase()));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Parcours'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.view_carousel_outlined),
-            tooltip: 'Imprimer la frise de ce parcours',
-            onPressed: () => ParcoursFrisePdfService.export(
-                context: context, provider: provider, parcours: progression),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_road),
-            tooltip: 'Gérer les parcours',
-            onPressed: () => _openSettings(context),
-          ),
-        ],
-      ),
-      body: ListView(
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (progressions.length > 1) ...[
@@ -139,14 +190,6 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
             onChildTap: (c) => setState(() => _childId = c.id),
           ),
         ],
-      ),
-    );
-  }
-
-  void _openSettings(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen(initialTab: 1, standalone: true)),
     );
   }
 }
@@ -259,7 +302,7 @@ class ProgressionCard extends StatelessWidget {
             if (jalons.isEmpty)
               const Text(
                 "Aucune étape pour l'instant : ajoutez-en à ce parcours dans "
-                'Paramètres › Parcours.',
+                "l'onglet Gérer.",
                 style: TextStyle(color: kMutedTextColor),
               )
             else

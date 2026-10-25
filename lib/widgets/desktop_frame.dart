@@ -9,9 +9,9 @@ import '../utils/platform_support.dart';
 const double kDesktopBreakpoint = 840;
 
 /// Mise en page ordinateur (barre laterale) : fenetre large, ou plateforme
-/// de bureau pas trop etroite.
-bool usesDesktopLayout(double width) =>
-    width >= kDesktopBreakpoint || (isDesktopPlatform && width >= 600);
+/// de bureau (Mac, Windows) quelle que soit la largeur : Espaces & Ateliers et
+/// Parcours n'y ont leur entree que dans la barre laterale.
+bool usesDesktopLayout(double width) => width >= kDesktopBreakpoint || isDesktopPlatform;
 
 /// Largeur maximale du contenu : au-dela, les listes et formulaires pensees
 /// pour un telephone deviennent illisibles (lignes de 1500 px).

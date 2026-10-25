@@ -11,9 +11,14 @@ import '../models/activity.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../services/atelier_eligibility_service.dart';
+import '../services/atelier_grouping.dart';
+import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import '../utils/platform_support.dart';
 import '../widgets/voice_note_field.dart';
+
+/// Mode de saisie choisi sur le premier ecran.
+enum _ScanMode { qr, manual }
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -34,11 +39,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   /// Eleves supplementaires pour la saisie groupee : le meme atelier est
   /// enregistre pour chacun, avec la meme note et les memes photos.
   final Set<String> _extraChildIds = {};
-  bool _showManualSelection = false;
+
+  /// Null : premier ecran (choix du mode). Sur ordinateur, sans camera, on
+  /// passe directement a la selection manuelle.
+  _ScanMode? _mode = isMobilePlatform ? null : _ScanMode.manual;
+
+  final TextEditingController _childSearchCtrl = TextEditingController();
+  final TextEditingController _atelierSearchCtrl = TextEditingController();
+  String _childQuery = '';
+  String _atelierQuery = '';
+
+  /// Selection manuelle : etapes de parcours plutot qu'ateliers.
+  bool _pickParcours = false;
 
   @override
   void dispose() {
     _noteController.dispose();
+    _childSearchCtrl.dispose();
+    _atelierSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -382,9 +400,397 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
   }
 
+  /// Recherche sans tenir compte des accents ni des majuscules.
+  static String _norm(String s) {
+    const from = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿœæ';
+    const to = 'aaaaaaceeeeiiiinooooouuuuyyoa';
+    final lower = s.toLowerCase();
+    final b = StringBuffer();
+    for (final ch in lower.split('')) {
+      final i = from.indexOf(ch);
+      b.write(i < 0 ? ch : to[i]);
+    }
+    return b.toString();
+  }
+
+  bool get _ready => _selectedChildId != null && _selectedActivityTypeId != null;
+
+  void _resetSelection() {
+    _selectedChildId = null;
+    _selectedActivityTypeId = null;
+    _childQuery = '';
+    _atelierQuery = '';
+    _childSearchCtrl.clear();
+    _atelierSearchCtrl.clear();
+  }
+
+  /// Choisit l'eleve ; l'atelier deja choisi est garde s'il lui reste ouvert.
+  void _selectChild(AppStateProvider provider, String id) {
+    setState(() {
+      _selectedChildId = id;
+      _childQuery = '';
+      _childSearchCtrl.clear();
+    });
+    final previous = provider.activityTypeById(_selectedActivityTypeId);
+    final child = provider.childById(id);
+    if (previous == null || child == null) return;
+    if (!AtelierEligibilityService.evaluate(provider: provider, child: child, atelier: previous).isAllowed) {
+      setState(() => _selectedActivityTypeId = null);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("L'atelier précédemment choisi n'est plus disponible pour cet élève."),
+      ));
+    }
+  }
+
+  /// Premier ecran : scanner des QR codes ou tout choisir a la main.
+  Widget _buildModeChoice(AppStateProvider provider) {
+    Widget card({
+      required IconData icon,
+      required Color color,
+      required String title,
+      required String text,
+      required VoidCallback onTap,
+    }) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: color,
+                  child: Icon(icon, color: Colors.white, size: 32),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(text, style: const TextStyle(fontSize: 13, color: kMutedTextColor)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(4, 8, 4, 16),
+          child: Text('Comment voulez-vous saisir l\'observation ?',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        card(
+          icon: Icons.qr_code_scanner,
+          color: const Color(0xFFFF7043),
+          title: 'Scanner les QR codes',
+          text: 'Badge de l\'élève et étiquette de l\'atelier ou de l\'étape, dans n\'importe quel ordre.',
+          onTap: () {
+            setState(() => _mode = _ScanMode.qr);
+            _startQrScanner(context, provider);
+          },
+        ),
+        card(
+          icon: Icons.touch_app,
+          color: const Color(0xFF4E9F3D),
+          title: 'Sélection manuelle',
+          text: 'Recherchez l\'élève, puis l\'atelier par domaine ou l\'étape par parcours.',
+          onTap: () => setState(() => _mode = _ScanMode.manual),
+        ),
+      ],
+    );
+  }
+
+  /// Bandeau du haut : mode en cours, eleve et atelier choisis (touchez-les
+  /// pour les changer).
+  Widget _buildStepHeader(AppStateProvider provider) {
+    final child = provider.childById(_selectedChildId);
+    final atelier = provider.activityTypeById(_selectedActivityTypeId);
+    final qr = _mode == _ScanMode.qr;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(qr ? Icons.qr_code_scanner : Icons.touch_app,
+                color: qr ? const Color(0xFFFF7043) : const Color(0xFF4E9F3D)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(qr ? 'Scan des QR codes' : 'Sélection manuelle',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+            if (isMobilePlatform)
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _resetSelection();
+                  _mode = null;
+                }),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Changer de mode'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            InputChip(
+              avatar: const Icon(Icons.person, size: 18),
+              label: Text(child == null ? 'Élève' : _fullName(child)),
+              selected: child != null,
+              onPressed: child == null || qr ? null : () => setState(() => _selectedChildId = null),
+              onDeleted: child == null ? null : () => setState(() => _selectedChildId = null),
+            ),
+            InputChip(
+              avatar: Icon(atelier?.inProgression ?? false ? Icons.flag : Icons.category, size: 18),
+              label: Text(atelier == null ? 'Atelier ou étape' : atelier.name),
+              selected: atelier != null,
+              onPressed: atelier == null || qr ? null : () => setState(() => _selectedActivityTypeId = null),
+              onDeleted: atelier == null ? null : () => setState(() => _selectedActivityTypeId = null),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (qr && !_ready) ...[
+          ElevatedButton.icon(
+            onPressed: () => _startQrScanner(context, provider),
+            icon: const Icon(Icons.photo_camera, size: 22),
+            label: Text(child == null && atelier == null ? 'Scanner' : 'Scanner le QR code manquant',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7043),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ] else if (!qr && child == null)
+          _buildChildPicker(provider)
+        else if (!qr && atelier == null)
+          _buildAtelierPicker(provider, child!),
+      ],
+    );
+  }
+
+  static String _fullName(Child c) => '${c.firstname} ${c.lastname ?? ''}'.trim();
+
+  Widget _searchField(TextEditingController ctrl, String hint, ValueChanged<String> onChanged) {
+    return TextField(
+      controller: ctrl,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: const Icon(Icons.search),
+        isDense: true,
+        border: const OutlineInputBorder(),
+        suffixIcon: ctrl.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () {
+                  ctrl.clear();
+                  onChanged('');
+                },
+              ),
+      ),
+      onChanged: onChanged,
+    );
+  }
+
+  /// Etape 1 (manuel) : l'eleve, en tapant un bout de son prenom ou nom.
+  Widget _buildChildPicker(AppStateProvider provider) {
+    final q = _norm(_childQuery.trim());
+    final list = provider.children
+        .where((c) => q.isEmpty || _norm(_fullName(c)).contains(q) || _norm(c.group ?? '').contains(q))
+        .toList()
+      ..sort((a, b) => a.firstname.toLowerCase().compareTo(b.firstname.toLowerCase()));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('1. Quel élève ?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        const SizedBox(height: 8),
+        _searchField(_childSearchCtrl, 'Prénom ou nom (quelques lettres suffisent)',
+            (v) => setState(() => _childQuery = v)),
+        const SizedBox(height: 8),
+        if (list.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('Aucun élève ne correspond.', style: TextStyle(color: kMutedTextColor)),
+          ),
+        for (final c in list)
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: hexToColor(c.colorHex),
+                child: Text(c.avatarText.isNotEmpty ? c.avatarText : c.firstname.characters.first,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+              title: Text(_fullName(c), style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: c.group == null || c.group!.isEmpty ? null : Text(c.group!),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _selectChild(provider, c.id),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Etape 2 (manuel) : l'atelier, range par domaine puis sous-domaine, ou
+  /// l'etape, rangee par parcours.
+  Widget _buildAtelierPicker(AppStateProvider provider, Child child) {
+    final q = _norm(_atelierQuery.trim());
+    final searching = q.isNotEmpty;
+    final results = {
+      for (final e in AtelierEligibilityService.annotate(provider: provider, child: child)) e.key.id: e.value,
+    };
+
+    Widget atelierTile(ActivityType a, {String? leadingNumber}) {
+      final r = results[a.id]!;
+      final blocked = !r.isAllowed;
+      final warn = r.status == AtelierEligibility.allowedWithWarning;
+      return ListTile(
+        dense: true,
+        enabled: !blocked,
+        leading: leadingNumber != null
+            ? CircleAvatar(
+                radius: 14,
+                backgroundColor: blocked ? Colors.grey : hexToColor(a.colorHex),
+                child: Text(leadingNumber,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              )
+            : CircleAvatar(
+                radius: 14,
+                backgroundColor: hexToColor(a.colorHex),
+                child: Icon(iconForName(a.iconName, fallback: Icons.palette), size: 14, color: Colors.white),
+              ),
+        title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: blocked || warn ? Text(r.message, style: const TextStyle(fontSize: 11)) : null,
+        trailing: blocked
+            ? const Icon(Icons.lock, size: 18, color: Colors.grey)
+            : warn
+                ? const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange)
+                : const Icon(Icons.chevron_right),
+        onTap: blocked ? null : () => setState(() => _selectedActivityTypeId = a.id),
+      );
+    }
+
+    final List<Widget> groups;
+    if (!_pickParcours) {
+      // Ateliers des espaces proposes a cet eleve (sections comprises).
+      final ateliers = provider.activityTypes.where((a) => !a.inProgression && results[a.id]!.isAllowed).where((a) {
+        if (!searching) return true;
+        return _norm('${a.name} ${AtelierGrouping.domainTitleOf(a)} '
+                '${AtelierGrouping.subdomainTitlesOf(a).join(' ')} ${provider.placeOf(a)?.name ?? ''}')
+            .contains(q);
+      });
+      groups = [
+        for (final d in AtelierGrouping.byDomain(ateliers))
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ExpansionTile(
+              key: ValueKey('d_${d.key}_$searching'),
+              initiallyExpanded: searching,
+              title: Text(d.key, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('${d.value.length} atelier(s)', style: const TextStyle(fontSize: 12)),
+              children: [
+                for (final s in AtelierGrouping.bySubdomain(d.value))
+                  // Un seul groupe « Autres » : pas de sous-niveau inutile.
+                  if (AtelierGrouping.bySubdomain(d.value).length == 1 &&
+                      s.key == AtelierGrouping.otherSubdomain)
+                    ...s.value.map(atelierTile)
+                  else
+                    ExpansionTile(
+                      key: ValueKey('s_${d.key}_${s.key}_$searching'),
+                      initiallyExpanded: searching,
+                      tilePadding: const EdgeInsets.only(left: 24, right: 16),
+                      childrenPadding: const EdgeInsets.only(left: 16),
+                      title: Text(s.key, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: Text('${s.value.length} atelier(s)', style: const TextStyle(fontSize: 11)),
+                      children: s.value.map(atelierTile).toList(),
+                    ),
+              ],
+            ),
+          ),
+      ];
+    } else {
+      groups = [
+        for (final p in provider.progressions)
+          () {
+            final steps = provider.ateliersInProgressionOrdered(p.id);
+            final shown = [
+              for (final (i, s) in steps.indexed)
+                if (!searching || _norm('${p.name} ${s.name}').contains(q)) (i, s),
+            ];
+            if (shown.isEmpty) return const SizedBox.shrink();
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ExpansionTile(
+                key: ValueKey('p_${p.id}_$searching'),
+                // Seul parcours ou recherche : deplie d'emblee.
+                initiallyExpanded: searching || provider.progressions.length == 1,
+                leading: Icon(iconForName(p.iconName, fallback: Icons.timeline), color: hexToColor(p.colorHex)),
+                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(
+                    p.concernsGroup(child.group)
+                        ? '${steps.length} étape(s)'
+                        : '${steps.length} étape(s) · pas prévu pour cette section',
+                    style: const TextStyle(fontSize: 12)),
+                children: [for (final (i, s) in shown) atelierTile(s, leadingNumber: '${i + 1}')],
+              ),
+            );
+          }(),
+      ];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('2. Quel atelier ou quelle étape ?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        const SizedBox(height: 8),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: false, icon: Icon(Icons.category), label: Text('Ateliers')),
+            ButtonSegment(value: true, icon: Icon(Icons.timeline), label: Text('Parcours')),
+          ],
+          selected: {_pickParcours},
+          onSelectionChanged: (sel) => setState(() => _pickParcours = sel.first),
+        ),
+        const SizedBox(height: 8),
+        _searchField(
+            _atelierSearchCtrl,
+            _pickParcours ? 'Rechercher un parcours ou une étape' : 'Rechercher un atelier, un domaine, un sous-domaine',
+            (v) => setState(() => _atelierQuery = v)),
+        const SizedBox(height: 8),
+        if (groups.whereType<Card>().isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+                _pickParcours ? 'Aucune étape ne correspond.' : 'Aucun atelier ne correspond.',
+                style: const TextStyle(color: kMutedTextColor)),
+          ),
+        ...groups,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
+    if (_mode == null) return _buildModeChoice(provider);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -405,204 +811,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.qr_code_scanner, size: 48, color: Color(0xFFFF7043)),
-                const SizedBox(height: 10),
-                const Text(
-                  'Association QR Code Express',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Scannez le badge élève puis la fiche d\'atelier en classe',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Color(0xFF718096)),
-                ),
+                _buildStepHeader(provider),
 
-                const SizedBox(height: 24),
-
-                // Open Camera Button
-                ElevatedButton.icon(
-                  onPressed: () => _startQrScanner(context, provider),
-                  icon: const Icon(Icons.photo_camera, size: 22),
-                  label: const Text('Ouvrir l\'appareil photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF7043),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Toggle manual selection
-                GestureDetector(
-                  onTap: () => setState(() => _showManualSelection = !_showManualSelection),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Row(
-                          children: [
-                            const Text(
-                              'SÉLECTION MANUELLE',
-                              style: TextStyle(fontSize: 12, color: Color(0xFFA0AEC0), fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              _showManualSelection ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                              size: 16,
-                              color: const Color(0xFFA0AEC0),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                ),
-
-                // Manual selectors (hidden by default)
-                AnimatedCrossFade(
-                  duration: const Duration(milliseconds: 300),
-                  crossFadeState: _showManualSelection ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
-                        // ne suivrait pas ses changements.
-                        // ignore: deprecated_member_use
-                        value: _selectedChildId,
-                        decoration: const InputDecoration(
-                          labelText: 'Élève sélectionné',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
-                        ),
-                        items: provider.children.map((c) {
-                          return DropdownMenuItem(
-                            value: c.id,
-                            child: Text('${c.firstname} ${c.lastname ?? ""}'),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          final previousAtelierId = _selectedActivityTypeId;
-                          setState(() => _selectedChildId = val);
-                          if (previousAtelierId == null) return;
-                          final child = provider.childById(val);
-                          final atelier = provider.activityTypeById(previousAtelierId);
-                          final stillOk = child != null &&
-                              atelier != null &&
-                              AtelierEligibilityService.evaluate(provider: provider, child: child, atelier: atelier)
-                                  .isAllowed;
-                          if (!stillOk) {
-                            setState(() => _selectedActivityTypeId = null);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("L'atelier précédemment choisi n'est plus disponible pour cet élève."),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      Builder(builder: (context) {
-                        final child = provider.childById(_selectedChildId);
-                        final annotated = child == null
-                            ? const <MapEntry<ActivityType, AtelierEligibilityResult>>[]
-                            : AtelierEligibilityService.annotate(provider: provider, child: child)
-                                .where((e) => e.value.isAllowed)
-                                .toList();
-                        return DropdownButtonFormField<String>(
-                          // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
-                          // ne suivrait pas ses changements.
-                          // ignore: deprecated_member_use
-                          value: _selectedActivityTypeId,
-                          decoration: InputDecoration(
-                            labelText: 'Atelier sélectionné',
-                            border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.category),
-                            hintText: child == null ? "Sélectionnez d'abord un élève" : null,
-                          ),
-                          items: child == null
-                              ? const []
-                              : annotated.map((entry) {
-                                  final atelier = entry.key;
-                                  final warn =
-                                      entry.value.status == AtelierEligibility.allowedWithWarning;
-                                  return DropdownMenuItem(
-                                    value: atelier.id,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(child: Text(atelier.name, overflow: TextOverflow.ellipsis)),
-                                        if (warn) ...[
-                                          const SizedBox(width: 6),
-                                          const Icon(Icons.warning_amber_rounded,
-                                              size: 14, color: Colors.orange),
-                                        ],
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                          onChanged: child == null
-                              ? null
-                              : (val) => setState(() => _selectedActivityTypeId = val),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Selected items summary when manual is hidden
-                if (!_showManualSelection && (_selectedChildId != null || _selectedActivityTypeId != null)) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FAF0),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF4E9F3D).withValues(alpha: 0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_selectedChildId != null) ...[
-                          Row(children: [
-                            const Icon(Icons.person, size: 14, color: Color(0xFF4E9F3D)),
-                            const SizedBox(width: 6),
-                            Text(
-                              provider.children.firstWhere((c) => c.id == _selectedChildId,
-                                  orElse: () => Child(id: '', firstname: '?', colorHex: '', avatarText: '')).firstname,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          ]),
-                        ],
-                        if (_selectedActivityTypeId != null) ...[
-                          const SizedBox(height: 4),
-                          Row(children: [
-                            const Icon(Icons.category, size: 14, color: Color(0xFF4E9F3D)),
-                            const SizedBox(width: 6),
-                            Text(
-                              provider.activityTypes.firstWhere((a) => a.id == _selectedActivityTypeId,
-                                  orElse: () => ActivityType(id: '', name: '?', spaceId: '', colorHex: '')).name,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          ]),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
+                // La suite (statut, photos, note) une fois l'eleve et
+                // l'atelier choisis.
+                if (_ready) ...[
                 // Customizable Evaluation Status
                 if (provider.evaluationStatuses.isNotEmpty) ...[
                   DropdownButtonFormField<String>(
@@ -761,9 +974,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                   ? '${targetIds.length} observations enregistrées ! 🎉'
                                   : 'Activité enregistrée avec succès ! 🎉',
                             );
+                            if (_mode == _ScanMode.qr) {
+                              // Apres l'animation de confirmation (1,4 s).
+                              Future.delayed(const Duration(milliseconds: 1600), () {
+                                if (mounted && context.mounted && _mode == _ScanMode.qr) {
+                                  _startQrScanner(context, provider);
+                                }
+                              });
+                            }
                             setState(() {
-                              _selectedChildId = null;
-                              _selectedActivityTypeId = null;
+                              _resetSelection();
                               _selectedEvaluationStatusId = null;
                               _noteController.clear();
                               _selectedPhotoPaths.clear();
@@ -783,6 +1003,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
+                ],
               ],
             ),
           ),

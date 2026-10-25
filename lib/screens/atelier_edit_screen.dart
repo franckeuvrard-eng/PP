@@ -326,7 +326,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       )
                     else if (provider.progressions.isEmpty)
                       const Text(
-                        "Aucun parcours : créez-en un dans l'onglet « Parcours » des Paramètres.",
+                        "Aucun parcours : créez-en un dans Parcours › Gérer.",
                         style: TextStyle(fontSize: 12, color: Colors.orange),
                       )
                     else ...[
@@ -351,7 +351,7 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         "Une nouvelle étape s'ajoute en fin de parcours ; l'ordre se règle "
-                        "dans l'onglet « Parcours ».",
+                        "dans Parcours › Gérer.",
                         style: TextStyle(fontSize: 11, color: kMutedTextColor),
                       ),
                     ],

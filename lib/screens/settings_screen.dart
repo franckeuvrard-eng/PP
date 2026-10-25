@@ -15,14 +15,13 @@ import '../widgets/school_year_card.dart';
 import 'sync_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'referentials_manager_screen.dart';
-import 'progressions_settings_tab.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.initialTab = 0, this.standalone = false});
 
-  /// Onglet ouvert au depart : 0 Profil Classe, 1 Parcours, 2 Apparence,
-  /// 3 Sauvegarde & Securite. Espaces & Ateliers a sa propre page du menu
-  /// principal (SpacesWorkshopsScreen).
+  /// Onglet ouvert au depart : 0 Profil Classe, 1 Apparence, 2 Sauvegarde &
+  /// Securite. Espaces & Ateliers et Parcours ont leur propre page du menu
+  /// principal (SpacesWorkshopsScreen, ProgressionsScreen).
   final int initialTab;
 
   /// Ouvert comme page a part (depuis la prise en main) : barre de titre
@@ -48,7 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final settings = provider.classSettings;
 
@@ -88,7 +87,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           indicatorColor: const Color(0xFF4E9F3D),
           tabs: const [
             Tab(icon: Icon(Icons.school), text: 'Profil Classe'),
-            Tab(icon: Icon(Icons.timeline), text: 'Parcours'),
             Tab(icon: Icon(Icons.brightness_6), text: 'Apparence'),
             Tab(icon: Icon(Icons.security), text: 'Sauvegarde & Sécurité'),
           ],
@@ -98,7 +96,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         controller: _tabController,
         children: [
           _buildClassProfileTab(provider),
-          const ProgressionsSettingsTab(),
           _buildAppearanceTab(provider),
           _buildSecurityBackupTab(provider),
         ],
