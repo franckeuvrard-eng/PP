@@ -23,6 +23,39 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.6.0',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.school, 'Le programme de maternelle à jour',
+          'Les domaines et objectifs suivent le programme en vigueur (BO du 31 octobre 2024 et '
+              'du 7 mai 2026). On choisit le cycle, le domaine, puis le sous-domaine ; chaque '
+              'objectif affiche son âge (avant 4 ans, dès 4 ans, dès 5 ans). Vos ateliers gardent '
+              'leurs objectifs et domaines actuels.'),
+      ReleaseItem(Icons.timeline, 'Des parcours et leurs étapes',
+          'Les progressions s\'appellent maintenant des parcours. Un parcours n\'est pas un '
+              'atelier : ses étapes se créent depuis le parcours, et vous choisissez les sections '
+              'qui le suivent.'),
+      ReleaseItem(Icons.view_carousel, 'La frise à afficher en classe',
+          'Imprimez un parcours en grand, étape par étape, pour que les élèves suivent eux-mêmes '
+              'où ils en sont : vierge pour leurs pinces, ou avec leurs prénoms.'),
+      ReleaseItem(Icons.grid_on, 'Suivi des parcours',
+          'Un tableau élèves × parcours montre l\'étape où en est chacun, en PDF ou en Excel '
+              '(avec une feuille prête pour un tableau croisé dynamique).'),
+      ReleaseItem(Icons.assignment_turned_in, 'Le plan de travail',
+          'Les « ateliers obligatoires » deviennent le plan de travail. Son PDF montre les '
+              'photos des ateliers, et les parcours sur une page à part.'),
+      ReleaseItem(Icons.visibility_off, 'Mettre un atelier de côté',
+          'Désactivez un atelier depuis sa fiche : il disparaît d\'Espaces & Ateliers mais '
+              'reste dans les observations, les rapports et les statistiques.'),
+      ReleaseItem(Icons.space_dashboard, 'Plus près de vous',
+          'Espaces & Ateliers et Rapports ont leur place dans le menu (barre latérale sur Mac '
+              'et iPad ; accueil et barre du haut sur iPhone). Et beaucoup plus d\'icônes pour vos '
+              'ateliers.'),
+      ReleaseItem(Icons.system_update, 'Mettez à jour tous vos appareils',
+          'La synchronisation par Wi-Fi ne se fait qu\'entre appareils en version 1.6.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.5.0',
     date: 'Octobre 2026',
     items: [

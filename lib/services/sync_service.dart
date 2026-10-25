@@ -108,7 +108,9 @@ const int kSyncDefaultPort = 48765;
 const String kSyncGenerationKey = '\u0002generation';
 // 2 : accord explicite de l'appareil qui recoit (/request + jeton de session).
 /// 3 : progressions separees des espaces (1.5).
-const int _protocol = 3;
+/// 4 : ateliers desactives, sections des parcours (1.6) : une 1.5 les
+/// perdrait en reecrivant l'atelier ou le parcours.
+const int _protocol = 4;
 
 /// Delai laisse a l'appareil qui recoit pour accepter ou refuser.
 const kSyncConsentTimeout = Duration(seconds: 90);
