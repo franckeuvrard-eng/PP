@@ -23,6 +23,16 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.6.2',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.content_paste, 'Coller une image',
+          'Copiez une image sur un site (appui long sur iPhone, clic droit sur Mac), puis touchez '
+              '« Coller » dans les photos d\'un atelier ou d\'une étape. Elle est ajoutée comme une '
+              'photo, et peut recevoir une légende.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.6.1',
     date: 'Octobre 2026',
     items: [

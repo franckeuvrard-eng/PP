@@ -3,7 +3,7 @@ description: Application iOS de suivi d'activités petite enfance et maternelle 
 # Flutter version: 3.47.7 - Mon Suivi Maternelle
 publish_to: 'none'
 
-version: 1.6.1+8
+version: 1.6.2+9
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -47,6 +47,8 @@ dependencies:
   # Conteneur iCloud Drive prive (iOS/macOS), code natif dans le depot.
   petitpas_icloud:
     path: packages/petitpas_icloud
+  pasteboard: ^0.6.0
+  image: ^4.3.0
 
 dev_dependencies:
   flutter_test:
@@ -54,8 +56,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
   # Generation de l'icone macOS arrondie (tool/make_macos_icon.dart).
-  image: ^4.3.0
-
 flutter_launcher_icons:
   ios: true
   image_path: "assets/images/app_icon.jpg"

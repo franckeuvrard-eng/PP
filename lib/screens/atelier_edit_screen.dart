@@ -6,6 +6,7 @@ import '../widgets/photo_thumb.dart';
 import '../providers/app_provider.dart';
 import '../models/activity_type.dart';
 import '../data/eduscol_data.dart';
+import '../services/clipboard_image_service.dart';
 import '../utils/color_utils.dart';
 import '../widgets/age_chip.dart';
 import '../widgets/color_swatch_picker.dart';
@@ -165,6 +166,25 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     return groups;
   }
 
+  bool _pasting = false;
+
+  /// Colle l'image du presse-papiers (copiee depuis un site, une autre app...).
+  Future<void> _pastePhoto() async {
+    if (_pasting) return;
+    setState(() => _pasting = true);
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    final result = await ClipboardImageService.paste(provider, 'ateliers');
+    if (!mounted) return;
+    setState(() {
+      _pasting = false;
+      if (result.relPath != null) _photoPaths.add(result.relPath!);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result.error ?? 'Image collée.'),
+      backgroundColor: result.error == null ? const Color(0xFF4E9F3D) : Colors.orange,
+    ));
+  }
+
   Future<void> _addAtelierPhotos() async {
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final picker = ImagePicker();
@@ -208,6 +228,15 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                   if (relPath != null && mounted) {
                     setState(() => _photoPaths.add(relPath));
                   }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.content_paste),
+                title: const Text('Coller une image'),
+                subtitle: const Text('Copiée depuis internet ou une autre application'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _pastePhoto();
                 },
               ),
             ],
@@ -867,6 +896,36 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                                     .colorScheme
                                     .onSurfaceVariant,
                                 size: 26),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Coller en un geste : image copiee sur un site.
+                        Tooltip(
+                          message: 'Coller une image copiée',
+                          child: GestureDetector(
+                            onTap: _pastePhoto,
+                            child: Container(
+                              width: 88,
+                              height: 88,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Theme.of(context).dividerColor),
+                              ),
+                              child: _pasting
+                                  ? const Center(
+                                      child: SizedBox(
+                                          width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)))
+                                  : Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.content_paste,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant, size: 24),
+                                        const SizedBox(height: 4),
+                                        const Text('Coller', style: TextStyle(fontSize: 12)),
+                                      ],
+                                    ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),

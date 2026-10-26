@@ -1287,6 +1287,25 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
 
+  /// Enregistre une image deja prete (ex. collee depuis le presse-papiers)
+  /// dans Documents/[subDir] ; renvoie son chemin relatif, ou null.
+  Future<String?> saveImageBytesToDocs(Uint8List bytes, String subDir) async {
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+      final targetDir = Directory('$_docsDirPath/$subDir');
+      if (!await targetDir.exists()) await targetDir.create(recursive: true);
+      final filename = '${subDir}_colle_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await File('${targetDir.path}/$filename').writeAsBytes(bytes, flush: true);
+      return '$subDir/$filename';
+    } catch (e) {
+      debugPrint('[Photo] enregistrement de l\'image collee impossible : $e');
+      return null;
+    }
+  }
+
   // Saves an XFile (from image_picker) directly to Documents using native byte stream
   Future<String> saveXFileToDocs(XFile xfile, String subDir) async {
     try {
