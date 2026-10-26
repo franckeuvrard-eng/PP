@@ -50,7 +50,15 @@ void main() {
     await databaseFactory.deleteDatabase(await cheminBase(nomBase));
   });
 
+  // Applications creees par le test : leur sauvegarde du demarrage doit
+  // etre finie avant de supprimer le dossier temporaire.
+  final crees = <AppStateProvider>[];
+
   tearDown(() async {
+    for (final app in crees) {
+      await app.whenStartupBackupDone();
+    }
+    crees.clear();
     await databaseFactory.deleteDatabase(await cheminBase(nomBase));
     if (await racine.exists()) {
       try {
@@ -62,12 +70,15 @@ void main() {
     }
   });
 
-  AppStateProvider creerProvider({String? nom, String? documentsPath}) =>
-      AppStateProvider(
-        database: AppDatabase(fileName: nom ?? nomBase),
-        documentsPath: documentsPath ?? racine.path,
-        autoLoad: false,
-      );
+  AppStateProvider creerProvider({String? nom, String? documentsPath}) {
+    final app = AppStateProvider(
+      database: AppDatabase(fileName: nom ?? nomBase),
+      documentsPath: documentsPath ?? racine.path,
+      autoLoad: false,
+    );
+    crees.add(app);
+    return app;
+  }
 
   group('Migration de schema', () {
     test('une base v1 est reprise sans perdre ses donnees', () async {

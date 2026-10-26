@@ -110,7 +110,8 @@ const String kSyncGenerationKey = '\u0002generation';
 /// 3 : progressions separees des espaces (1.5).
 /// 4 : ateliers desactives, sections des parcours (1.6) : une 1.5 les
 /// perdrait en reecrivant l'atelier ou le parcours.
-const int _protocol = 4;
+/// 5 : sous-domaine des ateliers (1.6.3), meme raison.
+const int _protocol = 5;
 
 /// Delai laisse a l'appareil qui recoit pour accepter ou refuser.
 const kSyncConsentTimeout = Duration(seconds: 90);

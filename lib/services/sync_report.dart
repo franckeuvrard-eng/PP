@@ -1,3 +1,4 @@
+import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import 'sync_merge.dart';
 
@@ -101,6 +102,7 @@ class SyncReport {
     'description': 'Description',
     'domaine': 'Domaine',
     'domaineId': 'Domaine',
+    'sousDomaineId': 'Sous-domaine',
     'objectifs': 'Objectifs',
     'isObligatory': 'Plan de travail',
     'obligatoryGroups': 'Groupes concernés',
@@ -149,6 +151,8 @@ class SyncReport {
         return n.space(text);
       case 'progressionId':
         return n.progression(text);
+      case 'sousDomaineId':
+        return EduscolData.subdomainById(text)?.title ?? text;
       case 'evaluationStatusId':
       case 'minStatusId':
       case 'progressionMinStatusId':

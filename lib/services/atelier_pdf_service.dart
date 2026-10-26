@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../data/eduscol_data.dart';
 import '../providers/app_provider.dart';
 import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
@@ -35,6 +36,43 @@ class AtelierPdfService {
         label,
         style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
       ),
+    );
+  }
+
+  /// Toutes les photos lisibles d'un atelier, l'illustration principale en
+  /// tete.
+  static List<pw.MemoryImage> imagesOf(AppStateProvider provider, ActivityType atelier) => [
+        for (final relPath in atelier.allPhotoPaths)
+          if (imageAt(provider, relPath) case final image?) image,
+      ];
+
+  /// Mosaique de toutes les photos, chacune entiere, qui remplit la place
+  /// donnee : 1 photo seule, 2 cote a cote, jusqu'a 4 en 2 x 2, au-dela en
+  /// 3 colonnes. A placer dans une zone de hauteur fixe (ou un Expanded).
+  static pw.Widget photoMosaic(List<pw.MemoryImage> images, {double gap = 3}) {
+    final n = images.length;
+    final cols = n == 1 ? 1 : (n <= 4 ? 2 : 3);
+    final rows = (n / cols).ceil();
+    return pw.Column(
+      children: [
+        for (var r = 0; r < rows; r++) ...[
+          if (r > 0) pw.SizedBox(height: gap),
+          pw.Expanded(
+            child: pw.Row(
+              children: [
+                for (var c = 0; c < cols; c++) ...[
+                  if (c > 0) pw.SizedBox(width: gap),
+                  pw.Expanded(
+                    child: r * cols + c < n
+                        ? pw.Image(images[r * cols + c], fit: pw.BoxFit.contain) // photo entiere
+                        : pw.SizedBox(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -119,6 +157,9 @@ class AtelierPdfService {
             pw.Text('Espace : ${pdfSafe(space.name)}', style: const pw.TextStyle(fontSize: 11)),
             if (atelier.domaine.isNotEmpty)
               pw.Text('Domaine : ${pdfSafe(atelier.domaine)}', style: const pw.TextStyle(fontSize: 11)),
+            if (EduscolData.subdomainById(atelier.sousDomaineId) != null)
+              pw.Text('Sous-domaine : ${pdfSafe(EduscolData.subdomainById(atelier.sousDomaineId)!.title)}',
+                  style: const pw.TextStyle(fontSize: 11)),
             if (atelier.isObligatory)
               pw.Text(
                 atelier.obligatoryGroups.isEmpty

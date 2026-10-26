@@ -163,11 +163,7 @@ class ParcoursFrisePdfService {
 
   static pw.Widget _stepCard(AppStateProvider provider, ActivityType step, int index, PdfColor color,
       List<String>? names, bool withNames) {
-    pw.MemoryImage? image;
-    for (final path in step.allPhotoPaths) {
-      image = AtelierPdfService.imageAt(provider, path);
-      if (image != null) break;
-    }
+    final images = AtelierPdfService.imagesOf(provider, step);
     return _frame(color, [
       _numberBadge('${index + 1}', color),
       pw.SizedBox(height: 8),
@@ -177,9 +173,8 @@ class ParcoursFrisePdfService {
           style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
       pw.SizedBox(height: 8),
       pw.Expanded(
-        child: image == null
-            ? pw.SizedBox()
-            : pw.Image(image, fit: pw.BoxFit.contain), // photo entiere
+        // Toutes les photos de l'etape, entieres.
+        child: images.isEmpty ? pw.SizedBox() : AtelierPdfService.photoMosaic(images, gap: 6),
       ),
       pw.SizedBox(height: 8),
       _childrenZone(names, withNames),

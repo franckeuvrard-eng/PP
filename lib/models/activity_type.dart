@@ -19,6 +19,9 @@ class ActivityType {
   /// une formulation officielle évolue, l'atelier se retrouverait rattaché à
   /// un domaine qui n'existe plus.
   final String? domaineId;
+
+  /// Sous-domaine Eduscol choisi (voir EduscolData.subdomains), ou null.
+  final String? sousDomaineId;
   final List<String> objectifs;
   final bool isObligatory;
 
@@ -63,6 +66,7 @@ class ActivityType {
     this.imagePath,
     this.domaine = '',
     this.domaineId,
+    this.sousDomaineId,
     this.objectifs = const [],
     this.isObligatory = false,
     this.iconName,
@@ -108,6 +112,7 @@ class ActivityType {
     Object? imagePath = kUndefined,
     String? domaine,
     Object? domaineId = kUndefined,
+    Object? sousDomaineId = kUndefined,
     List<String>? objectifs,
     bool? isObligatory,
     Object? iconName = kUndefined,
@@ -127,6 +132,7 @@ class ActivityType {
       imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
       domaine: domaine ?? this.domaine,
       domaineId: domaineId == kUndefined ? this.domaineId : domaineId as String?,
+      sousDomaineId: sousDomaineId == kUndefined ? this.sousDomaineId : sousDomaineId as String?,
       objectifs: objectifs ?? this.objectifs,
       isObligatory: isObligatory ?? this.isObligatory,
       iconName: iconName == kUndefined ? this.iconName : iconName as String?,
@@ -152,6 +158,7 @@ class ActivityType {
       'imagePath': imagePath,
       'domaine': domaine,
       'domaineId': domaineId,
+      'sousDomaineId': sousDomaineId,
       'objectifs': objectifs,
       'isObligatory': isObligatory,
       'iconName': iconName,
@@ -174,6 +181,7 @@ class ActivityType {
       imagePath: map['imagePath'],
       domaine: map['domaine'] ?? '',
       domaineId: map['domaineId'],
+      sousDomaineId: map['sousDomaineId'],
       objectifs: List<String>.from(map['objectifs'] ?? map['pedagogicalDomains'] ?? []),
       isObligatory: map['isObligatory'] ?? false,
       iconName: map['iconName'],

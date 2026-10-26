@@ -98,8 +98,10 @@ class MandatoryAteliersPdfService {
               else
                 for (final spaceId in spaceIds) ...[
                   groupTitle(spaceId, 'Sans espace'),
-                  for (final atelier in bySpace[spaceId]!)
-                    _atelierPlanBlock(provider: provider, child: child, atelier: atelier),
+                  ..._vignetteRows([
+                    for (final atelier in bySpace[spaceId]!)
+                      _vignette(provider: provider, child: child, atelier: atelier),
+                  ]),
                 ],
             ],
           ),
@@ -114,8 +116,9 @@ class MandatoryAteliersPdfService {
               ...header('Plan de travail - Parcours'),
               for (final progressionId in progressionIds) ...[
                 groupTitle(progressionId, 'Parcours'),
-                for (final (i, step) in byProgression[progressionId]!.indexed)
-                  _atelierPlanBlock(
+                ..._vignetteRows([
+                  for (final (i, step) in byProgression[progressionId]!.indexed)
+                  _vignette(
                     provider: provider,
                     child: child,
                     atelier: step,
@@ -125,6 +128,7 @@ class MandatoryAteliersPdfService {
                     done: AtelierEligibilityService.meetsThreshold(provider, child.id, step.id,
                         provider.progressionById(progressionId)?.minStatusId),
                   ),
+                ]),
               ],
             ],
           ),
@@ -135,12 +139,32 @@ class MandatoryAteliersPdfService {
     return doc.save();
   }
 
-  /// Bloc "plan de travail" d'un atelier pour un eleve : grande case a
-  /// cocher (cochee des que le statut le plus recent est "acquis") suivie
-  /// de tout le detail de l'atelier (domaine, description, objectifs) et de
-  /// son statut courant, pour que l'eleve/la famille sache exactement quoi
-  /// faire et ou il en est.
-  static pw.Widget _atelierPlanBlock({
+  static const _perRow = 3;
+
+  /// Vignettes rangees par lignes de [_perRow] : chaque ligne est un bloc
+  /// que la page peut reporter a la suivante (une grille d'un seul tenant ne
+  /// se coupe pas entre deux pages).
+  static List<pw.Widget> _vignetteRows(List<pw.Widget> vignettes) => [
+        for (var i = 0; i < vignettes.length; i += _perRow)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 10),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                for (var j = i; j < i + _perRow; j++) ...[
+                  if (j > i) pw.SizedBox(width: 10),
+                  pw.Expanded(child: j < vignettes.length ? vignettes[j] : pw.SizedBox()),
+                ],
+              ],
+            ),
+          ),
+      ];
+
+  /// Vignette d'un atelier (ou d'une etape) pour un eleve : la photo en
+  /// grand, le nom, le statut courant (bordure verte une fois acquis, seuil
+  /// du parcours pour une etape) et trois cases que l'eleve coche a la main a
+  /// chaque passage. La photo dit quoi faire a un enfant qui ne lit pas.
+  static pw.Widget _vignette({
     required AppStateProvider provider,
     required Child child,
     required ActivityType atelier,
@@ -153,71 +177,66 @@ class MandatoryAteliersPdfService {
       activityTypeId: atelier.id,
     );
     final acquis = done ?? snapshot.statusId == 'acquis';
-    final statusColor = PdfColor.fromInt(int.parse(snapshot.colorHex.replaceFirst('#', '0xff')));
-    final photoTiles = <pw.Widget>[];
-    for (final relPath in atelier.allPhotoPaths) {
-      final image = AtelierPdfService.imageAt(provider, relPath);
-      if (image == null) continue;
-      photoTiles.add(AtelierPdfService.photoTile(image, atelier.captionFor(relPath), width: 110));
-    }
+    final statusColor = _color(snapshot.colorHex);
+    final atelierColor = _color(atelier.colorHex);
+    final images = AtelierPdfService.imagesOf(provider, atelier);
+    final initial = atelier.name.trim().isEmpty ? '?' : atelier.name.trim()[0].toUpperCase();
 
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 10),
-      padding: const pw.EdgeInsets.all(8),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey400, width: 0.7),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+        border: pw.Border.all(color: acquis ? PdfColors.green700 : atelierColor, width: acquis ? 2 : 1.2),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
       ),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
+          // Toutes les photos, entieres (ou pastille a l'initiale). Zone plus
+          // haute au-dela de 4 photos pour qu'elles restent lisibles.
           pw.Container(
-            width: 24,
-            height: 24,
-            margin: const pw.EdgeInsets.only(top: 1, right: 10),
+            height: images.length > 4 ? 170 : 120,
+            padding: const pw.EdgeInsets.all(4),
             decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: acquis ? PdfColors.green700 : PdfColors.grey600, width: 1.5),
-              color: acquis ? PdfColors.green700 : PdfColors.white,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+              color: images.isEmpty ? atelierColor : null,
+              borderRadius: const pw.BorderRadius.only(
+                topLeft: pw.Radius.circular(9),
+                topRight: pw.Radius.circular(9),
+              ),
             ),
-            child: acquis
-                ? pw.Center(
-                    child: pw.Text('X',
-                        style: pw.TextStyle(color: PdfColors.white, fontSize: 15, fontWeight: pw.FontWeight.bold)),
-                  )
-                : null,
+            alignment: pw.Alignment.center,
+            child: images.isNotEmpty
+                ? AtelierPdfService.photoMosaic(images)
+                : pw.Text(pdfSafe(initial),
+                    style: pw.TextStyle(fontSize: 54, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
           ),
-          pw.Expanded(
+          pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(pdfSafe(stepLabel == null ? atelier.name : '$stepLabel - ${atelier.name}'),
-                    style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                if (atelier.domaine.isNotEmpty)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 2),
-                    child: pw.Text('Domaine : ${pdfSafe(atelier.domaine)}',
-                        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-                  ),
-                if (atelier.description != null && atelier.description!.trim().isNotEmpty)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 3),
-                    child: pw.Text(pdfSafe(atelier.description!.trim()), style: const pw.TextStyle(fontSize: 9)),
-                  ),
-                if (atelier.objectifs.isNotEmpty) ...[
-                  pw.SizedBox(height: 3),
-                  ...atelier.objectifs.map(
-                    (o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 9)),
-                  ),
-                ],
-                if (photoTiles.isNotEmpty) ...[
-                  pw.SizedBox(height: 6),
-                  pw.Wrap(spacing: 8, runSpacing: 8, children: photoTiles),
-                ],
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'Statut actuel : ${pdfSafe(snapshot.label)}',
-                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: statusColor),
+                if (stepLabel != null)
+                  pw.Text(pdfSafe(stepLabel),
+                      style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: atelierColor)),
+                pw.Text(pdfSafe(atelier.name),
+                    maxLines: 2, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 2),
+                pw.Text(pdfSafe(acquis ? '${snapshot.label} - fait !' : snapshot.label),
+                    maxLines: 1,
+                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: statusColor)),
+                pw.SizedBox(height: 6),
+                // Trois passages a cocher a la main, sur la feuille.
+                pw.Row(
+                  children: [
+                    for (var k = 0; k < 3; k++)
+                      pw.Container(
+                        width: 22,
+                        height: 22,
+                        margin: const pw.EdgeInsets.only(right: 8),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(color: PdfColors.grey700, width: 1.5),
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -225,6 +244,14 @@ class MandatoryAteliersPdfService {
         ],
       ),
     );
+  }
+
+  static PdfColor _color(String hex) {
+    try {
+      return PdfColor.fromInt(int.parse(hex.replaceFirst('#', '0xff')));
+    } catch (_) {
+      return PdfColors.grey600;
+    }
   }
 
   /// Ouvre l'apercu imprimable / partageable du rapport, pour un ou plusieurs

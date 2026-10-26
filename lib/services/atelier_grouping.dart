@@ -4,9 +4,9 @@ import '../models/activity_type.dart';
 /// Rangement des ateliers (hors etapes de parcours) par domaine puis
 /// sous-domaine, partage par les etiquettes QR et la saisie manuelle.
 ///
-/// Le sous-domaine n'est pas enregistre sur l'atelier : il se deduit de ses
-/// objectifs Eduscol. Un atelier dont les objectifs couvrent deux
-/// sous-domaines figure dans les deux.
+/// Sous-domaine : celui choisi sur l'atelier, sinon deduit de ses objectifs
+/// Eduscol (un atelier dont les objectifs couvrent deux sous-domaines figure
+/// alors dans les deux).
 class AtelierGrouping {
   static const noDomain = 'Sans domaine';
   static const otherSubdomain = 'Autres ateliers';
@@ -18,6 +18,9 @@ class AtelierGrouping {
   /// Sous-domaines couverts par les objectifs de l'atelier, dans l'ordre du
   /// programme.
   static List<String> subdomainTitlesOf(ActivityType a) {
+    // Sous-domaine choisi sur l'atelier : il fait foi.
+    final chosen = EduscolData.subdomainById(a.sousDomaineId);
+    if (chosen != null) return [chosen.title];
     final ids = <String>{
       for (final o in EduscolData.objectives)
         if (a.objectifs.contains(o.text) && (a.domaineId == null || o.domainId == a.domaineId))

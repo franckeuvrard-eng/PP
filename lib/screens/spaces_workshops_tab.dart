@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../data/eduscol_data.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
@@ -343,7 +344,8 @@ Widget atelierSettingsTile(
         ? null
         : Text(
             [
-              if (atelier.domaine.isNotEmpty) '📚 ${atelier.domaine}',
+              if (atelier.domaine.isNotEmpty)
+                '📚 ${EduscolData.subdomainById(atelier.sousDomaineId)?.title ?? atelier.domaine}',
               if (atelier.objectifs.isNotEmpty)
                 '🏁 ${atelier.objectifs.length} objectif(s)',
             ].join('  •  '),

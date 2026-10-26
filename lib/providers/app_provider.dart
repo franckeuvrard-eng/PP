@@ -755,7 +755,8 @@ class AppStateProvider extends ChangeNotifier {
 
       // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
       // l'affichage de l'application.
-      unawaited(_maybeAutoBackup(settings['last_auto_backup']));
+      _startupBackup = _maybeAutoBackup(settings['last_auto_backup']);
+      unawaited(_startupBackup);
       unawaited(purgeOrphanPhotos());
       unawaited(_scheduleReminderIfEnabled());
     } catch (e) {
@@ -864,6 +865,16 @@ class AppStateProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Sauvegarde du demarrage, lancee sans attendre pour ne pas retarder
+  /// l'ouverture de l'application.
+  Future<void>? _startupBackup;
+
+  /// Attend la fin de la sauvegarde du demarrage. Pour les tests : supprimer
+  /// le dossier des documents pendant qu'elle s'ecrit la ferait echouer
+  /// (« Directory listing failed » dans les journaux).
+  @visibleForTesting
+  Future<void> whenStartupBackupDone() async => _startupBackup;
 
   /// Sauvegarde au plus une fois par jour, au demarrage.
   Future<void> _maybeAutoBackup(String? lastIso) async {

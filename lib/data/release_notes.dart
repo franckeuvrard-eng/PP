@@ -23,6 +23,23 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.6.3',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.grid_view, 'Le plan de travail en vignettes',
+          'Chaque atelier est une vignette avec toutes ses photos, son nom, son statut et trois '
+              'cases que l\'élève coche à chaque passage. La bordure devient verte une fois acquis.'),
+      ReleaseItem(Icons.subdirectory_arrow_right, 'Le sous-domaine est enregistré',
+          'Le sous-domaine choisi sur un atelier ou une étape est gardé et affiché sur sa fiche. '
+              'Rouvrez vos ateliers existants pour le choisir.'),
+      ReleaseItem(Icons.photo_library, 'Toutes les photos',
+          'Les vignettes du plan de travail et la frise des parcours montrent toutes les photos '
+              'd\'un atelier, en entier.'),
+      ReleaseItem(Icons.system_update, 'Mettez à jour tous vos appareils',
+          'La synchronisation par Wi-Fi ne se fait qu\'entre appareils en version 1.6.3.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.6.2',
     date: 'Octobre 2026',
     items: [

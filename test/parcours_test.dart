@@ -126,6 +126,10 @@ void main() {
       // Sans domaine : en dernier.
       expect(groups.last.key, AtelierGrouping.noDomain);
       expect(groups.last.value.map((a) => a.id), contains('libre'));
+      // Sous-domaine choisi sur l'atelier : il l'emporte sur les objectifs.
+      final autre = EduscolData.subdomainsOf(obj.domainId).firstWhere((s) => s.id != sub.id);
+      final choisi = app.activityTypeById('aimants')!.copyWith(sousDomaineId: autre.id);
+      expect(AtelierGrouping.subdomainTitlesOf(choisi), [autre.title]);
       // Les etapes de parcours ne sont pas des ateliers d'espace.
       expect(groups.expand((g) => g.value).any((a) => a.inProgression), isFalse);
     });

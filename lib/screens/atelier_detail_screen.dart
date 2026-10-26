@@ -148,6 +148,12 @@ class AtelierDetailScreen extends StatelessWidget {
                   const Text('Domaine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   Text('📚 ${current.domaine}'),
+                  if (EduscolData.subdomainById(current.sousDomaineId) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, left: 4),
+                      child: Text('↳ ${EduscolData.subdomainById(current.sousDomaineId)!.title}',
+                          style: const TextStyle(color: kMutedTextColor)),
+                    ),
                 ],
                 if (current.objectifs.isNotEmpty) ...[
                   const SizedBox(height: 16),

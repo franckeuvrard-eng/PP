@@ -122,6 +122,13 @@ class EduscolData {
   static List<EduscolSubdomain> subdomainsOf(String domainId) =>
       [for (final s in subdomains) if (s.domainId == domainId) s];
 
+  static EduscolSubdomain? subdomainById(String? id) {
+    for (final s in subdomains) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
   static const List<EduscolDomain> domains = [
     EduscolDomain(
       id: 'd1_langage',

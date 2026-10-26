@@ -49,7 +49,8 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
   /// Cycle du programme dont on parcourt les domaines.
   late int _cycle;
 
-  /// Null : tous les sous-domaines du domaine choisi.
+  /// Sous-domaine de l'atelier, enregistre avec lui ; filtre aussi la liste
+  /// des objectifs. Null : non precise (tous les objectifs du domaine).
   String? _selectedSubdomainId;
   late String _selectedLevelFilter;
   late bool _isObligatory;
@@ -108,6 +109,12 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
     _photoPaths = List<String>.from(act?.photoPaths ?? []);
     _photoCaptions = Map<String, String>.from(act?.photoCaptions ?? {});
     _imagePath = act?.imagePath;
+
+    // Garde seulement un sous-domaine qui appartient bien au domaine.
+    _selectedSubdomainId =
+        EduscolData.subdomainById(act?.sousDomaineId)?.domainId == _selectedDomainId
+            ? act?.sousDomaineId
+            : null;
 
     _domainSectionHasContent =
         act != null && (act.domaine.isNotEmpty || act.objectifs.isNotEmpty);
@@ -586,7 +593,8 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                       items: [
                         const DropdownMenuItem<String?>(
                           value: null,
-                          child: Text('Tous les sous-domaines', style: TextStyle(fontSize: 13)),
+                          child: Text('Non précisé (tous les objectifs du domaine)',
+                              style: TextStyle(fontSize: 13, color: kMutedTextColor)),
                         ),
                         for (final s in EduscolData.subdomainsOf(_selectedDomainId!))
                           DropdownMenuItem<String?>(
@@ -1074,6 +1082,9 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
       imagePath: _imagePath,
       domaine: finalDomaine,
       domaineId: finalDomaineId,
+      sousDomaineId: EduscolData.subdomainById(_selectedSubdomainId)?.domainId == finalDomaineId
+          ? _selectedSubdomainId
+          : null,
       objectifs: _selectedObjectives,
       isObligatory: _isObligatory,
       iconName: _iconName,
