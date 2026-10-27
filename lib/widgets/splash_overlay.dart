@@ -38,6 +38,7 @@ class _SplashOverlayState extends State<SplashOverlay> with TickerProviderStateM
   late final AnimationController _fade =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
   bool _gone = !SplashOverlay.enabled;
+  final _appKey = GlobalKey();
   bool _started = false;
 
   @override
@@ -77,13 +78,17 @@ class _SplashOverlayState extends State<SplashOverlay> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (_gone) return widget.child;
+    // L'application garde toujours la meme place dans l'arbre : si elle etait
+    // reconstruite a la fin de l'animation, l'ecran de verrouillage
+    // repartirait de zero et redemanderait Face ID (double demande).
+    final app = KeyedSubtree(key: _appKey, child: widget.child);
+    if (_gone) return Stack(children: [app]);
     // Les donnees peuvent arriver apres la fin de l'animation.
     final loaded = context.watch<AppStateProvider>().isLoaded;
     if (loaded) WidgetsBinding.instance.addPostFrameCallback((_) => _maybeLeave());
 
     return Stack(children: [
-      widget.child,
+      app,
       FadeTransition(
         opacity: ReverseAnimation(_fade),
         child: GestureDetector(

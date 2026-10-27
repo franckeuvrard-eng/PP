@@ -23,6 +23,14 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.8.4',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.face, 'Face ID une seule fois',
+          'Après l\'animation d\'ouverture, Face ID n\'est plus demandé deux fois de suite.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.8.3',
     date: 'Octobre 2026',
     items: [

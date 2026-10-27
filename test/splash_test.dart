@@ -30,7 +30,7 @@ void main() {
 
     Widget build() => ChangeNotifierProvider<AppStateProvider>.value(
           value: app,
-          child: const MaterialApp(home: SplashOverlay(child: Scaffold(body: Text('APPLI')))),
+          child: const MaterialApp(home: SplashOverlay(child: _Counted())),
         );
 
     await tester.pumpWidget(build());
@@ -43,9 +43,13 @@ void main() {
     expect(find.text('A petits pas'), findsNothing, reason: 'l\'animation doit s\'effacer');
     expect(find.text('APPLI'), findsOneWidget);
     expect(SplashOverlay.done.value, isTrue, reason: 'Face ID peut alors se lancer');
+    // L'ecran sous l'animation n'est pas reconstruit a la fin : sinon le
+    // verrouillage redemandait Face ID une seconde fois.
+    expect(_Counted.created, 1);
 
     // Un toucher passe l'animation.
     await tester.pumpWidget(const SizedBox());
+    _Counted.created = 0;
     await tester.pumpWidget(build());
     expect(find.text('A petits pas'), findsOneWidget);
     await tester.tap(find.text('A petits pas'));
@@ -54,4 +58,24 @@ void main() {
     expect(find.text('A petits pas'), findsNothing);
     SplashOverlay.enabled = false;
   });
+}
+
+/// Ecran factice qui compte ses creations (un etat recree = Face ID redemande).
+class _Counted extends StatefulWidget {
+  const _Counted();
+  static int created = 0;
+
+  @override
+  State<_Counted> createState() => _CountedState();
+}
+
+class _CountedState extends State<_Counted> {
+  @override
+  void initState() {
+    super.initState();
+    _Counted.created++;
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Text('APPLI'));
 }

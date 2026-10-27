@@ -269,6 +269,8 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _authenticate() async {
+    // Jamais deux demandes Face ID a la fois, ni apres le deverrouillage.
+    if (_isAuthenticating || _isAuthenticated) return;
     bool authenticated = false;
     try {
       setState(() {
