@@ -11,7 +11,10 @@ name: TestFlight
 #   ASC_PRIVATE_KEY     contenu complet du fichier AuthKey_XXXX.p8
 #
 # Signature automatique « cloud » : Xcode cree certificats et profils via la
-# cle API, rien a gerer a la main.
+# cle API, rien a gerer a la main. Comme chaque machine est neuve, il cree un
+# certificat de developpement a chaque fois : le job « certificates » revoque
+# d'abord ceux des compilations precedentes, sinon la limite d'Apple est
+# vite atteinte.
 on:
   workflow_dispatch:
     inputs:
@@ -26,8 +29,30 @@ env:
   IOS_DEPLOYMENT_TARGET: '15.0'
 
 jobs:
+  # Une seule fois, avant les deux compilations (qui tournent en parallele :
+  # un nettoyage dans chacune pourrait revoquer le certificat que l'autre
+  # vient de creer). Voir scripts/cleanup_dev_certificates.py.
+  certificates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Revoquer les certificats de developpement de l'integration continue
+        # Un echec ici ne bloque pas : la signature dira ensuite si la place manque.
+        continue-on-error: true
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          pip install --quiet "pyjwt[crypto]"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          python3 scripts/cleanup_dev_certificates.py "$KEY_ID" "$ISSUER" "$RUNNER_TEMP/AuthKey.p8"
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
   ios:
     if: inputs.platforms != 'macos'
+    needs: certificates
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -100,6 +125,7 @@ jobs:
 
   macos:
     if: inputs.platforms != 'ios'
+    needs: certificates
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
