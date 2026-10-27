@@ -23,6 +23,16 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.8.3',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.back_hand, 'Les petites mains font l\'empreinte',
+          'À l\'ouverture, les mains peintes et les feuilles se posent une à une et composent la '
+              'grande empreinte, du talon vers les orteils. Avec Face ID, le déverrouillage attend '
+              'la fin de l\'animation.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.8.2',
     date: 'Octobre 2026',
     items: [

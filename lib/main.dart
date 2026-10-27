@@ -253,7 +253,19 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
       _isAuthenticated = true;
       return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    // Face ID attend la fin de l'animation d'ouverture : sa fenetre la
+    // recouvrait, et on ne la voyait jamais.
+    if (SplashOverlay.done.value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    } else {
+      void start() {
+        if (!SplashOverlay.done.value) return;
+        SplashOverlay.done.removeListener(start);
+        if (mounted) _authenticate();
+      }
+
+      SplashOverlay.done.addListener(start);
+    }
   }
 
   Future<void> _authenticate() async {

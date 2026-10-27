@@ -35,10 +35,14 @@ void main() {
 
     await tester.pumpWidget(build());
     expect(find.text('A petits pas'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 3));
+    // Face ID attend : l'animation n'est pas finie.
+    await tester.pump(const Duration(seconds: 1));
+    expect(SplashOverlay.done.value, isFalse);
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(find.text('A petits pas'), findsNothing, reason: 'l\'animation doit s\'effacer');
     expect(find.text('APPLI'), findsOneWidget);
+    expect(SplashOverlay.done.value, isTrue, reason: 'Face ID peut alors se lancer');
 
     // Un toucher passe l'animation.
     await tester.pumpWidget(const SizedBox());
