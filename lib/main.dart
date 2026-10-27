@@ -18,6 +18,7 @@ import 'screens/reports_screen.dart';
 import 'screens/spaces_workshops_tab.dart';
 import 'screens/ateliers_hub_screen.dart';
 import 'screens/planning_screen.dart';
+import 'widgets/splash_overlay.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -34,10 +35,6 @@ import 'services/children_import_service.dart';
 /// repli automatique).
 @visibleForTesting
 List<String>? debugThemeFontFallback;
-
-/// Creme de l'ecran de demarrage, identique au fond de LaunchImage.jpg et
-/// a la couleur de LaunchScreen.storyboard (#FCF5E9).
-const kSplashCream = Color(0xFFFCF5E9);
 
 void main() {
   runApp(
@@ -193,7 +190,7 @@ class PetitPasApp extends StatelessWidget {
         maxScaleFactor: 1.8,
         child: StorageErrorBanner(child: child ?? const SizedBox.shrink()),
       ),
-      home: const LockScreen(),
+      home: const SplashOverlay(child: LockScreen()),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:petitpas/main.dart';
 import 'package:petitpas/providers/app_provider.dart';
 import 'package:petitpas/providers/cloud_sync_controller.dart';
 import 'package:petitpas/services/app_database.dart';
+import 'package:petitpas/widgets/splash_overlay.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -26,6 +27,8 @@ Future<(AppStateProvider, CloudSyncController)> pumpPetitPas(
 }) async {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
+  // Animation d'ouverture coupee : elle recouvrirait l'ecran pendant 1,5 s.
+  SplashOverlay.enabled = false;
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = const Size(1179, 2556);
   tester.view.devicePixelRatio = 3;

@@ -23,6 +23,15 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.8.2',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.directions_walk, 'Un petit pas à l\'ouverture',
+          'Au lancement, l\'empreinte fait un petit pas et le nom de l\'application apparaît, avant '
+              'de laisser place à l\'accueil. Touchez l\'écran pour passer.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.8.1',
     date: 'Octobre 2026',
     items: [
