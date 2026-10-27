@@ -102,6 +102,17 @@ void main() {
     expect(find.text('Bravo ${child.firstname} !'), findsOneWidget);
     expect(app.pendingLogs.where((l) => l.childId == child.id && l.activityTypeId == 'perles'), hasLength(1));
     await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // Sortie : sans Face ID (en test), la confirmation de secours ferme le mode.
+    await tester.tap(find.text('Adulte'));
+    // La reponse (absente en test) du module d'authentification arrive en
+    // asynchrone reel.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quitter'));
+    await tester.pumpAndSettle();
+    expect(find.text('Qui es-tu ?'), findsNothing, reason: 'le mode eleve doit se fermer');
     await endPetitPas(tester, sync);
   });
 }

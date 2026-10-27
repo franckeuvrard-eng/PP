@@ -23,6 +23,15 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.8.1',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.lock_open, 'Sortir du mode élève',
+          'Le bouton « Adulte » du mode élève demande bien Face ID ou le code de l\'appareil, puis '
+              'ramène à l\'application. Un message s\'affiche si l\'authentification échoue.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.8.0',
     date: 'Octobre 2026',
     items: [

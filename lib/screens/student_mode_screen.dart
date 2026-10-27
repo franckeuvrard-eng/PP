@@ -30,6 +30,10 @@ class _StudentModeScreenState extends State<StudentModeScreen> {
   Child? _child;
   String? _doneAtelierName;
   Timer? _reset;
+  bool _exiting = false;
+
+  /// Vrai une fois l'adulte authentifie : l'ecran peut alors se fermer.
+  bool _allowPop = false;
 
   static const _cream = Color(0xFFFCF5E9);
 
@@ -39,26 +43,58 @@ class _StudentModeScreenState extends State<StudentModeScreen> {
     super.dispose();
   }
 
+  /// Sortie du mode eleve, reservee a l'adulte (Face ID, Touch ID ou code).
   Future<void> _exit() async {
+    if (_exiting) return;
+    _exiting = true;
     var ok = false;
+    String? problem;
     try {
       final auth = LocalAuthentication();
-      if (await auth.isDeviceSupported()) {
-        ok = await auth.authenticate(
-          localizedReason: 'Réservé à l\'adulte : quitter le mode élève.',
-          biometricOnly: false,
-        );
-      } else {
+      if (!await auth.isDeviceSupported()) {
         ok = await _confirmWithoutAuth();
+      } else {
+        ok = await auth.authenticate(
+          localizedReason: "Réservé à l'adulte : quitter le mode élève.",
+          biometricOnly: false,
+          // Comme le verrouillage au demarrage : la fenetre Face ID fait
+          // passer l'app en arriere-plan, ce qui annulait la demande.
+          persistAcrossBackgrounding: true,
+        );
+      }
+    } on LocalAuthException catch (e) {
+      switch (e.code) {
+        case LocalAuthExceptionCode.noCredentialsSet:
+        case LocalAuthExceptionCode.noBiometricHardware:
+        case LocalAuthExceptionCode.uiUnavailable:
+          ok = await _confirmWithoutAuth();
+        case LocalAuthExceptionCode.userCanceled:
+        case LocalAuthExceptionCode.systemCanceled:
+          break; // l'adulte a annule : on reste dans le mode eleve
+        default:
+          problem = "Authentification impossible (${e.code.name}). Réessayez, ou utilisez le code de l'appareil.";
       }
     } on PlatformException {
       ok = await _confirmWithoutAuth();
     } on MissingPluginException {
       ok = await _confirmWithoutAuth();
-    } catch (_) {
-      ok = false;
+    } catch (e) {
+      problem = "Authentification impossible : $e";
+    } finally {
+      _exiting = false;
     }
-    if (ok && mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (!ok) {
+      if (problem != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+      }
+      return;
+    }
+    // L'ecran bloque le retour (PopScope) : on l'autorise avant de sortir.
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
   }
 
   /// Appareil sans code ni Face ID : simple confirmation.
@@ -127,7 +163,7 @@ class _StudentModeScreenState extends State<StudentModeScreen> {
   Widget build(BuildContext context) {
     final app = Provider.of<AppStateProvider>(context);
     return PopScope(
-      canPop: false,
+      canPop: _allowPop,
       child: Scaffold(
         backgroundColor: _cream,
         body: SafeArea(
