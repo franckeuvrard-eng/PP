@@ -5,9 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
-import '../services/child_activity_report_service.dart';
 import '../utils/color_utils.dart';
-import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
@@ -217,165 +215,14 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                     ),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
-                                onPressed: () => _choosePdfPeriod(context, child, provider),
-                                tooltip: 'Générer le rapport PDF',
-                              ),
-                            ],
-                          ),
+                          // Le rapport PDF d'un eleve se genere depuis Rapports.
+                          trailing: const Icon(Icons.chevron_right),
                         ),
                       );
                     },
                   ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─────────────────── PDF PERIOD PICKER ───────────────────
-  void _choosePdfPeriod(BuildContext context, Child child, AppStateProvider provider) {
-    DateTimeRange? customRange;
-    bool onlyLatestPerAtelier = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.date_range, color: Color(0xFF4E9F3D)),
-                  SizedBox(width: 8),
-                  Text('Période du rapport'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Choisissez la période à inclure dans le rapport PDF :',
-                      style: TextStyle(fontSize: 13)),
-                  const SizedBox(height: 12),
-                  _periodButton(
-                    context: context,
-                    label: 'Toute la période',
-                    icon: Icons.all_inclusive,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider, null, null, onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: 'Ce mois-ci',
-                    icon: Icons.calendar_month,
-                    onTap: () {
-                      final now = DateTime.now();
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider,
-                          DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 0), onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: 'Semaine en cours',
-                    icon: Icons.view_week,
-                    onTap: () {
-                      final now = DateTime.now();
-                      final monday = now.subtract(Duration(days: now.weekday - 1));
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider,
-                          DateTime(monday.year, monday.month, monday.day),
-                          DateTime(monday.year, monday.month, monday.day + 6, 23, 59), onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: customRange != null
-                        ? '${DateFormat('dd/MM').format(customRange!.start)} → ${DateFormat('dd/MM').format(customRange!.end)}'
-                        : 'Période personnalisée…',
-                    icon: Icons.tune,
-                    onTap: () async {
-                      final picked = await showDateRangePicker(
-                        context: context,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                        locale: const Locale('fr', 'FR'),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => customRange = picked);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: const Text('Occurrence la plus récente seulement', style: TextStyle(fontSize: 13)),
-                    subtitle: const Text(
-                      "Sinon, toutes les fois où l'atelier a été refait apparaissent.",
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    value: onlyLatestPerAtelier,
-                    activeThumbColor: const Color(0xFF4E9F3D),
-                    onChanged: (val) => setDialogState(() => onlyLatestPerAtelier = val),
-                  ),
-                  if (customRange != null) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _openPdfPreview(context, child, provider, customRange!.start,
-                              customRange!.end.add(const Duration(days: 1)), onlyLatestPerAtelier);
-                        },
-                        icon: const Icon(Icons.picture_as_pdf),
-                        label: const Text('Générer le PDF'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4E9F3D),
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _periodButton({
-    required BuildContext context,
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
       ),
     );
   }
@@ -388,39 +235,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
         fullscreenDialog: true,
         builder: (context) => ChildFormDialog(provider: provider, child: child),
       ),
-    );
-  }
-
-  // ─────────────────── PDF PREVIEW ───────────────────
-
-  Future<void> _openPdfPreview(
-    BuildContext context,
-    Child child,
-    AppStateProvider provider,
-    DateTime? from,
-    DateTime? to, [
-    bool onlyLatestPerAtelier = false,
-  ]) async {
-    String periodLabel = 'Toute la période';
-    if (from != null && to != null) {
-      periodLabel = '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}';
-    }
-
-    openPdfViewer(
-      context,
-      title: 'Rapport - ${child.firstname} ($periodLabel)',
-      fileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
-      build: (format) => ChildActivityReportService.generateChildReportBytes(
-        child: child,
-        provider: provider,
-        format: format,
-        from: from,
-        to: to,
-        onlyLatestPerAtelier: onlyLatestPerAtelier,
-      ),
-      shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
-      shareSubject: 'Rapport d\'activités - ${child.firstname}',
-      shareEmails: child.parentEmails.isEmpty ? null : child.parentEmails,
     );
   }
 

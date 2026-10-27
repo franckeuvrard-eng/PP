@@ -356,8 +356,8 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _reportsIndex, 3, 4];
 
   /// Barre du bas (iPhone), dans l'ordre affiche. Espaces & Ateliers et
-  /// Parcours y sont reunis dans l'onglet Ateliers ; Badges QR et Rapports
-  /// s'ouvrent depuis le menu « ⋯ » de la barre du haut.
+  /// Parcours y sont reunis dans l'onglet Ateliers ; Rapports (QR codes
+  /// compris) s'ouvre depuis la tuile de l'accueil.
   static const _phoneOrder = [0, 1, 2, _hubIndex, 4];
 
   static const _badgesIndex = 3;
@@ -702,27 +702,11 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
           ],
         ),
         actions: [
-          // Un seul menu : les pages qui n'ont pas d'onglet en bas.
-          PopupMenuButton<VoidCallback>(
-            icon: const Icon(Icons.more_horiz),
-            tooltip: 'Plus',
-            onSelected: (open) => open(),
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: () => _openPhonePage(const QrGeneratorScreen(standalone: true)),
-                child: const ListTile(
-                    leading: Icon(Icons.print_outlined), title: Text('Badges QR élèves')),
-              ),
-              PopupMenuItem(
-                value: () => _openPhonePage(const ReportsScreen()),
-                child: const ListTile(
-                    leading: Icon(Icons.description_outlined), title: Text('Rapports')),
-              ),
-              PopupMenuItem(
-                value: () => _openPhonePage(const HelpScreen()),
-                child: const ListTile(leading: Icon(Icons.help_outline), title: Text('Aide')),
-              ),
-            ],
+          // Rapports et QR codes s'ouvrent depuis la tuile de l'accueil.
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Aide',
+            onPressed: () => _openPhonePage(const HelpScreen()),
           ),
         ],
       ),

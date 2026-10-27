@@ -1727,6 +1727,27 @@ class AppStateProvider extends ChangeNotifier {
     return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus);
   }
 
+  /// Droit a l'effacement (RGPD) : la fiche, le suivi des sons et des
+  /// referentiels, et toutes les observations de l'eleve. Ses photos et
+  /// notes vocales qui ne servent plus a personne (une observation de groupe
+  /// garde les siennes) partent a la corbeille des medias, videe apres
+  /// 60 jours.
+  ///
+  /// Une sauvegarde est faite avant ; si elle echoue, rien n'est efface et la
+  /// methode renvoie -1. Sinon, le nombre d'observations effacees.
+  Future<int> eraseChildData(String id) async {
+    if (!await _writeAutoBackup()) return -1;
+    final logs = _activities.where((l) => l.childId == id).toList();
+    deleteChild(id);
+    for (final log in logs) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+    await purgeOrphanPhotos();
+    return logs.length;
+  }
+
   /// Retablit un eleve supprime, avec son suivi des sons et des referentiels.
   void restoreChild(DeletedChild deleted) {
     _children.add(deleted.child);

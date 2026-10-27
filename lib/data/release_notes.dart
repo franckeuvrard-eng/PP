@@ -23,6 +23,25 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.7.0',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.tune, 'Des rapports à votre mesure',
+          'Le plan de travail et le nouveau rapport « Parcours des élèves » sont en paysage, avec '
+              'des vignettes de même hauteur. Choisissez d\'afficher le statut et les cases à '
+              'cocher, et quels statuts inclure (par exemple seulement « Jamais fait »).'),
+      ReleaseItem(Icons.person, 'Le rapport des élèves',
+          'Dans Rapports, pour un élève, plusieurs ou toute la classe : période, analyse des sons, '
+              'vos référentiels, et activités rangées par domaine, sous-domaine et parcours.'),
+      ReleaseItem(Icons.privacy_tip, 'Tout le RGPD au même endroit',
+          'Paramètres > RGPD regroupe la politique de confidentialité, l\'export des données d\'un '
+              'élève, son effacement complet, la fin d\'année et la réinitialisation.'),
+      ReleaseItem(Icons.description, 'Rapports et QR codes',
+          'Sur iPhone, la tuile Rapports de l\'accueil ouvre aussi les QR codes (badges, ateliers, '
+              'étapes). La fiche d\'un parcours entier s\'imprime avec toutes ses étapes.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.6.3',
     date: 'Octobre 2026',
     items: [

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../utils/file_export.dart';
 import '../providers/app_provider.dart';
+import '../services/child_data_export_service.dart';
+import '../models/child.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
 import '../services/children_import_service.dart';
@@ -20,7 +22,7 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.initialTab = 0, this.standalone = false});
 
   /// Onglet ouvert au depart : 0 Profil Classe, 1 Apparence, 2 Sauvegarde &
-  /// Securite. Espaces & Ateliers et Parcours ont leur propre page du menu
+  /// Securite, 3 RGPD. Espaces & Ateliers et Parcours ont leur propre page du menu
   /// principal (SpacesWorkshopsScreen, ProgressionsScreen).
   final int initialTab;
 
@@ -47,7 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
     final provider = Provider.of<AppStateProvider>(context, listen: false);
     final settings = provider.classSettings;
 
@@ -89,6 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             Tab(icon: Icon(Icons.school), text: 'Profil Classe'),
             Tab(icon: Icon(Icons.brightness_6), text: 'Apparence'),
             Tab(icon: Icon(Icons.security), text: 'Sauvegarde & Sécurité'),
+            Tab(icon: Icon(Icons.privacy_tip), text: 'RGPD'),
           ],
         ),
       ),
@@ -98,6 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           _buildClassProfileTab(provider),
           _buildAppearanceTab(provider),
           _buildSecurityBackupTab(provider),
+          _buildRgpdTab(provider),
         ],
       ),
     );
@@ -969,10 +973,6 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
 
-          // Fin d'annee scolaire : archive puis repart a vide
-          SchoolYearCard(provider: provider),
-          const SizedBox(height: 16),
-
           // Rappel local des eleves non evalues (iOS et macOS seulement)
           if (ReminderService.isSupported)
           Card(
@@ -1038,19 +1038,81 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────── TAB 4 : RGPD ───────────────────
+  /// Tout ce qui touche aux donnees personnelles des eleves : information,
+  /// droit d'acces, droit a l'effacement, duree de conservation.
+  Widget _buildRgpdTab(AppStateProvider provider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🔒 RGPD & données personnelles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          const Text(
+            'Les données des élèves restent sur vos appareils et dans votre iCloud. '
+            'Vous pouvez répondre ici aux demandes des familles.',
+            style: TextStyle(fontSize: 12, color: kMutedTextColor),
+          ),
           const SizedBox(height: 16),
 
-          // Confidentialite / RGPD
+          // Information des familles
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: ListTile(
               leading: const Icon(Icons.privacy_tip, color: Color(0xFF4E9F3D)),
-              title: const Text('Politique de confidentialité (RGPD)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              title: const Text('Politique de confidentialité', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               subtitle: const Text('Données collectées, stockage local, droits des familles.', style: TextStyle(fontSize: 12)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Droit d'acces et de portabilite
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.download, color: Color(0xFF42A5F5)),
+              title: const Text('Exporter les données d\'un élève', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text(
+                  'Droit d\'accès : toutes les données conservées pour un élève, à remettre à sa famille.',
+                  style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: provider.children.isEmpty
+                  ? null
+                  : () async {
+                      final child = await _pickChild(provider, 'Exporter les données de…');
+                      if (child != null && mounted) {
+                        ChildDataExportService.exportChild(context: context, provider: provider, child: child);
+                      }
+                    },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Droit a l'effacement
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.person_remove, color: Colors.red),
+              title: const Text('Effacer un élève et ses données', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              subtitle: const Text(
+                  'Droit à l\'effacement : fiche, observations, suivis, photos et notes vocales.',
+                  style: TextStyle(fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: provider.children.isEmpty ? null : () => _eraseChild(provider),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Duree de conservation : fin d'annee scolaire, archive puis repart a vide
+          SchoolYearCard(provider: provider),
           const SizedBox(height: 16),
 
           // Selective Reset
@@ -1067,6 +1129,100 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
         ],
       ),
     );
+  }
+
+  /// Choix d'un eleve, avec recherche par prenom ou nom.
+  Future<Child?> _pickChild(AppStateProvider provider, String title) {
+    var query = '';
+    return showDialog<Child>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setSt) {
+          final q = query.trim().toLowerCase();
+          final list = provider.children
+              .where((c) => q.isEmpty || '${c.firstname} ${c.lastname ?? ''}'.toLowerCase().contains(q))
+              .toList()
+            ..sort((a, b) => a.firstname.toLowerCase().compareTo(b.firstname.toLowerCase()));
+          return AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 420,
+              child: Column(
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Prénom ou nom',
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => setSt(() => query = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Scrollbar(
+                      thumbVisibility: true,
+                      child: ListView(
+                        children: [
+                          for (final c in list)
+                            ListTile(
+                              dense: true,
+                              title: Text('${c.firstname} ${c.lastname ?? ''}'.trim()),
+                              subtitle: c.group == null || c.group!.isEmpty ? null : Text(c.group!),
+                              onTap: () => Navigator.pop(dialogContext, c),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Droit a l'effacement : confirmation chiffree, sauvegarde, puis effacement.
+  Future<void> _eraseChild(AppStateProvider provider) async {
+    final child = await _pickChild(provider, 'Effacer les données de…');
+    if (child == null || !mounted) return;
+    final name = '${child.firstname} ${child.lastname ?? ''}'.trim();
+    final count = provider.activityCountForChild(child.id);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Effacer $name ?'),
+        content: Text(
+          'Seront effacés : sa fiche, ses $count observation(s), son suivi des sons et des '
+          'référentiels. Ses photos et notes vocales (sauf celles d\'une observation de groupe) '
+          'vont à la corbeille des médias, vidée après 60 jours.\n\n'
+          'Une sauvegarde est faite juste avant. Cet effacement ne peut pas être annulé depuis l\'écran.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Effacer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final erased = await provider.eraseChildData(child.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(erased < 0
+          ? 'Sauvegarde impossible : rien n\'a été effacé.'
+          : '$name et ses $erased observation(s) ont été effacés.'),
+      backgroundColor: erased < 0 ? Colors.orange : Colors.red,
+    ));
   }
 
   void _openResetDialog(BuildContext context, AppStateProvider provider) {

@@ -10,8 +10,8 @@ import '../utils/color_utils.dart';
 /// Badges QR des eleves et etiquettes QR des ateliers, rangees par domaine.
 /// Les QR des etapes de parcours sont dans l'ecran Parcours.
 ///
-/// Page de la barre laterale sur Mac et iPad ; sur iPhone, ouverte depuis le
-/// menu « ⋯ » de la barre du haut ([standalone] : barre de titre avec retour).
+/// Page de la barre laterale sur Mac et iPad ; sur iPhone, ouverte depuis
+/// Rapports > QR codes ([standalone] : barre de titre avec retour).
 class QrGeneratorScreen extends StatelessWidget {
   const QrGeneratorScreen({super.key, this.standalone = false});
 

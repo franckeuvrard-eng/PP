@@ -6,10 +6,10 @@ import 'package:petitpas/models/activity_type.dart';
 
 import 'support/app_harness.dart';
 
-/// iPhone : barre du bas, menu « ⋯ » et Scan & Go (choix du mode puis
+/// iPhone : barre du bas, tuile Rapports, Aide seule en haut et Scan & Go (choix du mode puis
 /// saisie manuelle enchainee).
 void main() {
-  testWidgets('barre du bas et menu du haut', (tester) async {
+  testWidgets('barre du bas, tuile Rapports et Aide seule en haut', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final (_, sync) = await pumpPetitPas(tester, prepare: (app) {
       app.markOnboardingDone();
@@ -23,12 +23,16 @@ void main() {
     expect(find.byTooltip('Scan Express'), findsNothing);
     expect(find.byTooltip('Rapports'), findsNothing);
 
-    await tester.tap(find.byTooltip('Plus'));
+    expect(find.byTooltip('Plus'), findsNothing);
+    expect(find.byTooltip('Aide'), findsOneWidget);
+
+    // Tuile Rapports de l'accueil, avec les QR codes.
+    await tester.tap(find.text('Rapports'));
     await tester.pumpAndSettle();
-    expect(find.text('Badges QR élèves'), findsOneWidget);
-    expect(find.text('Rapports'), findsOneWidget);
-    expect(find.text('Aide'), findsOneWidget);
-    await tester.tapAt(const Offset(10, 10));
+    await tester.scrollUntilVisible(find.text('QR codes'), 200);
+    expect(find.text('Badges élèves'), findsOneWidget);
+    expect(find.text('Étiquettes ateliers'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
     // Onglet Ateliers : entrees Espaces & Ateliers et Parcours.

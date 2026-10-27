@@ -9,6 +9,8 @@ import '../models/space.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
+import 'reports_screen.dart';
+import '../widgets/desktop_frame.dart';
 import 'edit_activity_log_screen.dart';
 import '../widgets/voice_note_play_button.dart';
 
@@ -82,6 +84,25 @@ class HomeDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+
+          // iPhone : les Rapports (et les QR codes) s'ouvrent d'ici ; sur Mac
+          // et iPad ils sont dans la barre laterale.
+          if (!usesDesktopLayout(MediaQuery.sizeOf(context).width)) ...[
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF4E9F3D),
+                  child: Icon(Icons.description, color: Colors.white),
+                ),
+                title: const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Plan de travail, suivi des parcours, QR codes, exports.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 20),
 

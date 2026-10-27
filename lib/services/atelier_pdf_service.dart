@@ -7,6 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../models/progression.dart';
 import '../data/eduscol_data.dart';
 import '../providers/app_provider.dart';
 import '../utils/pdf_text.dart';
@@ -191,6 +192,112 @@ class AtelierPdfService {
     );
 
     return doc.save();
+  }
+
+  /// Fiche d'un parcours : le parcours (sections, seuil de passage) puis
+  /// chacune de ses etapes, dans l'ordre, avec description, objectifs et
+  /// photos legendees.
+  static Future<Uint8List> buildParcoursBytes({
+    required AppStateProvider provider,
+    required Progression parcours,
+    required PdfPageFormat format,
+  }) async {
+    final settings = provider.classSettings;
+    final steps = provider.ateliersInProgressionOrdered(parcours.id);
+    String? threshold;
+    for (final s in provider.evaluationStatuses) {
+      if (s.id == parcours.minStatusId) threshold = s.label;
+    }
+
+    pw.Widget step(int i, ActivityType s) {
+      final tiles = <pw.Widget>[
+        for (final relPath in s.allPhotoPaths)
+          if (imageAt(provider, relPath) case final image?) photoTile(image, s.captionFor(relPath), width: 120),
+      ];
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Divider(color: PdfColors.grey400),
+          pw.Text(pdfSafe('Étape ${i + 1} - ${s.name}'),
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          if (s.domaine.isNotEmpty)
+            pw.Text(
+                'Domaine : ${pdfSafe(s.domaine)}'
+                '${EduscolData.subdomainById(s.sousDomaineId) == null ? '' : ' > ${pdfSafe(EduscolData.subdomainById(s.sousDomaineId)!.title)}'}',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+          if (s.description != null && s.description!.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(pdfSafe(s.description!.trim()), style: const pw.TextStyle(fontSize: 10)),
+          ],
+          if (s.objectifs.isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            ...s.objectifs.map((o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 9.5))),
+          ],
+          if (tiles.isNotEmpty) ...[
+            pw.SizedBox(height: 6),
+            pw.Wrap(spacing: 8, runSpacing: 8, children: tiles),
+          ],
+          pw.SizedBox(height: 8),
+        ],
+      );
+    }
+
+    final doc = pw.Document();
+    doc.addPage(pw.MultiPage(
+      pageFormat: format,
+      build: (context) => [
+        pw.Header(
+          level: 0,
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Fiche parcours - A petits pas',
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 11)),
+            ],
+          ),
+        ),
+        pw.Text(
+          '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
+          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
+        ),
+        pw.SizedBox(height: 14),
+        pw.Text(pdfSafe(parcours.name), style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        pw.Text('${steps.length} étape(s), à faire dans l\'ordre', style: const pw.TextStyle(fontSize: 11)),
+        pw.Text(
+            parcours.targetGroups.isEmpty
+                ? 'Sections : toute la classe'
+                : 'Sections : ${parcours.targetGroups.map(pdfSafe).join(', ')}',
+            style: const pw.TextStyle(fontSize: 11)),
+        if (threshold != null)
+          pw.Text('On passe à l\'étape suivante au niveau « ${pdfSafe(threshold)} »',
+              style: const pw.TextStyle(fontSize: 11)),
+        if (parcours.description != null && parcours.description!.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(pdfSafe(parcours.description!.trim()),
+              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+        ],
+        pw.SizedBox(height: 10),
+        if (steps.isEmpty)
+          pw.Text('Aucune étape pour l\'instant.', style: const pw.TextStyle(fontSize: 11))
+        else
+          for (final (i, s) in steps.indexed) step(i, s),
+      ],
+    ));
+    return doc.save();
+  }
+
+  static void openParcoursPreview(BuildContext context, AppStateProvider provider, Progression parcours) {
+    final safeName = parcours.name.replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '').trim().replaceAll(' ', '_');
+    openPdfViewer(
+      context,
+      title: 'Fiche - ${parcours.name}',
+      fileName: 'Parcours_${safeName.isEmpty ? 'sans_nom' : safeName}.pdf',
+      build: (format) => buildParcoursBytes(provider: provider, parcours: parcours, format: format),
+      shareSubject: 'Fiche parcours - ${parcours.name}',
+      shareBody: 'Veuillez trouver ci-joint la fiche du parcours ${parcours.name}.',
+    );
   }
 
   /// Ouvre l'apercu imprimable / partageable de la fiche atelier.

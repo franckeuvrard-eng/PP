@@ -107,6 +107,26 @@ void main() {
           isNotEmpty);
     });
 
+    test('plan de travail : filtre par statut, rapport des parcours a part', () async {
+      final lea = app.childById('lea')!;
+      final bande = app.activityTypeById('bande')!; // acquis
+      final droite = app.activityTypeById('droite')!; // jamais fait
+      const jamais = WorkPlanOptions(statusKeys: {WorkPlanOptions.noLog});
+      expect(MandatoryAteliersPdfService.includes(app, lea, droite, jamais), isTrue);
+      expect(MandatoryAteliersPdfService.includes(app, lea, bande, jamais), isFalse);
+      expect(MandatoryAteliersPdfService.includes(app, lea, bande, const WorkPlanOptions()), isTrue);
+      for (final o in [
+        const WorkPlanOptions(),
+        const WorkPlanOptions(showStatus: false, showCheckboxes: false),
+        WorkPlanOptions(parcoursIds: {'p'}, statusKeys: {WorkPlanOptions.noLog}),
+      ]) {
+        expect(
+            await MandatoryAteliersPdfService.buildParcoursBytes(
+                provider: app, children: [lea], format: PdfPageFormat.a4, options: o),
+            isNotEmpty);
+      }
+    });
+
     test('planches QR : badges, ateliers par domaine, etapes par parcours', () async {
       expect(await QrSheetsPdfService.badgesBytes(app, PdfPageFormat.a4), isNotEmpty);
       expect(await QrSheetsPdfService.ateliersBytes(app, PdfPageFormat.a4), isNotEmpty);

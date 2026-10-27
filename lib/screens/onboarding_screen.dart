@@ -45,7 +45,7 @@ const _tour = [
   _TourPage(Icons.home, 'Accueil', 'Votre journée en un coup d\'œil.', [
     'Le fil du jour liste les observations saisies aujourd\'hui ; touchez le crayon pour en modifier une.',
     '« Aujourd\'hui » compte les observations du jour, « Analyses » ouvre les statistiques.',
-    'Sur iPhone, l\'onglet Ateliers ouvre Espaces & Ateliers et Parcours ; le menu « ⋯ » en haut ouvre Badges QR, Rapports et l\'Aide. Sur Mac et iPad, tout est dans la barre latérale.',
+    'Sur iPhone, l\'onglet Ateliers ouvre Espaces & Ateliers et Parcours, et la tuile Rapports de l\'accueil ouvre les rapports et les QR codes. Sur Mac et iPad, tout est dans la barre latérale.',
     '« Rapports » regroupe le plan de travail, le suivi des parcours, les fiches PDF et les exports.',
     'Tirez vers le bas pour synchroniser avec vos autres appareils.',
   ]),
@@ -58,7 +58,7 @@ const _tour = [
   _TourPage(Icons.people, 'Élèves', 'Les fiches de la classe.', [
     'Chaque fiche regroupe le profil, l\'historique des activités et les acquis.',
     'Les filtres montrent qui attend encore une observation aujourd\'hui.',
-    'L\'icône PDF produit la fiche d\'un élève à partager avec sa famille.',
+    'Le rapport d\'un élève à partager avec sa famille se génère depuis Rapports.',
     'Ajoutez les élèves un par un, ou tous d\'un coup depuis un fichier Excel.',
   ]),
   _TourPage(Icons.print, 'Badges QR', 'Les étiquettes à imprimer.', [

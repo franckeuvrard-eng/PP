@@ -13,138 +13,213 @@ import 'atelier_eligibility_service.dart';
 import 'atelier_pdf_service.dart';
 import 'atelier_status_resolver.dart';
 
-/// Genere, pour un ou plusieurs eleves, la liste des ateliers obligatoires
-/// pour leur section avec leur statut courant : de quoi savoir, d'un coup
-/// d'oeil, ce qu'il reste a faire.
+/// Reglages d'un plan de travail (ateliers ou parcours), choisis avant
+/// l'export.
+class WorkPlanOptions {
+  /// Affiche le statut actuel sous le nom.
+  final bool showStatus;
+
+  /// Trois cases a cocher a la main sous chaque vignette.
+  final bool showCheckboxes;
+
+  /// Statuts a inclure (voir [WorkPlanOptions.keyOf]) ; null : tous.
+  final Set<String>? statusKeys;
+
+  /// Parcours a inclure (rapport des parcours) ; null : tous ceux que suit
+  /// la section de l'eleve.
+  final Set<String>? parcoursIds;
+
+  const WorkPlanOptions({
+    this.showStatus = true,
+    this.showCheckboxes = true,
+    this.statusKeys,
+    this.parcoursIds,
+  });
+
+  /// Cle de filtre d'un statut : l'identifiant du niveau d'evaluation, ou
+  /// [noLog] sans observation (« Jamais fait », ou observation sans niveau).
+  static const noLog = 'none';
+  static String keyOf(AtelierStatusSnapshot s) =>
+      s.statusId == null || s.statusId == 'sans_statut' ? noLog : s.statusId!;
+}
+
+/// Plans de travail par eleve, en paysage et en vignettes de meme hauteur :
+///  - [buildBytes] : les ateliers des espaces coches « plan de travail » pour
+///    la section de l'eleve ;
+///  - [buildParcoursBytes] : les etapes des parcours, rapport a part.
 class MandatoryAteliersPdfService {
+  static const _perRow = 4;
+  static const _imageHeight = 118.0;
+
   static Future<Uint8List> buildBytes({
     required AppStateProvider provider,
     required List<Child> children,
     required PdfPageFormat format,
+    WorkPlanOptions options = const WorkPlanOptions(),
   }) async {
-    final settings = provider.classSettings;
     final doc = pw.Document();
-
     for (final child in children) {
-      // Ateliers des espaces coches « plan de travail » pour la section.
-      final inSpaces = provider.activityTypes
+      final ateliers = provider.activityTypes
           .where((a) => !a.inProgression && a.isObligatoryForGroup(child.group))
           .toList();
-      // Les parcours ont leur propre page, dans l'ordre de leurs etapes :
-      // tous ceux que suit la section de l'eleve.
-      final byProgression = <String, List<ActivityType>>{
-        for (final p in provider.progressions)
-          if (p.concernsGroup(child.group) && provider.ateliersInProgressionOrdered(p.id).isNotEmpty)
-            p.id: provider.ateliersInProgressionOrdered(p.id),
-      };
-      final mandatory = [...inSpaces, for (final l in byProgression.values) ...l];
-
       final bySpace = <String, List<ActivityType>>{};
-      for (final atelier in inSpaces) {
-        (bySpace[atelier.spaceId] ??= []).add(atelier);
+      for (final a in ateliers) {
+        (bySpace[a.spaceId] ??= []).add(a);
       }
       final spaceIds = bySpace.keys.toList()
         ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
-      for (final list in bySpace.values) {
-        list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+      final groups = <(String, List<pw.Widget>)>[];
+      for (final spaceId in spaceIds) {
+        final list = bySpace[spaceId]!..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        final vignettes = <pw.Widget>[
+          for (final a in list)
+            if (_vignette(provider: provider, child: child, atelier: a, options: options) case final v?) v,
+        ];
+        if (vignettes.isNotEmpty) groups.add((provider.placeById(spaceId)?.name ?? 'Sans espace', vignettes));
       }
 
-      final progressionIds = byProgression.keys.toList()
-        ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
-
-      List<pw.Widget> header(String title) => [
-            pw.Header(
-              level: 0,
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('$title - A petits pas',
-                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                      style: const pw.TextStyle(fontSize: 11)),
-                ],
-              ),
-            ),
-            pw.Text(
-              '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
-              style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
-            ),
-            pw.SizedBox(height: 14),
-            pw.Text(pdfSafe('${child.firstname} ${child.lastname ?? ''}'.trim()),
-                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            if (child.group != null && child.group!.isNotEmpty)
-              pw.Text('Section : ${pdfSafe(child.group!)}', style: const pw.TextStyle(fontSize: 11)),
-            pw.SizedBox(height: 10),
-          ];
-
-      pw.Widget groupTitle(String id, String fallback) => pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
-            child: pw.Text(pdfSafe(provider.placeById(id)?.name ?? fallback),
-                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-          );
-
-      // Page des ateliers d'espaces, toujours presente (meme vide, elle dit
-      // qu'il n'y a rien a faire). La page des progressions n'existe que si
-      // la section a des jalons obligatoires.
-      if (inSpaces.isNotEmpty || byProgression.isEmpty) {
-        doc.addPage(
-          pw.MultiPage(
-            pageFormat: format,
-            build: (context) => [
-              ...header('Plan de travail'),
-              if (mandatory.isEmpty)
-                pw.Text('Aucun atelier dans le plan de travail de cette section.',
-                    style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700))
-              else
-                for (final spaceId in spaceIds) ...[
-                  groupTitle(spaceId, 'Sans espace'),
-                  ..._vignetteRows([
-                    for (final atelier in bySpace[spaceId]!)
-                      _vignette(provider: provider, child: child, atelier: atelier),
-                  ]),
-                ],
-            ],
-          ),
-        );
-      }
-
-      if (byProgression.isNotEmpty) {
-        doc.addPage(
-          pw.MultiPage(
-            pageFormat: format,
-            build: (context) => [
-              ...header('Plan de travail - Parcours'),
-              for (final progressionId in progressionIds) ...[
-                groupTitle(progressionId, 'Parcours'),
-                ..._vignetteRows([
-                  for (final (i, step) in byProgression[progressionId]!.indexed)
-                  _vignette(
-                    provider: provider,
-                    child: child,
-                    atelier: step,
-                    stepLabel: 'Étape ${i + 1}',
-                    // Une etape est cochee des qu'elle atteint le seuil de
-                    // passage du parcours, comme sur l'ecran Parcours.
-                    done: AtelierEligibilityService.meetsThreshold(provider, child.id, step.id,
-                        provider.progressionById(progressionId)?.minStatusId),
-                  ),
-                ]),
-              ],
-            ],
-          ),
-        );
-      }
+      _addChildPages(
+        doc,
+        provider,
+        format,
+        child,
+        title: 'Plan de travail',
+        groups: groups,
+        empty: ateliers.isEmpty
+            ? 'Aucun atelier dans le plan de travail de cette section.'
+            : 'Aucun atelier ne correspond aux statuts choisis.',
+      );
     }
-
     return doc.save();
   }
 
-  static const _perRow = 3;
+  static Future<Uint8List> buildParcoursBytes({
+    required AppStateProvider provider,
+    required List<Child> children,
+    required PdfPageFormat format,
+    WorkPlanOptions options = const WorkPlanOptions(),
+  }) async {
+    final doc = pw.Document();
+    for (final child in children) {
+      final parcours = provider.progressions
+          .where((p) => options.parcoursIds == null
+              ? p.concernsGroup(child.group)
+              : options.parcoursIds!.contains(p.id))
+          .toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-  /// Vignettes rangees par lignes de [_perRow] : chaque ligne est un bloc
-  /// que la page peut reporter a la suivante (une grille d'un seul tenant ne
-  /// se coupe pas entre deux pages).
-  static List<pw.Widget> _vignetteRows(List<pw.Widget> vignettes) => [
+      final groups = <(String, List<pw.Widget>)>[];
+      for (final p in parcours) {
+        final steps = provider.ateliersInProgressionOrdered(p.id);
+        final vignettes = <pw.Widget>[
+          for (final (i, s) in steps.indexed)
+            if (_vignette(
+              provider: provider,
+              child: child,
+              atelier: s,
+              options: options,
+              stepLabel: 'Étape ${i + 1}',
+              // Etape validee des qu'elle atteint le seuil du parcours.
+              done: AtelierEligibilityService.meetsThreshold(provider, child.id, s.id, p.minStatusId),
+            )
+                case final v?)
+              v,
+        ];
+        if (vignettes.isNotEmpty) groups.add((p.name, vignettes));
+      }
+
+      _addChildPages(
+        doc,
+        provider,
+        format,
+        child,
+        title: 'Parcours',
+        groups: groups,
+        empty: parcours.isEmpty
+            ? 'Aucun parcours pour cet élève.'
+            : 'Aucune étape ne correspond aux statuts choisis.',
+      );
+    }
+    return doc.save();
+  }
+
+  /// Pages d'un eleve : en-tete, puis chaque groupe (espace ou parcours).
+  /// Le titre d'un groupe et sa premiere ligne de vignettes forment un bloc
+  /// insecable : un titre ne reste jamais seul en bas de page.
+  static void _addChildPages(
+    pw.Document doc,
+    AppStateProvider provider,
+    PdfPageFormat format,
+    Child child, {
+    required String title,
+    required List<(String, List<pw.Widget>)> groups,
+    required String empty,
+  }) {
+    final settings = provider.classSettings;
+    doc.addPage(pw.MultiPage(
+      pageFormat: format.landscape,
+      margin: const pw.EdgeInsets.all(28),
+      header: (context) => pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 10),
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)),
+        ),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(pdfSafe('$title - ${child.firstname} ${child.lastname ?? ''}'.trim()),
+                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    [
+                      if (child.group != null && child.group!.isNotEmpty) 'Section ${child.group}',
+                      settings.name,
+                      settings.schoolYear,
+                    ].map(pdfSafe).join(' - '),
+                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
+                  ),
+                ],
+              ),
+            ),
+            pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+      build: (context) {
+        if (groups.isEmpty) {
+          return [pw.Text(empty, style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700))];
+        }
+        final out = <pw.Widget>[];
+        for (final (name, vignettes) in groups) {
+          final rows = _rows(vignettes);
+          // Bloc insecable : une Column (et un Container, qui en herite) peut
+          // etre coupee entre deux pages par MultiPage.
+          out.add(pw.Inseparable(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 6, bottom: 6),
+                  child: pw.Text(pdfSafe(name), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                ),
+                rows.first,
+              ],
+            ),
+          ));
+          out.addAll(rows.skip(1));
+        }
+        return out;
+      },
+    ));
+  }
+
+  /// Lignes de [_perRow] vignettes, chacune insecable.
+  static List<pw.Widget> _rows(List<pw.Widget> vignettes) => [
         for (var i = 0; i < vignettes.length; i += _perRow)
           pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 10),
@@ -160,17 +235,31 @@ class MandatoryAteliersPdfService {
           ),
       ];
 
-  /// Vignette d'un atelier (ou d'une etape) pour un eleve : la photo en
-  /// grand, le nom, le statut courant (bordure verte une fois acquis, seuil
-  /// du parcours pour une etape) et trois cases que l'eleve coche a la main a
-  /// chaque passage. La photo dit quoi faire a un enfant qui ne lit pas.
-  static pw.Widget _vignette({
+  /// Vrai si le statut actuel de l'atelier pour cet eleve fait partie des
+  /// statuts retenus.
+  static bool includes(AppStateProvider provider, Child child, ActivityType atelier, WorkPlanOptions options) {
+    if (options.statusKeys == null) return true;
+    final snapshot = AtelierStatusResolver.resolve(provider: provider, childId: child.id, activityTypeId: atelier.id);
+    return options.statusKeys!.contains(WorkPlanOptions.keyOf(snapshot));
+  }
+
+  /// Hauteur commune de toutes les vignettes d'un export : elle ne depend que
+  /// des reglages, jamais du contenu (nombre de photos, longueur du nom).
+  static double _height(WorkPlanOptions o, {required bool step}) =>
+      _imageHeight + 8 + (step ? 11 : 0) + 28 + (o.showStatus ? 13 : 0) + (o.showCheckboxes ? 30 : 0) + 10;
+
+  /// Vignette d'un atelier (ou d'une etape) pour un eleve, ou null si son
+  /// statut n'est pas retenu : toutes les photos, le nom, le statut et trois
+  /// cases a cocher selon les reglages ; bordure verte une fois acquis.
+  static pw.Widget? _vignette({
     required AppStateProvider provider,
     required Child child,
     required ActivityType atelier,
+    required WorkPlanOptions options,
     String? stepLabel,
     bool? done,
   }) {
+    if (!includes(provider, child, atelier, options)) return null;
     final snapshot = AtelierStatusResolver.resolve(
       provider: provider,
       childId: child.id,
@@ -183,6 +272,7 @@ class MandatoryAteliersPdfService {
     final initial = atelier.name.trim().isEmpty ? '?' : atelier.name.trim()[0].toUpperCase();
 
     return pw.Container(
+      height: _height(options, step: stepLabel != null),
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: acquis ? PdfColors.green700 : atelierColor, width: acquis ? 2 : 1.2),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
@@ -190,10 +280,9 @@ class MandatoryAteliersPdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          // Toutes les photos, entieres (ou pastille a l'initiale). Zone plus
-          // haute au-dela de 4 photos pour qu'elles restent lisibles.
+          // Toutes les photos, entieres (ou pastille a l'initiale).
           pw.Container(
-            height: images.length > 4 ? 170 : 120,
+            height: _imageHeight,
             padding: const pw.EdgeInsets.all(4),
             decoration: pw.BoxDecoration(
               color: images.isEmpty ? atelierColor : null,
@@ -209,35 +298,48 @@ class MandatoryAteliersPdfService {
                     style: pw.TextStyle(fontSize: 54, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
           ),
           pw.Padding(
-            padding: const pw.EdgeInsets.fromLTRB(8, 6, 8, 8),
+            padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 0),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 if (stepLabel != null)
-                  pw.Text(pdfSafe(stepLabel),
-                      style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: atelierColor)),
-                pw.Text(pdfSafe(atelier.name),
-                    maxLines: 2, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 2),
-                pw.Text(pdfSafe(acquis ? '${snapshot.label} - fait !' : snapshot.label),
-                    maxLines: 1,
-                    style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: statusColor)),
-                pw.SizedBox(height: 6),
-                // Trois passages a cocher a la main, sur la feuille.
-                pw.Row(
-                  children: [
-                    for (var k = 0; k < 3; k++)
-                      pw.Container(
-                        width: 22,
-                        height: 22,
-                        margin: const pw.EdgeInsets.only(right: 8),
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border.all(color: PdfColors.grey700, width: 1.5),
-                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-                        ),
-                      ),
-                  ],
+                  pw.SizedBox(
+                    height: 11,
+                    child: pw.Text(pdfSafe(stepLabel),
+                        style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: atelierColor)),
+                  ),
+                // Nom sur deux lignes au plus, place reservee meme s'il est court.
+                pw.SizedBox(
+                  height: 28,
+                  child: pw.Text(pdfSafe(atelier.name),
+                      maxLines: 2, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                 ),
+                if (options.showStatus)
+                  pw.SizedBox(
+                    height: 13,
+                    child: pw.Text(pdfSafe(acquis ? '${snapshot.label} - fait !' : snapshot.label),
+                        maxLines: 1,
+                        style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: statusColor)),
+                  ),
+                if (options.showCheckboxes)
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 6),
+                    // Trois passages a cocher a la main, sur la feuille.
+                    child: pw.Row(
+                      children: [
+                        for (var k = 0; k < 3; k++)
+                          pw.Container(
+                            width: 22,
+                            height: 22,
+                            margin: const pw.EdgeInsets.only(right: 8),
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border.all(color: PdfColors.grey700, width: 1.5),
+                              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -254,25 +356,44 @@ class MandatoryAteliersPdfService {
     }
   }
 
-  /// Ouvre l'apercu imprimable / partageable du rapport, pour un ou plusieurs
-  /// eleves (une page par eleve).
+  static String _fileLabel(List<Child> children) {
+    final label = children.length == 1 ? children.first.firstname : '${children.length}_eleves';
+    final safe = label.replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '').trim().replaceAll(' ', '_');
+    return safe.isEmpty ? 'eleves' : safe;
+  }
+
+  /// Apercu imprimable / partageable du plan de travail (ateliers).
   static void exportForChildren({
     required BuildContext context,
     required AppStateProvider provider,
     required List<Child> children,
+    WorkPlanOptions options = const WorkPlanOptions(),
   }) {
-    final label = children.length == 1
-        ? children.first.firstname
-        : '${children.length}_eleves';
-    final safeLabel = label.replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '').trim().replaceAll(' ', '_');
-
     openPdfViewer(
       context,
       title: 'Plan de travail',
-      fileName: 'Plan_de_travail_${safeLabel.isEmpty ? 'eleves' : safeLabel}.pdf',
-      build: (format) => buildBytes(provider: provider, children: children, format: format),
+      fileName: 'Plan_de_travail_${_fileLabel(children)}.pdf',
+      build: (format) => buildBytes(provider: provider, children: children, format: format, options: options),
       shareSubject: 'Plan de travail - A petits pas',
       shareBody: 'Veuillez trouver ci-joint le plan de travail.',
+    );
+  }
+
+  /// Apercu imprimable / partageable du plan des parcours.
+  static void exportParcoursForChildren({
+    required BuildContext context,
+    required AppStateProvider provider,
+    required List<Child> children,
+    WorkPlanOptions options = const WorkPlanOptions(),
+  }) {
+    openPdfViewer(
+      context,
+      title: 'Parcours des élèves',
+      fileName: 'Parcours_${_fileLabel(children)}.pdf',
+      build: (format) =>
+          buildParcoursBytes(provider: provider, children: children, format: format, options: options),
+      shareSubject: 'Parcours - A petits pas',
+      shareBody: 'Veuillez trouver ci-joint les parcours.',
     );
   }
 }
