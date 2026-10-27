@@ -147,6 +147,16 @@ class _ProgressionCard extends StatelessWidget {
               onPressed: () => _openEditor(context, progression: progression),
             ),
             IconButton(
+              icon: const Icon(Icons.copy, color: Colors.grey, size: 20),
+              tooltip: 'Dupliquer le parcours et ses étapes',
+              onPressed: () {
+                final copy = provider.duplicateProgression(progression.id);
+                if (copy == null) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('« ${copy.name} » créé avec ${jalons.length} étape(s).')));
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
               tooltip: 'Supprimer le parcours',
               onPressed: () => _confirmDelete(context, provider, jalons.length),

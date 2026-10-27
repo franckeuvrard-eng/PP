@@ -136,6 +136,16 @@ class SpacesWorkshopsTab extends StatelessWidget {
                       onPressed: () => _openSpaceEditor(context, space: space),
                     ),
                     IconButton(
+                      icon: const Icon(Icons.copy, color: Colors.grey, size: 20),
+                      tooltip: 'Dupliquer l\'espace et ses ateliers',
+                      onPressed: () {
+                        final copy = provider.duplicateSpace(space.id);
+                        if (copy == null) return;
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('« ${copy.name} » créé avec ${ateliersInSpace.length} atelier(s).')));
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.delete_outline,
                           color: Colors.red, size: 20),
                       tooltip: 'Supprimer l\'espace',

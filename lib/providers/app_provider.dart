@@ -1811,6 +1811,64 @@ class AppStateProvider extends ChangeNotifier {
 
   void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
 
+  // ─── DUPLICATION ───
+  // Une copie reprend tout le contenu (description, objectifs, photos et
+  // legendes, reglages) mais aucune observation : elle demarre vierge. Les
+  // photos sont partagees avec l'original (memes fichiers) : supprimer l'un
+  // ne les efface pas tant que l'autre s'en sert.
+
+  int _dupSeq = 0;
+  String _newId(String prefix) => '${prefix}_${DateTime.now().microsecondsSinceEpoch}_${_dupSeq++}';
+
+  /// Duplique un atelier (ou une etape, ajoutee en fin de son parcours).
+  ActivityType? duplicateActivityType(String id, {String? spaceId, String? progressionId, bool keepName = false}) {
+    final src = activityTypeById(id);
+    if (src == null) return null;
+    final inProgression = progressionId != null || (spaceId == null && src.inProgression);
+    final targetProgression = progressionId ?? (inProgression ? src.progressionId : null);
+    final copy = src.copyWith(
+      id: _newId('act'),
+      name: keepName ? src.name : '${src.name} (copie)',
+      spaceId: inProgression ? '' : (spaceId ?? src.spaceId),
+      progressionId: targetProgression,
+      position: inProgression ? nextPositionInProgression(targetProgression!) : -1,
+    );
+    saveActivityType(copy);
+    return copy;
+  }
+
+  /// Duplique un espace avec tous ses ateliers.
+  Space? duplicateSpace(String id) {
+    final src = spaceById(id);
+    if (src == null) return null;
+    final copy = src.copyWith(id: _newId('space'), name: '${src.name} (copie)');
+    addOrUpdateSpace(copy);
+    for (final a in ateliersInSpace(id)) {
+      duplicateActivityType(a.id, spaceId: copy.id, keepName: true);
+    }
+    return copy;
+  }
+
+  /// Duplique un parcours avec ses etapes, dans le meme ordre.
+  Progression? duplicateProgression(String id) {
+    final src = progressionById(id);
+    if (src == null) return null;
+    final copy = Progression(
+      id: _newId('prog'),
+      name: '${src.name} (copie)',
+      colorHex: src.colorHex,
+      iconName: src.iconName,
+      description: src.description,
+      minStatusId: src.minStatusId,
+      targetGroups: src.targetGroups,
+    );
+    saveProgression(copy);
+    for (final s in ateliersInProgressionOrdered(id)) {
+      duplicateActivityType(s.id, progressionId: copy.id, keepName: true);
+    }
+    return copy;
+  }
+
   /// Desactive (ou reactive) un atelier sans toucher a ses observations.
   void setActivityTypeDisabled(String id, bool disabled) {
     final current = activityTypeById(id);

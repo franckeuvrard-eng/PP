@@ -114,6 +114,8 @@ class HelpScreen extends StatelessWidget {
             steps: [
               'Un parcours est une suite d\'étapes à faire dans l\'ordre (par exemple : couper une bande, puis une ligne droite, puis une courbe). Ce n\'est pas un atelier : il n\'est rangé dans aucun espace.',
               'Créez-le dans Parcours > onglet Gérer, choisissez le seuil de passage, les sections qui le suivent, puis ajoutez ses étapes avec « Ajouter une étape ». Glissez la poignée ⠿ pour changer leur ordre.',
+              'Dupliquer : l\'icône « copier » d\'un parcours en fait une copie avec toutes ses étapes ; de même pour un espace (avec ses ateliers) et, depuis sa fiche, pour un atelier ou une étape. La copie reprend description, objectifs et photos, sans les observations.',
+              'À surveiller (carte de l\'accueil) : pour chaque élève, les domaines sans observation depuis 2, 3 ou 4 semaines ; et la part du programme travaillée par vos ateliers, avec les objectifs qui n\'en ont aucun.',
               'Sections : sans section cochée, toute la classe suit le parcours. Sinon seuls les élèves de ces sections apparaissent dans le suivi, le plan de travail et le rapport des parcours.',
               'Une étape reste verrouillée pour un élève tant que la précédente n\'a pas atteint le seuil de passage.',
               'L\'écran Parcours (barre latérale sur Mac et iPad, onglet Ateliers sur iPhone) montre le fil : où en est la classe, ou un élève. L\'onglet Parcours de la fiche élève montre la même chose pour lui.',

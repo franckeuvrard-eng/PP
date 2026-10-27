@@ -10,6 +10,8 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'reports_screen.dart';
+import 'coverage_screen.dart';
+import '../services/coverage_service.dart';
 import '../widgets/desktop_frame.dart';
 import 'edit_activity_log_screen.dart';
 import '../widgets/voice_note_play_button.dart';
@@ -84,6 +86,36 @@ class HomeDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+
+          // A surveiller : domaines delaisses et programme non couvert.
+          Builder(builder: (context) {
+            final gaps = CoverageService.domainGaps(provider);
+            final childCount = {for (final g in gaps) g.child.id}.length;
+            final (done, total) = CoverageService.objectiveCoverage(provider);
+            return Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: childCount > 0 ? Colors.orange : const Color(0xFF4E9F3D),
+                    child: Icon(childCount > 0 ? Icons.notification_important : Icons.task_alt,
+                        color: Colors.white),
+                  ),
+                  title: const Text('À surveiller', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text([
+                    childCount == 0
+                        ? 'Chaque élève a été vu dans chaque domaine ces 3 semaines.'
+                        : '$childCount élève(s) sans observation depuis 3 semaines dans un domaine.',
+                    'Programme : $done objectifs sur $total travaillés.',
+                  ].join('\n')),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CoverageScreen())),
+                ),
+              ),
+            );
+          }),
 
           // iPhone : les Rapports (et les QR codes) s'ouvrent d'ici ; sur Mac
           // et iPad ils sont dans la barre laterale.

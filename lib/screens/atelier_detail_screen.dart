@@ -62,6 +62,19 @@ class AtelierDetailScreen extends StatelessWidget {
                 onPressed: () => AtelierPdfService.openPreview(context, provider, current),
               ),
               IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: current.inProgression ? "Dupliquer l'étape" : "Dupliquer l'atelier",
+                onPressed: () {
+                  final copy = provider.duplicateActivityType(current.id);
+                  if (copy == null) return;
+                  // Ouvre la copie, prete a etre renommee ou modifiee.
+                  Navigator.pushReplacement(
+                      context, MaterialPageRoute(builder: (_) => AtelierDetailScreen(atelier: copy)));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('« ${copy.name} » créé (sans les observations).')));
+                },
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit),
                 tooltip: 'Modifier',
                 onPressed: () => Navigator.push(

@@ -23,6 +23,21 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.7.1',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.notification_important, 'À surveiller',
+          'Une carte de l\'accueil signale les élèves qui n\'ont rien eu dans un domaine depuis '
+              'quelques semaines, et la part du programme travaillée par vos ateliers, avec les '
+              'objectifs qui n\'en ont encore aucun.'),
+      ReleaseItem(Icons.copy, 'Dupliquer',
+          'Copiez un parcours avec ses étapes, un espace avec ses ateliers, ou un seul atelier : '
+              'tout est repris (objectifs, photos), sans les observations.'),
+      ReleaseItem(Icons.palette, 'Une nouvelle icône',
+          'La même empreinte de mains et de feuilles, sur un fond crème plus doux.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.7.0',
     date: 'Octobre 2026',
     items: [
