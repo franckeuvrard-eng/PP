@@ -38,6 +38,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>A petits pas utilise la caméra pour scanner les QR Codes des élèves et des ateliers en classe, ainsi que pour prendre des photos des activités.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>A petits pas transforme votre voix en texte quand vous dictez une observation ou une description.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>A petits pas a besoin d'accéder au microphone pour la prise de vidéo avec la caméra et pour enregistrer des notes vocales sur les observations.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

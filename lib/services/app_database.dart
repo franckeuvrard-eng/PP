@@ -11,6 +11,9 @@ import '../models/child.dart';
 import '../models/class_settings.dart';
 import '../models/evaluation_status.dart';
 import '../models/progression.dart';
+import '../models/need_group.dart';
+import '../models/carnet_entry.dart';
+import '../models/planning_slot.dart';
 import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../models/space.dart';
@@ -35,7 +38,7 @@ class AppDatabase {
   /// Version du schema. **Toute evolution passe par [_migrate]**, jamais par une
   /// retouche de [_createV1] : les installations deja deployees ne rejouent que
   /// les migrations manquantes.
-  static const _schemaVersion = 6;
+  static const _schemaVersion = 9;
 
   /// Tables « entite » : cle primaire texte + JSON.
   ///
@@ -171,6 +174,25 @@ class AppDatabase {
           'CREATE TABLE IF NOT EXISTS progressions '
           '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
         );
+      case 7:
+        // Groupes de besoin (eleves reunis pour retravailler la meme chose).
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS need_groups '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
+      case 8:
+        // Carnet de suivi : commentaires par periode et synthese de fin de
+        // maternelle, saisis par l'enseignant.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS carnets '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
+      case 9:
+        // Planning des ateliers : un creneau par jour et par groupe.
+        await db.execute(
+          'CREATE TABLE IF NOT EXISTS planning '
+          '(id TEXT PRIMARY KEY, data TEXT NOT NULL)',
+        );
       default:
         throw StateError('Migration manquante vers la version $version');
     }
@@ -214,6 +236,21 @@ class AppDatabase {
       (await _readAll('progressions')).map(Progression.fromMap).toList();
   Future<void> saveProgression(Progression p) => _upsert('progressions', p.id, p.toMap());
   Future<void> deleteProgression(String id) => _delete('progressions', id);
+
+  Future<List<NeedGroup>> readNeedGroups() async =>
+      (await _readAll('need_groups')).map(NeedGroup.fromMap).toList();
+  Future<void> saveNeedGroup(NeedGroup g) => _upsert('need_groups', g.id, g.toMap());
+  Future<void> deleteNeedGroup(String id) => _delete('need_groups', id);
+
+  Future<List<CarnetEntry>> readCarnets() async =>
+      (await _readAll('carnets')).map(CarnetEntry.fromMap).toList();
+  Future<void> saveCarnet(CarnetEntry e) => _upsert('carnets', e.id, e.toMap());
+  Future<void> deleteCarnet(String id) => _delete('carnets', id);
+
+  Future<List<PlanningSlot>> readPlanning() async =>
+      (await _readAll('planning')).map(PlanningSlot.fromMap).toList();
+  Future<void> savePlanningSlot(PlanningSlot slot) => _upsert('planning', slot.id, slot.toMap());
+  Future<void> deletePlanningSlot(String id) => _delete('planning', id);
 
   Future<List<ActivityType>> readActivityTypes() async =>
       (await _readAll('activity_types')).map(ActivityType.fromMap).toList();
@@ -488,6 +525,9 @@ class AppDatabase {
     required List<EvaluationStatus> evaluationStatuses,
     required Map<String, Map<String, SonStatut>> sons,
     List<Progression> progressions = const [],
+    List<NeedGroup> needGroups = const [],
+    List<CarnetEntry> carnets = const [],
+    List<PlanningSlot> planning = const [],
   }) async {
     final db = await _database;
     // Une transaction unique : une restauration interrompue ne doit pas
@@ -513,6 +553,18 @@ class AppDatabase {
       await txn.delete('progressions');
       for (final p in progressions) {
         await txn.insert('progressions', {'id': p.id, 'data': json.encode(p.toMap())});
+      }
+      await txn.delete('need_groups');
+      for (final g in needGroups) {
+        await txn.insert('need_groups', {'id': g.id, 'data': json.encode(g.toMap())});
+      }
+      await txn.delete('carnets');
+      for (final e in carnets) {
+        await txn.insert('carnets', {'id': e.id, 'data': json.encode(e.toMap())});
+      }
+      await txn.delete('planning');
+      for (final slot in planning) {
+        await txn.insert('planning', {'id': slot.id, 'data': json.encode(slot.toMap())});
       }
       sons.forEach((childId, entries) {
         entries.forEach((son, statut) {

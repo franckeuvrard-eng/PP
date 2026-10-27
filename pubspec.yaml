@@ -3,7 +3,7 @@ description: Application iOS de suivi d'activités petite enfance et maternelle 
 # Flutter version: 3.47.7 - Mon Suivi Maternelle
 publish_to: 'none'
 
-version: 1.7.1+12
+version: 1.8.0+13
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -49,6 +49,7 @@ dependencies:
     path: packages/petitpas_icloud
   pasteboard: ^0.6.0
   image: ^4.3.0
+  speech_to_text: ^7.5.0
 
 dev_dependencies:
   flutter_test:

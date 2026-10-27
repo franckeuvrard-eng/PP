@@ -13,6 +13,7 @@ Future<WorkPlanOptions?> showWorkPlanOptionsDialog(
 }) {
   var showStatus = true;
   var showCheckboxes = true;
+  var onlyPlanned = false;
   // Statuts : niveaux d'evaluation + « jamais fait ». Tous coches au depart.
   final statusOptions = <(String, String, String)>[
     (WorkPlanOptions.noLog, 'Jamais fait', '#9E9E9E'),
@@ -42,6 +43,13 @@ Future<WorkPlanOptions?> showWorkPlanOptionsDialog(
                   subtitle: const Text('Sous le nom de chaque vignette'),
                   value: showStatus,
                   onChanged: (v) => setSt(() => showStatus = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Seulement ce qui est prévu cette semaine'),
+                  subtitle: const Text('D’après le planning, pour chaque élève'),
+                  value: onlyPlanned,
+                  onChanged: (v) => setSt(() => onlyPlanned = v),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -110,6 +118,7 @@ Future<WorkPlanOptions?> showWorkPlanOptionsDialog(
                         // Tous coches : pas de filtre (un niveau ajoute plus tard reste inclus).
                         statusKeys: statuses.length == statusOptions.length ? null : Set.of(statuses),
                         parcoursIds: parcours.isEmpty ? null : Set.of(parcours),
+                        onlyPlannedThisWeek: onlyPlanned,
                       ),
                     ),
           ),

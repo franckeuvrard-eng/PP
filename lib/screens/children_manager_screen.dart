@@ -7,6 +7,7 @@ import '../providers/app_provider.dart';
 import '../models/child.dart';
 import '../utils/color_utils.dart';
 import 'child_profile_screen.dart';
+import 'need_groups_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
 
@@ -126,6 +127,13 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.groups, size: 18),
+                        label: Text('Groupes de besoin (${provider.needGroups.length})'),
+                        onPressed: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => const NeedGroupsScreen())),
+                      ),
+                      const SizedBox(width: 8),
                       FilterChip(
                         label: Text('Tous (${allChildren.length})'),
                         selected: _filterMode == ChildFilterMode.all,

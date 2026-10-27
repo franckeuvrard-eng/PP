@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/dictation_button.dart';
 import '../widgets/photo_thumb.dart';
 import '../providers/app_provider.dart';
 import '../models/activity_type.dart';
@@ -834,9 +835,10 @@ class _AtelierEditScreenState extends State<AtelierEditScreen> {
                 children: [
                   TextField(
                     controller: _descCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Description de l\'activité (optionnel)',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: DictationButton(controller: _descCtrl),
                     ),
                     maxLines: 2,
                   ),

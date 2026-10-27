@@ -74,6 +74,43 @@ class HelpScreen extends StatelessWidget {
             ],
           ),
           _HelpSection(
+            icon: Icons.child_care,
+            title: 'Mode élève (tablette)',
+            steps: [
+              'Scan & Go > « Mode élève » (sur Mac et iPad : bouton « Mode élève » en haut de Scan & Go). L\'enfant touche sa photo (ou scanne son badge), puis l\'atelier qu\'il a fait : les ateliers prévus pour lui aujourd\'hui sont marqués d\'une étoile, les étapes verrouillées ne sont pas proposées.',
+              'La saisie part « à valider », sans niveau. La carte « À valider » de l\'accueil liste les saisies : touchez le niveau atteint, ou supprimez une saisie erronée.',
+              'Pour quitter le mode élève : bouton « Adulte » en haut, puis Face ID ou le code de l\'appareil.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.calendar_view_week,
+            title: 'Planning de la semaine',
+            steps: [
+              'Planning (barre latérale sur Mac et iPad, onglet Ateliers sur iPhone) : pour chaque jour, ajoutez un créneau, choisissez pour qui (toute la classe, une section, un groupe de besoin) et quels ateliers ou étapes.',
+              'Rotation : choisissez des groupes, des jours et des ateliers ; chaque groupe passe à l\'atelier suivant le jour d\'après. « Reprendre la semaine précédente » recopie la semaine d\'avant ; l\'icône PDF imprime le tableau de la semaine.',
+              'Dans Scan & Go, les ateliers prévus aujourd\'hui pour l\'élève sont en tête ; le plan de travail peut ne garder que ce qui est prévu cette semaine.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.menu_book,
+            title: 'Carnet de suivi et synthèse',
+            steps: [
+              'Rapports > Carnet de suivi : choisissez l\'élève (flèches pour passer au suivant) et la période (P1 à P5, dates modifiables). Pour chaque domaine, l\'appli montre les réussites de la période (dernière observation de chaque atelier au niveau le plus abouti) ; ajoutez votre commentaire, au clavier ou en dictée.',
+              'Le PDF reprend les réussites avec leurs photos, vos commentaires, un espace pour le mot de la famille et les signatures.',
+              'Rapports > Synthèse de fin de maternelle : pour chaque sous-domaine du programme, « ne réussit pas encore », « est en voie de réussite » ou « réussit souvent ». L\'appli suggère un niveau d\'après les observations de l\'année ; « Appliquer les suggestions » les reprend d\'un coup. Ajoutez points forts et besoins.',
+              'Dictée : le micro à droite d\'un champ (note d\'observation, description, commentaires) transforme la voix en texte ; touchez-le de nouveau pour arrêter.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.groups,
+            title: 'Groupes de besoin',
+            steps: [
+              'Élèves > Groupes de besoin. L\'onglet Suggestions propose des groupes tirés des observations : les élèves arrivés à la même étape d\'un parcours, ceux au même niveau sur un atelier (hors le niveau le plus abouti), ceux qui n\'ont jamais fait un atelier de leur plan de travail.',
+              '« Enregistrer le groupe » le garde dans Mes groupes ; on peut aussi en créer un à la main, le renommer, changer sa couleur et ses élèves.',
+              'Un groupe se coche d\'un geste partout où l\'on choisit des élèves : « Enregistrer aussi pour » dans Scan & Go, et les rapports (plan de travail, parcours, rapport des élèves). Les sections aussi.',
+            ],
+          ),
+          _HelpSection(
             icon: Icons.qr_code_scanner,
             title: 'Scan & Go : enregistrer une observation',
             steps: [

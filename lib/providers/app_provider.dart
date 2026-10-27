@@ -22,6 +22,9 @@ import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import '../models/progression.dart';
+import '../models/need_group.dart';
+import '../models/carnet_entry.dart';
+import '../models/planning_slot.dart';
 import '../services/app_database.dart';
 import '../services/progression_migration.dart';
 import '../services/reminder_service.dart';
@@ -199,6 +202,123 @@ class AppStateProvider extends ChangeNotifier {
   List<Progression> _progressions = [];
   List<Progression> get progressions => List.unmodifiable(_progressions);
 
+  /// Groupes de besoin enregistres, par nom.
+  List<NeedGroup> _needGroups = [];
+  List<NeedGroup> get needGroups => List.unmodifiable(
+      _needGroups.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
+
+  NeedGroup? needGroupById(String? id) {
+    for (final g in _needGroups) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  void saveNeedGroup(NeedGroup group) {
+    final i = _needGroups.indexWhere((g) => g.id == group.id);
+    if (i >= 0) {
+      _needGroups[i] = group;
+    } else {
+      _needGroups.add(group);
+    }
+    _write(_db.saveNeedGroup(group));
+    _notify();
+  }
+
+  void deleteNeedGroup(String id) {
+    _needGroups.removeWhere((g) => g.id == id);
+    _write(_db.deleteNeedGroup(id));
+    _notify();
+  }
+
+  /// Carnet de suivi : saisies de l'enseignant par eleve et par periode.
+  List<CarnetEntry> _carnets = [];
+
+  CarnetEntry carnetFor(String childId, String period) {
+    final id = CarnetEntry.idFor(childId, period);
+    for (final e in _carnets) {
+      if (e.id == id) return e;
+    }
+    return CarnetEntry(childId: childId, period: period);
+  }
+
+  void saveCarnet(CarnetEntry entry) {
+    final i = _carnets.indexWhere((e) => e.id == entry.id);
+    if (i >= 0) {
+      _carnets[i] = entry;
+    } else {
+      _carnets.add(entry);
+    }
+    _write(_db.saveCarnet(entry));
+    _notify();
+  }
+
+  /// Planning des ateliers : creneaux par jour et par groupe.
+  List<PlanningSlot> _planning = [];
+
+  List<PlanningSlot> planningForWeek(String week) =>
+      _planning.where((s) => s.week == week).toList()..sort((a, b) => a.day.compareTo(b.day));
+
+  void savePlanningSlot(PlanningSlot slot) {
+    final i = _planning.indexWhere((s) => s.id == slot.id);
+    if (i >= 0) {
+      _planning[i] = slot;
+    } else {
+      _planning.add(slot);
+    }
+    _write(_db.savePlanningSlot(slot));
+    _notify();
+  }
+
+  void deletePlanningSlot(String id) {
+    _planning.removeWhere((s) => s.id == id);
+    _write(_db.deletePlanningSlot(id));
+    _notify();
+  }
+
+  /// Vrai si le creneau concerne cet eleve (toute la classe, sa section ou
+  /// un de ses groupes de besoin).
+  bool slotConcerns(PlanningSlot slot, Child child) {
+    if (slot.target == PlanningSlot.allClass) return true;
+    if (slot.target.startsWith('section:')) return child.group == slot.target.substring(8);
+    if (slot.target.startsWith('group:')) {
+      return needGroupById(slot.target.substring(6))?.childIds.contains(child.id) ?? false;
+    }
+    return false;
+  }
+
+  /// Ateliers prevus pour l'eleve un jour donne.
+  Set<String> plannedAteliersFor(Child child, DateTime day) => {
+        for (final s in _planning)
+          if (s.week == PlanningSlot.weekOf(day) && s.day == day.weekday && slotConcerns(s, child))
+            ...s.atelierIds,
+      };
+
+  /// Ateliers prevus pour l'eleve dans la semaine de [day].
+  Set<String> plannedAteliersForWeek(Child child, DateTime day) => {
+        for (final s in _planning)
+          if (s.week == PlanningSlot.weekOf(day) && slotConcerns(s, child)) ...s.atelierIds,
+      };
+
+  /// Libelle d'une cible de creneau.
+  String planningTargetLabel(String target) {
+    if (target == PlanningSlot.allClass) return 'Toute la classe';
+    if (target.startsWith('section:')) return target.substring(8);
+    if (target.startsWith('group:')) return needGroupById(target.substring(6))?.name ?? 'Groupe supprimé';
+    return target;
+  }
+
+  /// Retire un eleve (supprime) de ses groupes.
+  void _removeChildFromGroups(String childId) {
+    for (var i = 0; i < _needGroups.length; i++) {
+      final g = _needGroups[i];
+      if (!g.childIds.contains(childId)) continue;
+      final updated = g.copyWith(childIds: [for (final c in g.childIds) if (c != childId) c]);
+      _needGroups[i] = updated;
+      _write(_db.saveNeedGroup(updated));
+    }
+  }
+
   Progression? progressionById(String? id) {
     if (id == null) return null;
     for (final p in _progressions) {
@@ -336,7 +456,20 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Libelle affichable d'une observation, robuste a la suppression du niveau.
   String? statusLabel(ActivityLog log) =>
-      statusById(log.evaluationStatusId)?.label ?? log.legacyStatusLabel;
+      statusById(log.evaluationStatusId)?.label ??
+      log.legacyStatusLabel ??
+      (log.pendingValidation ? 'À valider' : null);
+
+  /// Observations saisies par les eleves (mode tablette), a valider.
+  List<ActivityLog> get pendingLogs =>
+      _activities.where((l) => l.pendingValidation).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  /// L'adulte valide une saisie d'eleve en lui donnant un niveau.
+  void validateLog(String id, String? statusId) {
+    final i = _activities.indexWhere((l) => l.id == id);
+    if (i < 0) return;
+    updateActivityLog(_activities[i].copyWith(evaluationStatusId: statusId, pendingValidation: false));
+  }
   List<String> get sections => List.unmodifiable(_sections);
 
   void setSections(List<String> sections) {
@@ -694,6 +827,9 @@ class AppStateProvider extends ChangeNotifier {
         _activityTypes = types;
         _activities = activities;
         _progressions = await _db.readProgressions();
+        _needGroups = await _db.readNeedGroups();
+        _carnets = await _db.readCarnets();
+        _planning = await _db.readPlanning();
         _sonsProgress = await _db.readSons();
         _referentials = await _db.readReferentials();
         _referentialStatus = await _db.readAllReferentialStatuses();
@@ -789,6 +925,9 @@ class AppStateProvider extends ChangeNotifier {
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
       progressions: _progressions,
+      needGroups: _needGroups,
+      carnets: _carnets,
+      planning: _planning,
     );
   }
 
@@ -836,6 +975,9 @@ class AppStateProvider extends ChangeNotifier {
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
         'progressions': _progressions.map((p) => p.toMap()).toList(),
+        'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+        'carnets': _carnets.map((e) => e.toMap()).toList(),
+        'planning': _planning.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -937,6 +1079,9 @@ class AppStateProvider extends ChangeNotifier {
     _children = children;
     _spaces = spaces;
     _progressions = progressions;
+    if (data['need_groups'] is List) _needGroups = _decodeNeedGroups(data);
+    if (data['carnets'] is List) _carnets = _decodeCarnets(data);
+    if (data['planning'] is List) _planning = _decodePlanning(data);
     _activityTypes = activityTypes;
     _activities = activities;
     _evaluationStatuses = evaluationStatuses;
@@ -955,6 +1100,9 @@ class AppStateProvider extends ChangeNotifier {
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
       progressions: _progressions,
+      needGroups: _needGroups,
+      carnets: _carnets,
+      planning: _planning,
     );
     await _restoreReferentialsFrom(data);
     // Photos des donnees restaurees, si elles etaient parties a la corbeille.
@@ -1086,11 +1234,17 @@ class AppStateProvider extends ChangeNotifier {
     await _db.saveArchive(archive);
     await _db.clearTable('children');
     await _db.clearTable('activities');
+    // Les groupes de besoin reunissent des eleves : ils partent avec eux (et
+    // restent dans l'archive de l'annee).
+    await _db.clearTable('need_groups');
+    await _db.clearTable('carnets');
     await _db.clearAllSons();
     await _db.clearAllReferentialStatuses();
 
     _children = [];
     _activities = [];
+    _needGroups = [];
+    _carnets = [];
     _sonsProgress = {};
     // Les referentiels eux-memes (comme les ateliers) se reutilisent d'une
     // annee sur l'autre : seul le statut de chaque eleve est efface.
@@ -1417,6 +1571,9 @@ class AppStateProvider extends ChangeNotifier {
       'children': _children.map((c) => c.toMap()).toList(),
       'spaces': _spaces.map((s) => s.toMap()).toList(),
       'progressions': _progressions.map((p) => p.toMap()).toList(),
+      'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+      'carnets': _carnets.map((e) => e.toMap()).toList(),
+      'planning': _planning.map((p) => p.toMap()).toList(),
       'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
       'activities': _activities.map((l) => l.toMap()).toList(),
       'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1547,6 +1704,9 @@ class AppStateProvider extends ChangeNotifier {
       _children = children;
       _spaces = spaces;
       _progressions = progressions;
+      if (data['need_groups'] is List) _needGroups = _decodeNeedGroups(data);
+      if (data['carnets'] is List) _carnets = _decodeCarnets(data);
+      if (data['planning'] is List) _planning = _decodePlanning(data);
       _activityTypes = activityTypes;
       _activities = activities;
       _evaluationStatuses = evaluationStatuses;
@@ -1571,6 +1731,9 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
         progressions: _progressions,
+        needGroups: _needGroups,
+        carnets: _carnets,
+        planning: _planning,
       );
       await _restoreReferentialsFrom(data);
       _notify();
@@ -1591,6 +1754,9 @@ class AppStateProvider extends ChangeNotifier {
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
         'progressions': _progressions.map((p) => p.toMap()).toList(),
+        'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+        'carnets': _carnets.map((e) => e.toMap()).toList(),
+        'planning': _planning.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1716,7 +1882,9 @@ class AppStateProvider extends ChangeNotifier {
         if (entry.value.containsKey(id)) entry.key: Map<String, SonStatut>.from(entry.value[id]!),
     };
 
+    final groupIds = [for (final g in _needGroups) if (g.childIds.contains(id)) g.id];
     _children.removeWhere((c) => c.id == id);
+    _removeChildFromGroups(id);
     _sonsProgress.remove(id);
     for (final byChild in _referentialStatus.values) {
       byChild.remove(id);
@@ -1724,7 +1892,7 @@ class AppStateProvider extends ChangeNotifier {
     _write(_db.deleteChildCascade(id));
     _notify();
     unawaited(_scheduleReminderIfEnabled());
-    return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus);
+    return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus, groupIds: groupIds);
   }
 
   /// Droit a l'effacement (RGPD) : la fiche, le suivi des sons et des
@@ -1739,6 +1907,10 @@ class AppStateProvider extends ChangeNotifier {
     if (!await _writeAutoBackup()) return -1;
     final logs = _activities.where((l) => l.childId == id).toList();
     deleteChild(id);
+    for (final e in _carnets.where((e) => e.childId == id).toList()) {
+      _carnets.remove(e);
+      _write(_db.deleteCarnet(e.id));
+    }
     for (final log in logs) {
       _activities.remove(log);
       _write(_db.deleteActivity(log.id));
@@ -1751,6 +1923,13 @@ class AppStateProvider extends ChangeNotifier {
   /// Retablit un eleve supprime, avec son suivi des sons et des referentiels.
   void restoreChild(DeletedChild deleted) {
     _children.add(deleted.child);
+    for (final gid in deleted.groupIds) {
+      final g = needGroupById(gid);
+      if (g == null || g.childIds.contains(deleted.child.id)) continue;
+      final updated = g.copyWith(childIds: [...g.childIds, deleted.child.id]);
+      _needGroups[_needGroups.indexWhere((x) => x.id == gid)] = updated;
+      _write(_db.saveNeedGroup(updated));
+    }
     if (deleted.sons.isNotEmpty) {
       _sonsProgress[deleted.child.id] = Map<String, SonStatut>.from(deleted.sons);
     }
@@ -1995,6 +2174,21 @@ class AppStateProvider extends ChangeNotifier {
     debugPrint('Migration des progressions : ${_progressions.length} progression(s).');
   }
 
+  List<PlanningSlot> _decodePlanning(Map<String, dynamic> data) => [
+        for (final p in (data['planning'] as List?) ?? const [])
+          if (p is Map) PlanningSlot.fromMap(Map<String, dynamic>.from(p)),
+      ];
+
+  List<CarnetEntry> _decodeCarnets(Map<String, dynamic> data) => [
+        for (final e in (data['carnets'] as List?) ?? const [])
+          if (e is Map) CarnetEntry.fromMap(Map<String, dynamic>.from(e)),
+      ];
+
+  List<NeedGroup> _decodeNeedGroups(Map<String, dynamic> data) => [
+        for (final g in (data['need_groups'] as List?) ?? const [])
+          if (g is Map) NeedGroup.fromMap(Map<String, dynamic>.from(g)),
+      ];
+
   List<Progression> _decodeProgressions(Map<String, dynamic> data) => [
         for (final p in (data['progressions'] as List?) ?? const [])
           if (p is Map) Progression.fromMap(Map<String, dynamic>.from(p)),
@@ -2149,6 +2343,8 @@ class AppStateProvider extends ChangeNotifier {
 
     if (clearChildren) {
       _children = [];
+      _needGroups = [];
+      _carnets = [];
       _sonsProgress = {};
       for (final byChild in _referentialStatus.values) {
         byChild.clear();
@@ -2197,6 +2393,9 @@ class AppStateProvider extends ChangeNotifier {
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
         progressions: _progressions,
+        needGroups: _needGroups,
+        carnets: _carnets,
+        planning: _planning,
       );
     } catch (e) {
       debugPrint('Echec de la RAZ selective : $e');
@@ -2236,10 +2435,14 @@ class DeletedChild {
   /// eleve avait un statut enregistre.
   final Map<String, Map<String, SonStatut>> referentialStatus;
 
+  /// Groupes de besoin dont l'eleve faisait partie.
+  final List<String> groupIds;
+
   const DeletedChild({
     required this.child,
     required this.sons,
     this.referentialStatus = const {},
+    this.groupIds = const [],
   });
 }
 

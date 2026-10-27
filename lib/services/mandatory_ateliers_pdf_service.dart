@@ -29,11 +29,15 @@ class WorkPlanOptions {
   /// la section de l'eleve.
   final Set<String>? parcoursIds;
 
+  /// Seulement ce que le planning prevoit pour l'eleve cette semaine.
+  final bool onlyPlannedThisWeek;
+
   const WorkPlanOptions({
     this.showStatus = true,
     this.showCheckboxes = true,
     this.statusKeys,
     this.parcoursIds,
+    this.onlyPlannedThisWeek = false,
   });
 
   /// Cle de filtre d'un statut : l'identifiant du niveau d'evaluation, ou
@@ -59,8 +63,10 @@ class MandatoryAteliersPdfService {
   }) async {
     final doc = pw.Document();
     for (final child in children) {
+      final planned = options.onlyPlannedThisWeek ? provider.plannedAteliersForWeek(child, DateTime.now()) : null;
       final ateliers = provider.activityTypes
           .where((a) => !a.inProgression && a.isObligatoryForGroup(child.group))
+          .where((a) => planned == null || planned.contains(a.id))
           .toList();
       final bySpace = <String, List<ActivityType>>{};
       for (final a in ateliers) {
@@ -112,8 +118,10 @@ class MandatoryAteliersPdfService {
       final groups = <(String, List<pw.Widget>)>[];
       for (final p in parcours) {
         final steps = provider.ateliersInProgressionOrdered(p.id);
+        final planned = options.onlyPlannedThisWeek ? provider.plannedAteliersForWeek(child, DateTime.now()) : null;
         final vignettes = <pw.Widget>[
           for (final (i, s) in steps.indexed)
+            if (planned == null || planned.contains(s.id))
             if (_vignette(
               provider: provider,
               child: child,

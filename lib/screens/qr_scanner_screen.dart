@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/dictation_button.dart';
+import 'student_mode_screen.dart';
 import '../widgets/photo_thumb.dart';
 import '../providers/app_provider.dart';
 import '../models/activity.dart';
@@ -105,6 +107,50 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           content: SizedBox(
             width: double.maxFinite,
             height: 400,
+            child: Column(children: [
+              // Groupes de besoin : tout le groupe d'un geste (sauf l'eleve
+              // deja choisi).
+              if (provider.needGroups.isNotEmpty)
+                SizedBox(
+                  height: 44,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final g in provider.needGroups)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: () {
+                            // Seulement ceux pour qui l'atelier est ouvert
+                            // (une etape verrouillee ne s'enregistre pas).
+                            final atelier = provider.activityTypeById(_selectedActivityTypeId);
+                            final ids = {
+                              for (final id in g.childIds)
+                                if (id != _selectedChildId)
+                                  if (provider.childById(id) case final c?)
+                                    if (atelier == null ||
+                                        AtelierEligibilityService.evaluate(
+                                                provider: provider, child: c, atelier: atelier)
+                                            .isAllowed)
+                                      id,
+                            };
+                            return FilterChip(
+                              avatar: const Icon(Icons.groups, size: 16),
+                              label: Text(g.name),
+                              selected: ids.isNotEmpty && selection.containsAll(ids),
+                              onSelected: (_) => setSt(() {
+                                if (selection.containsAll(ids)) {
+                                  selection.removeAll(ids);
+                                } else {
+                                  selection.addAll(ids);
+                                }
+                              }),
+                            );
+                          }(),
+                        ),
+                    ],
+                  ),
+                ),
+              Expanded(
             child: Scrollbar(
               thumbVisibility: true,
               child: ListView(
@@ -136,6 +182,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     .toList(),
               ),
             ),
+              ),
+            ]),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
@@ -510,6 +558,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           text: 'Recherchez l\'élève, puis l\'atelier par domaine ou l\'étape par parcours.',
           onTap: () => setState(() => _mode = _ScanMode.manual),
         ),
+        card(
+          icon: Icons.child_care,
+          color: const Color(0xFF8E24AA),
+          title: 'Mode élève (tablette)',
+          text: 'Les enfants notent eux-mêmes ce qu\'ils ont fait ; vous validez ensuite. Sortie protégée.',
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(fullscreenDialog: true, builder: (_) => const StudentModeScreen())),
+        ),
       ],
     );
   }
@@ -532,6 +588,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               child: Text(qr ? 'Scan des QR codes' : 'Sélection manuelle',
                   style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             ),
+            // Ordinateur : pas d'ecran de choix, le mode eleve s'ouvre d'ici.
+            if (!isMobilePlatform)
+              TextButton.icon(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(fullscreenDialog: true, builder: (_) => const StudentModeScreen())),
+                icon: const Icon(Icons.child_care, size: 18),
+                label: const Text('Mode élève'),
+              ),
             if (isMobilePlatform)
               TextButton.icon(
                 onPressed: () => setState(() {
@@ -761,6 +825,29 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       children: [
         const Text('2. Quel atelier ou quelle étape ?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
         const SizedBox(height: 8),
+        // Planning : ce qui est prevu aujourd'hui pour cet eleve, en tete.
+        if (!searching)
+          if ([
+            for (final id in provider.plannedAteliersFor(child, DateTime.now()))
+              if (provider.activityTypeById(id) case final a?)
+                if (results[a.id]?.isAllowed ?? false) a,
+          ]
+              case final planned when planned.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              color: const Color(0xFFE8833A).withValues(alpha: 0.10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(children: [
+                    Icon(Icons.calendar_view_week, size: 18, color: Color(0xFFE8833A)),
+                    SizedBox(width: 8),
+                    Text('Prévu aujourd\'hui', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ]),
+                ),
+                for (final a in planned) atelierTile(a),
+              ]),
+            ),
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(value: false, icon: Icon(Icons.category), label: Text('Ateliers')),
@@ -863,10 +950,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
                 TextField(
                   controller: _noteController,
-                  decoration: const InputDecoration(
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: InputDecoration(
                     labelText: 'Observation / Note pédagogique',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.comment),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.comment),
+                    // Dictee : la voix devient du texte, ecrit dans la note.
+                    suffixIcon: DictationButton(controller: _noteController),
                   ),
                 ),
                 const SizedBox(height: 10),

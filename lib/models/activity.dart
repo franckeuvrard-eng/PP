@@ -25,6 +25,10 @@ class ActivityLog {
   /// Chemin relatif d'une note vocale unique jointe a l'observation.
   final String? audioPath;
 
+  /// Saisie par un eleve en mode tablette : l'adulte doit encore la valider
+  /// (et lui donner un niveau).
+  final bool pendingValidation;
+
   ActivityLog({
     required this.id,
     required this.childId,
@@ -36,6 +40,7 @@ class ActivityLog {
     this.legacyStatusLabel,
     this.photoCaptions = const {},
     this.audioPath,
+    this.pendingValidation = false,
   });
 
   /// Legende associee a une photo, ou null si aucune.
@@ -57,6 +62,7 @@ class ActivityLog {
     Object? evaluationStatusId = kUndefined,
     Map<String, String>? photoCaptions,
     Object? audioPath = kUndefined,
+    bool? pendingValidation,
   }) {
     return ActivityLog(
       id: id ?? this.id,
@@ -71,6 +77,7 @@ class ActivityLog {
       legacyStatusLabel: legacyStatusLabel,
       photoCaptions: photoCaptions ?? this.photoCaptions,
       audioPath: audioPath == kUndefined ? this.audioPath : audioPath as String?,
+      pendingValidation: pendingValidation ?? this.pendingValidation,
     );
   }
 
@@ -88,6 +95,9 @@ class ActivityLog {
       if (legacyStatusLabel != null) 'evaluationStatus': legacyStatusLabel,
       'photoCaptions': photoCaptions,
       'audioPath': audioPath,
+      // Absent quand faux : les observations ordinaires restent identiques
+      // (memes empreintes de synchro qu'avant).
+      if (pendingValidation) 'pendingValidation': true,
     };
   }
 
@@ -103,6 +113,7 @@ class ActivityLog {
       legacyStatusLabel: map['evaluationStatus'],
       photoCaptions: Map<String, String>.from(map['photoCaptions'] ?? {}),
       audioPath: map['audioPath'],
+      pendingValidation: map['pendingValidation'] == true,
     );
   }
 

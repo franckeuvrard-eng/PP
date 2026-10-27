@@ -7,6 +7,7 @@ import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/space.dart';
 import '../utils/color_utils.dart';
+import '../widgets/dictation_button.dart';
 import '../widgets/voice_note_field.dart';
 
 class EditActivityLogScreen extends StatefulWidget {
@@ -210,10 +211,11 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
 
             TextField(
               controller: _noteController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Notes / Observations de l\'enseignant',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
+                suffixIcon: DictationButton(controller: _noteController),
               ),
               maxLines: 4,
             ),

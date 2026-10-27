@@ -23,6 +23,9 @@ class SyncMerge {
     'children',
     'spaces',
     'progressions',
+    'need_groups',
+    'carnets',
+    'planning',
     'activity_types',
     'activities',
     'evaluation_statuses',
@@ -241,8 +244,20 @@ class SyncMerge {
   }) {
     // Donnees d'une version <= 1.4 (sauvegarde, ancien fichier) : converties
     // des deux cotes, de facon deterministe, avant de comparer.
-    final l = flatten(migrateSpaceProgressions(local));
-    final r = flatten(migrateSpaceProgressions(remote));
+    final lm = migrateSpaceProgressions(local);
+    final rm = migrateSpaceProgressions(remote);
+    final l = flatten(lm);
+    final r = flatten(rm);
+    // Collection absente d'un cote (appareil dans une version qui ne la
+    // connait pas encore, ex. les groupes de besoin) : ce n'est pas « tout
+    // supprime », l'autre cote est garde tel quel. Sinon une vieille version
+    // effacerait, a chaque synchro, ce qu'elle ne sait pas lire.
+    for (final name in listCollections) {
+      final inLocal = lm[name] is List;
+      final inRemote = rm[name] is List;
+      if (inLocal && !inRemote) r[name] = Map.of(l[name]!);
+      if (inRemote && !inLocal) l[name] = Map.of(r[name]!);
+    }
     final merged = <String, Map<String, Object?>>{};
     final stats = MergeStats();
     final conflicts = <MergeConflict>[];

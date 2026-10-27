@@ -17,6 +17,7 @@ import 'screens/progressions_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/spaces_workshops_tab.dart';
 import 'screens/ateliers_hub_screen.dart';
+import 'screens/planning_screen.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -33,6 +34,10 @@ import 'services/children_import_service.dart';
 /// repli automatique).
 @visibleForTesting
 List<String>? debugThemeFontFallback;
+
+/// Creme de l'ecran de demarrage, identique au fond de LaunchImage.jpg et
+/// a la couleur de LaunchScreen.storyboard (#FCF5E9).
+const kSplashCream = Color(0xFFFCF5E9);
 
 void main() {
   runApp(
@@ -291,9 +296,35 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
     }
 
     if (!provider.isLoaded) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF4E9F3D),
-        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      // Prolonge l'ecran de demarrage iOS (LaunchScreen.storyboard) a
+      // l'identique : meme creme, empreinte a la meme place (image carree
+      // ajustee au plus petit cote, empreinte sur 84 % de sa hauteur), pour
+      // qu'il n'y ait ni flash ni saut pendant le chargement des donnees.
+      return Scaffold(
+        backgroundColor: kSplashCream,
+        body: LayoutBuilder(builder: (context, c) {
+          final side = c.biggest.shortestSide;
+          return Stack(children: [
+            Center(
+              child: SizedBox(
+                height: side * 0.842,
+                child: Image.asset('assets/images/splash_foot.png', fit: BoxFit.contain),
+              ),
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 48,
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFFE8833A)),
+                ),
+              ),
+            ),
+          ]);
+        }),
       );
     }
 
@@ -349,11 +380,12 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     DesktopDestination(label: 'Élèves', icon: Icons.people_outline, selectedIcon: Icons.people),
     DesktopDestination(label: 'Espaces & Ateliers', icon: Icons.space_dashboard_outlined, selectedIcon: Icons.space_dashboard),
     DesktopDestination(label: 'Parcours', icon: Icons.timeline, selectedIcon: Icons.timeline),
+    DesktopDestination(label: 'Planning', icon: Icons.calendar_view_week_outlined, selectedIcon: Icons.calendar_view_week),
     DesktopDestination(label: 'Rapports', icon: Icons.description_outlined, selectedIcon: Icons.description),
     DesktopDestination(label: 'Badges QR', icon: Icons.print_outlined, selectedIcon: Icons.print),
     DesktopDestination(label: 'Paramètres', icon: Icons.tune, selectedIcon: Icons.tune),
   ];
-  static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _reportsIndex, 3, 4];
+  static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _planningIndex, _reportsIndex, 3, 4];
 
   /// Barre du bas (iPhone), dans l'ordre affiche. Espaces & Ateliers et
   /// Parcours y sont reunis dans l'onglet Ateliers ; Rapports (QR codes
@@ -365,6 +397,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   static const _reportsIndex = 6;
   static const _spacesIndex = 7;
   static const _hubIndex = 8;
+  static const _planningIndex = 9;
 
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -376,6 +409,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     ReportsScreen(),
     SpacesWorkshopsScreen(),
     AteliersHubScreen(),
+    PlanningScreen(),
   ];
 
   int get _desktopIndex {
@@ -569,7 +603,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     );
   }
 
-  /// Barre de menus de macOS : Cmd+1..8 pour changer de page, Cmd+? pour l'aide.
+  /// Barre de menus de macOS : Cmd+1..9 pour changer de page, Cmd+? pour l'aide.
   /// Sur les autres plateformes, `PlatformMenuBar` ne fait rien et les memes
   /// raccourcis passent par Ctrl+1..5 ([desktopNavigationShortcuts]).
   List<PlatformMenuItem> _macMenus() {
@@ -582,6 +616,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       LogicalKeyboardKey.digit6,
       LogicalKeyboardKey.digit7,
       LogicalKeyboardKey.digit8,
+      LogicalKeyboardKey.digit9,
     ];
     return [
       const PlatformMenu(

@@ -11,6 +11,7 @@ import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
 import 'reports_screen.dart';
 import 'coverage_screen.dart';
+import 'pending_validation_screen.dart';
 import '../services/coverage_service.dart';
 import '../widgets/desktop_frame.dart';
 import 'edit_activity_log_screen.dart';
@@ -86,6 +87,27 @@ class HomeDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+
+          // Saisies du mode eleve en attente de validation.
+          if (provider.pendingLogs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF8E24AA),
+                    child: Icon(Icons.child_care, color: Colors.white),
+                  ),
+                  title: Text('À valider (${provider.pendingLogs.length})',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Saisies des élèves en mode tablette : donnez-leur un niveau.'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const PendingValidationScreen())),
+                ),
+              ),
+            ),
 
           // A surveiller : domaines delaisses et programme non couvert.
           Builder(builder: (context) {

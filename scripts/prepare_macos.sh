@@ -29,6 +29,7 @@ grep -n "minSize" macos/Runner/MainFlutterWindow.swift
 
 PLIST=macos/Runner/Info.plist
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Notes vocales sur les observations.'" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'Dictee des observations en texte.'" "$PLIST"
 /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string 'Synchronisation avec l application sur iPhone/iPad.'" "$PLIST"
 # Service Bonjour de decouverte automatique (cf. sync_discovery.dart).
 /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" -c "Add :NSBonjourServices:0 string '_petitpas._tcp'" "$PLIST"

@@ -10,6 +10,7 @@ import '../services/parcours_frise_pdf_service.dart';
 import '../services/parcours_report_service.dart';
 import '../services/qr_sheets_pdf_service.dart';
 import 'qr_generator_screen.dart';
+import 'carnet_screen.dart';
 import '../models/progression.dart';
 import '../utils/color_utils.dart';
 import '../utils/pdf_viewer.dart';
@@ -163,6 +164,28 @@ class ReportsScreen extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: kMutedTextColor),
           ),
           const SizedBox(height: 16),
+          // Carnet de suivi (obligatoire en maternelle) et synthese de fin de GS.
+          for (final (synthese, icon, color, title, subtitle) in const [
+            (false, Icons.menu_book, Color(0xFFE8833A), 'Carnet de suivi (PDF)',
+                'Par période : les réussites de chaque domaine avec leurs photos, vos commentaires, la signature des parents.'),
+            (true, Icons.fact_check, Color(0xFF8E24AA), 'Synthèse de fin de maternelle (PDF)',
+                "Le niveau de chaque sous-domaine du programme (suggéré d'après les observations), points forts et besoins."),
+          ]) ...[
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: CircleAvatar(backgroundColor: color, child: Icon(icon, color: Colors.white)),
+                title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(subtitle),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: provider.children.isEmpty
+                    ? null
+                    : () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => CarnetScreen(synthese: synthese))),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: ListTile(

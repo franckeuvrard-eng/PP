@@ -23,6 +23,29 @@ class ReleaseItem {
 
 const kReleaseNotes = [
   ReleaseNote(
+    version: '1.8.0',
+    date: 'Octobre 2026',
+    items: [
+      ReleaseItem(Icons.menu_book, 'Le carnet de suivi',
+          'Rapports > Carnet de suivi : par période, les réussites de chaque domaine avec leurs '
+              'photos, vos commentaires et la signature des parents. Et la synthèse de fin de '
+              'maternelle, avec un niveau suggéré pour chaque sous-domaine.'),
+      ReleaseItem(Icons.groups, 'Les groupes de besoin',
+          'Élèves > Groupes de besoin : des groupes suggérés (même étape d\'un parcours, même niveau '
+              'sur un atelier), à enregistrer, puis à cocher d\'un geste dans Scan & Go et les rapports.'),
+      ReleaseItem(Icons.calendar_view_week, 'Le planning de la semaine',
+          'Quels groupes font quels ateliers, jour par jour, avec la rotation automatique. Scan & Go '
+              'met en tête ce qui est prévu aujourd\'hui.'),
+      ReleaseItem(Icons.child_care, 'Le mode élève',
+          'Sur tablette, les enfants notent eux-mêmes l\'atelier qu\'ils ont fait ; vous validez '
+              'ensuite avec le niveau atteint. La sortie du mode est protégée.'),
+      ReleaseItem(Icons.mic, 'La dictée',
+          'Le micro à droite des notes et commentaires transforme votre voix en texte.'),
+      ReleaseItem(Icons.wb_sunny, 'Un démarrage tout doux',
+          'L\'écran de démarrage reprend l\'empreinte de la nouvelle icône, sur fond crème.'),
+    ],
+  ),
+  ReleaseNote(
     version: '1.7.1',
     date: 'Octobre 2026',
     items: [

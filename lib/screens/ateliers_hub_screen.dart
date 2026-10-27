@@ -3,11 +3,12 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../utils/color_utils.dart';
 import 'progressions_screen.dart';
+import 'planning_screen.dart';
 import 'spaces_workshops_tab.dart';
 
 /// Onglet « Ateliers » de la barre du bas sur iPhone : l'entree vers les
-/// Espaces & Ateliers et les Parcours, qui ont chacun leur page de la barre
-/// laterale sur Mac et iPad.
+/// Espaces & Ateliers, les Parcours et le Planning, qui ont chacun leur page
+/// de la barre laterale sur Mac et iPad.
 class AteliersHubScreen extends StatelessWidget {
   const AteliersHubScreen({super.key});
 
@@ -59,6 +60,13 @@ class AteliersHubScreen extends StatelessWidget {
               ? 'Des étapes à faire dans l’ordre, comme un chemin.'
               : '${provider.progressions.length} parcours : suivi, étapes, frise et QR codes',
           page: (_) => const ProgressionsScreen(),
+        ),
+        entry(
+          icon: Icons.calendar_view_week,
+          color: const Color(0xFFE8833A),
+          title: 'Planning',
+          subtitle: 'Qui fait quel atelier, jour par jour',
+          page: (_) => const PlanningScreen(),
         ),
       ],
     );
