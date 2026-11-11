@@ -170,9 +170,9 @@ class MandatoryAteliersPdfService {
     }
   }
 
-  /// Vignette portrait d'un atelier pour un eleve : case a cocher (cochee des
-  /// que le statut le plus recent est "acquis") et nom, photo, puis domaine,
-  /// niveau, objectifs et statut courant.
+  /// Vignette portrait d'un atelier pour un eleve : nom, photo, domaine, niveau
+  /// et objectifs, puis trois cases vides a remplir a la main et le statut
+  /// courant.
   static pw.Widget _atelierTile({
     required AppStateProvider provider,
     required Child child,
@@ -185,7 +185,6 @@ class MandatoryAteliersPdfService {
       childId: child.id,
       activityTypeId: atelier.id,
     );
-    final acquis = snapshot.statusId == 'acquis';
     final statusColor = _color(snapshot.colorHex, PdfColors.grey700);
     final accent = _color(atelier.colorHex, PdfColors.grey500);
     final niveau = _levelsOf(atelier);
@@ -206,33 +205,9 @@ class MandatoryAteliersPdfService {
             pw.Container(height: 3, color: accent),
             pw.Padding(
               padding: const pw.EdgeInsets.fromLTRB(6, 5, 6, 0),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Container(
-                    width: 13,
-                    height: 13,
-                    margin: const pw.EdgeInsets.only(right: 5, top: 0.5),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: acquis ? PdfColors.green700 : PdfColors.grey600, width: 1.1),
-                      color: acquis ? PdfColors.green700 : PdfColors.white,
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
-                    ),
-                    child: acquis
-                        ? pw.Center(
-                            child: pw.Text('X',
-                                style: pw.TextStyle(
-                                    color: PdfColors.white, fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                          )
-                        : null,
-                  ),
-                  pw.Expanded(
-                    child: pw.Text(pdfSafe(atelier.name),
-                        maxLines: 2,
-                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                  ),
-                ],
-              ),
+              child: pw.Text(pdfSafe(atelier.name),
+                  maxLines: 2,
+                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.fromLTRB(6, 5, 6, 0),
@@ -290,11 +265,29 @@ class MandatoryAteliersPdfService {
             ),
             pw.Spacer(),
             pw.Padding(
-              padding: const pw.EdgeInsets.fromLTRB(6, 0, 6, 4),
-              child: pw.Text(
-                pdfSafe(snapshot.label),
-                maxLines: 1,
-                style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: statusColor),
+              padding: const pw.EdgeInsets.fromLTRB(6, 0, 6, 5),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  // Trois cases vides, a remplir a la main (croix, date,
+                  // gommette...) : rien n'est imprime autour.
+                  for (var i = 0; i < 3; i++)
+                    pw.Container(
+                      width: 12,
+                      height: 12,
+                      margin: const pw.EdgeInsets.only(right: 4),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey600, width: 1),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+                      ),
+                    ),
+                  pw.Spacer(),
+                  pw.Text(
+                    pdfSafe(snapshot.label),
+                    maxLines: 1,
+                    style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: statusColor),
+                  ),
+                ],
               ),
             ),
           ],
