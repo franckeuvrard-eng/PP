@@ -62,7 +62,7 @@ void main() {
         ));
       }
     }
-    expect(n, 15);
+    expect(n, EduscolData.domains.length * 3);
 
     final bytes = await MandatoryAteliersPdfService.buildBytes(
       provider: provider,
@@ -72,12 +72,12 @@ void main() {
     final text = latin1.decode(bytes, allowInvalid: true);
     final pages = RegExp(r'/Type\s*/Page\b').allMatches(text).length;
 
-    // Tous les ateliers du plan (ceux de l'exemple + les 15 ajoutes) : 3
+    // Tous les ateliers du plan (ceux de l'exemple + ceux ajoutes) : 3
     // colonnes x 4 rangees par page.
     final total = provider.activityTypes
         .where((a) => !a.inProgression && a.isObligatoryForGroup('PS'))
         .length;
-    expect(total, greaterThanOrEqualTo(15));
+    expect(total, greaterThanOrEqualTo(n));
     expect(pages, (total / 12).ceil());
   });
 }
