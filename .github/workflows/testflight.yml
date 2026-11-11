@@ -1,0 +1,166 @@
+name: Deploy to TestFlight
+
+# Construit l'application iOS signee et l'envoie a App Store Connect (TestFlight).
+#
+# Declenchement :
+#   - en poussant un tag `testflight-*` (depuis n'importe quelle branche) :
+#       git tag testflight-1 && git push origin testflight-1
+#   - ou Actions > Deploy to TestFlight > Run workflow (une fois ce fichier sur la
+#     branche par defaut).
+#
+# Prerequis (Settings > Secrets and variables > Actions) :
+#   Secrets   : APPSTORE_KEY_ID, APPSTORE_ISSUER_ID, APPSTORE_KEY_P8 (contenu du
+#               fichier .p8 encode en base64 : `base64 -i AuthKey_XXXX.p8`)
+#   Variables : IOS_BUNDLE_ID (ex. fr.monecole.apetitspas), APPLE_TEAM_ID
+# La signature est automatique : la cle API App Store Connect (role Admin ou
+# App Manager) permet a Xcode de creer le certificat et le profil de distribution.
+
+on:
+  push:
+    tags: [ 'testflight-*' ]
+  workflow_dispatch:
+
+env:
+  IOS_DEPLOYMENT_TARGET: '14.0'
+
+jobs:
+  testflight:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+          BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          [ -z "$KEY_ID" ] && missing="$missing APPSTORE_KEY_ID"
+          [ -z "$ISSUER_ID" ] && missing="$missing APPSTORE_ISSUER_ID"
+          [ -z "$KEY_P8" ] && missing="$missing APPSTORE_KEY_P8"
+          [ -z "$BUNDLE_ID" ] && missing="$missing IOS_BUNDLE_ID(variable)"
+          [ -z "$TEAM_ID" ] && missing="$missing APPLE_TEAM_ID(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Configuration TestFlight incomplete, a renseigner dans Settings > Secrets and variables > Actions :$missing"
+            exit 1
+          fi
+          case "$BUNDLE_ID" in com.example.*) echo "::error::IOS_BUNDLE_ID ne doit pas etre un identifiant d'exemple (com.example.*)"; exit 1;; esac
+
+      - name: Select Xcode 15.4
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Recreate iOS platform files
+        env:
+          BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID }}
+        run: |
+          mv ios/Runner/Info.plist Info.plist.bak
+          flutter create --project-name=petitpas --platforms=ios .
+          mv Info.plist.bak ios/Runner/Info.plist
+          rm -f test/widget_test.dart
+          # Identifiant reel de l'application (flutter create remet com.example.*).
+          sed -i '' "s/com\.example\.petitpas/${BUNDLE_ID}/g" ios/Runner.xcodeproj/project.pbxproj
+          grep -n 'PRODUCT_BUNDLE_IDENTIFIER' ios/Runner.xcodeproj/project.pbxproj
+          # Pas de question de conformite export a chaque envoi : l'app n'utilise
+          # que le chiffrement standard du systeme.
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/Runner/Info.plist || true
+
+      - name: Normalize iOS deployment target
+        run: |
+          T="${IOS_DEPLOYMENT_TARGET}"
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = ${T};/g" ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s|<string>12.0</string>|<string>${T}</string>|g" ios/Flutter/AppFrameworkInfo.plist
+          grep -n 'platform :ios' ios/Podfile || true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        # On n'envoie pas a TestFlight une version dont les tests echouent.
+        run: flutter test --reporter expanded
+
+      - name: Generate App Launcher Icons
+        run: dart run flutter_launcher_icons || flutter pub run flutter_launcher_icons || true
+
+      - name: Prepare Flutter build (no signing)
+        # Genere Generated.xcconfig et installe les pods ; la signature se fait
+        # ensuite dans xcodebuild. Le numero de build doit augmenter a chaque envoi.
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+
+      - name: Write App Store Connect API key
+        env:
+          KEY_P8: ${{ secrets.APPSTORE_KEY_P8 }}
+        run: |
+          echo "$KEY_P8" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Archive (signed)
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            archive > archive_output.txt 2>&1 || { tail -n 150 archive_output.txt; exit 1; }
+
+      - name: Export and upload to TestFlight
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            > export_output.txt 2>&1 || { tail -n 150 export_output.txt; exit 1; }
+          tail -n 20 export_output.txt
+
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-diagnostics
+          if-no-files-found: warn
+          path: |
+            archive_output.txt
+            export_output.txt
