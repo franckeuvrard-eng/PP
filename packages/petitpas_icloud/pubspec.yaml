@@ -1,0 +1,22 @@
+name: petitpas_icloud
+description: Acces au conteneur iCloud Drive prive de l'application (iOS et macOS).
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.38.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: PetitpasIcloudPlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: PetitpasIcloudPlugin
+        sharedDarwinSource: true

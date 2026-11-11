@@ -53,7 +53,7 @@ class _VoiceNotePlayButtonState extends State<VoiceNotePlayButton> {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFF4E9F3D).withOpacity(0.12),
+          color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

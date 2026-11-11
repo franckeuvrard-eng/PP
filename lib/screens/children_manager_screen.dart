@@ -5,10 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/app_provider.dart';
 import '../models/child.dart';
-import '../services/child_activity_report_service.dart';
 import '../utils/color_utils.dart';
-import '../utils/pdf_viewer.dart';
 import 'child_profile_screen.dart';
+import 'need_groups_screen.dart';
 
 enum ChildFilterMode { all, pendingToday, evaluatedToday }
 
@@ -91,6 +90,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_eleves', // onglets charges cote a cote : etiquettes Hero distinctes
         onPressed: () => _openChildDialog(context, provider),
         backgroundColor: const Color(0xFF4E9F3D),
         icon: const Icon(Icons.person_add, color: Colors.white),
@@ -127,10 +127,17 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.groups, size: 18),
+                        label: Text('Groupes de besoin (${provider.needGroups.length})'),
+                        onPressed: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => const NeedGroupsScreen())),
+                      ),
+                      const SizedBox(width: 8),
                       FilterChip(
                         label: Text('Tous (${allChildren.length})'),
                         selected: _filterMode == ChildFilterMode.all,
-                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        selectedColor: const Color(0xFF4E9F3D).withValues(alpha: 0.2),
                         checkmarkColor: const Color(0xFF4E9F3D),
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.all),
                       ),
@@ -138,7 +145,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       FilterChip(
                         label: Text('⏳ En attente ($pendingTodayCount)'),
                         selected: _filterMode == ChildFilterMode.pendingToday,
-                        selectedColor: Colors.amber.withOpacity(0.2),
+                        selectedColor: Colors.amber.withValues(alpha: 0.2),
                         checkmarkColor: Colors.amber.shade900,
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.pendingToday),
                       ),
@@ -146,7 +153,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                       FilterChip(
                         label: Text('✅ Évalués aujourd\'hui ($evaluatedTodayCount)'),
                         selected: _filterMode == ChildFilterMode.evaluatedToday,
-                        selectedColor: const Color(0xFF4E9F3D).withOpacity(0.2),
+                        selectedColor: const Color(0xFF4E9F3D).withValues(alpha: 0.2),
                         checkmarkColor: const Color(0xFF4E9F3D),
                         onSelected: (_) => setState(() => _filterMode = ChildFilterMode.evaluatedToday),
                       ),
@@ -195,7 +202,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                   ? Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF4E9F3D).withOpacity(0.15),
+                                        color: const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -206,7 +213,7 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                   : Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.15),
+                                        color: Colors.amber.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -216,165 +223,14 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
                                     ),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF4E9F3D)),
-                                onPressed: () => _choosePdfPeriod(context, child, provider),
-                                tooltip: 'Générer le rapport PDF',
-                              ),
-                            ],
-                          ),
+                          // Le rapport PDF d'un eleve se genere depuis Rapports.
+                          trailing: const Icon(Icons.chevron_right),
                         ),
                       );
                     },
                   ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ─────────────────── PDF PERIOD PICKER ───────────────────
-  void _choosePdfPeriod(BuildContext context, Child child, AppStateProvider provider) {
-    DateTimeRange? customRange;
-    bool onlyLatestPerAtelier = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.date_range, color: Color(0xFF4E9F3D)),
-                  SizedBox(width: 8),
-                  Text('Période du rapport'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Choisissez la période à inclure dans le rapport PDF :',
-                      style: TextStyle(fontSize: 13)),
-                  const SizedBox(height: 12),
-                  _periodButton(
-                    context: context,
-                    label: 'Toute la période',
-                    icon: Icons.all_inclusive,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider, null, null, onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: 'Ce mois-ci',
-                    icon: Icons.calendar_month,
-                    onTap: () {
-                      final now = DateTime.now();
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider,
-                          DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 0), onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: 'Semaine en cours',
-                    icon: Icons.view_week,
-                    onTap: () {
-                      final now = DateTime.now();
-                      final monday = now.subtract(Duration(days: now.weekday - 1));
-                      Navigator.pop(context);
-                      _openPdfPreview(context, child, provider,
-                          DateTime(monday.year, monday.month, monday.day),
-                          DateTime(monday.year, monday.month, monday.day + 6, 23, 59), onlyLatestPerAtelier);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _periodButton(
-                    context: context,
-                    label: customRange != null
-                        ? '${DateFormat('dd/MM').format(customRange!.start)} → ${DateFormat('dd/MM').format(customRange!.end)}'
-                        : 'Période personnalisée…',
-                    icon: Icons.tune,
-                    onTap: () async {
-                      final picked = await showDateRangePicker(
-                        context: context,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                        locale: const Locale('fr', 'FR'),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => customRange = picked);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: const Text('Occurrence la plus récente seulement', style: TextStyle(fontSize: 13)),
-                    subtitle: const Text(
-                      "Sinon, toutes les fois où l'atelier a été refait apparaissent.",
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    value: onlyLatestPerAtelier,
-                    activeColor: const Color(0xFF4E9F3D),
-                    onChanged: (val) => setDialogState(() => onlyLatestPerAtelier = val),
-                  ),
-                  if (customRange != null) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _openPdfPreview(context, child, provider, customRange!.start,
-                              customRange!.end.add(const Duration(days: 1)), onlyLatestPerAtelier);
-                        },
-                        icon: const Icon(Icons.picture_as_pdf),
-                        label: const Text('Générer le PDF'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4E9F3D),
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _periodButton({
-    required BuildContext context,
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
       ),
     );
   }
@@ -387,39 +243,6 @@ class _ChildrenManagerScreenState extends State<ChildrenManagerScreen> {
         fullscreenDialog: true,
         builder: (context) => ChildFormDialog(provider: provider, child: child),
       ),
-    );
-  }
-
-  // ─────────────────── PDF PREVIEW ───────────────────
-
-  Future<void> _openPdfPreview(
-    BuildContext context,
-    Child child,
-    AppStateProvider provider,
-    DateTime? from,
-    DateTime? to, [
-    bool onlyLatestPerAtelier = false,
-  ]) async {
-    String periodLabel = 'Toute la période';
-    if (from != null && to != null) {
-      periodLabel = '${DateFormat('dd/MM/yyyy').format(from)} → ${DateFormat('dd/MM/yyyy').format(to.subtract(const Duration(days: 1)))}';
-    }
-
-    openPdfViewer(
-      context,
-      title: 'Rapport - ${child.firstname} ($periodLabel)',
-      fileName: 'Rapport_${child.firstname}_${child.lastname ?? ""}.pdf'.replaceAll(' ', '_'),
-      build: (format) => ChildActivityReportService.generateChildReportBytes(
-        child: child,
-        provider: provider,
-        format: format,
-        from: from,
-        to: to,
-        onlyLatestPerAtelier: onlyLatestPerAtelier,
-      ),
-      shareBody: 'Veuillez trouver ci-joint le rapport d\'activités de ${child.firstname}.',
-      shareSubject: 'Rapport d\'activités - ${child.firstname}',
-      shareEmails: child.email != null && child.email!.isNotEmpty ? [child.email!] : null,
     );
   }
 
@@ -442,6 +265,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
   late final TextEditingController _groupController;
   late final TextEditingController _notesController;
   late final TextEditingController _emailController;
+  late final TextEditingController _email2Controller;
   String? _relativeImagePath;
   String? _selectedImagePath;
   DateTime? _birthdate;
@@ -459,6 +283,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     );
     _notesController = TextEditingController(text: child?.notes ?? '');
     _emailController = TextEditingController(text: child?.email ?? '');
+    _email2Controller = TextEditingController(text: child?.email2 ?? '');
     _relativeImagePath = child?.imagePath;
     _selectedImagePath = provider.getAbsolutePath(child?.imagePath);
     _birthdate = child?.birthdate != null ? DateTime.tryParse(child!.birthdate!) : null;
@@ -484,6 +309,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
     _groupController.dispose();
     _notesController.dispose();
     _emailController.dispose();
+    _email2Controller.dispose();
     super.dispose();
   }
 
@@ -620,6 +446,9 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                   if (current.isNotEmpty && !widget.provider.sections.contains(current)) current,
                 ];
                 return DropdownButtonFormField<String>(
+                  // Champ pilote par le code (ex. eleve choisi par scan) : initialValue
+                  // ne suivrait pas ses changements.
+                  // ignore: deprecated_member_use
                   value: options.contains(current) ? current : null,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -638,7 +467,18 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
               },
             ),
             const SizedBox(height: 12),
-            TextField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email des parents')),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Email parent 1'),
+            ),
+            TextField(
+              controller: _email2Controller,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Email parent 2 (facultatif)'),
+            ),
             const SizedBox(height: 10),
             TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes')),
             const SizedBox(height: 30),
@@ -657,6 +497,7 @@ class _ChildFormDialogState extends State<ChildFormDialog> {
                     group: _groupController.text.trim(),
                     notes: _notesController.text.trim(),
                     email: _emailController.text.trim(),
+                    email2: _email2Controller.text.trim().isEmpty ? null : _email2Controller.text.trim(),
                     colorHex: child?.colorHex ?? '#4E9F3D',
                     avatarText: _firstnameController.text.trim()[0].toUpperCase(),
                     imagePath: _relativeImagePath,

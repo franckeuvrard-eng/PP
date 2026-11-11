@@ -27,7 +27,7 @@ class IconSwatchPicker extends StatelessWidget {
           width: previewSize,
           height: previewSize,
           decoration: BoxDecoration(
-            color: previewColor.withOpacity(0.15),
+            color: previewColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(iconForName(iconName, fallback: fallback),

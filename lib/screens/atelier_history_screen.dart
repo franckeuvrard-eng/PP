@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../widgets/photo_thumb.dart';
 import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
@@ -76,7 +77,7 @@ class AtelierHistoryScreen extends StatelessWidget {
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
                   child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
                 ),
               ],
@@ -101,11 +102,11 @@ class AtelierHistoryScreen extends StatelessWidget {
                       return ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: absPath != null && File(absPath).existsSync()
-                            ? Image.file(File(absPath), width: 72, height: 72, fit: BoxFit.cover)
+                            ? PhotoThumb(path: absPath, size: 72, radius: 8)
                             : Container(
                                 width: 72,
                                 height: 72,
-                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                 child: const Icon(Icons.broken_image, size: 20),
                               ),
                       );

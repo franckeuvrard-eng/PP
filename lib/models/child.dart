@@ -12,6 +12,9 @@ class Child {
   final String colorHex;
   final String avatarText;
   final String? email;
+
+  /// Second contact (l'autre parent, un tuteur…), facultatif.
+  final String? email2;
   final String? imagePath;
 
   /// Autorisation « droit à l'image » donnée par les parents pour les photos.
@@ -31,9 +34,16 @@ class Child {
     required this.colorHex,
     required this.avatarText,
     this.email,
+    this.email2,
     this.imagePath,
     this.imageAuthorized = false,
   });
+
+  /// Adresses des parents renseignees (0, 1 ou 2), sans doublon.
+  List<String> get parentEmails => {
+        for (final e in [email, email2])
+          if (e != null && e.trim().isNotEmpty) e.trim(),
+      }.toList();
 
   /// Copie modifiee. Les champs non fournis restent inchanges ; passer
   /// explicitement `null` a un champ optionnel le vide.
@@ -47,6 +57,7 @@ class Child {
     String? colorHex,
     String? avatarText,
     Object? email = kUndefined,
+    Object? email2 = kUndefined,
     Object? imagePath = kUndefined,
     bool? imageAuthorized,
   }) {
@@ -60,6 +71,7 @@ class Child {
       colorHex: colorHex ?? this.colorHex,
       avatarText: avatarText ?? this.avatarText,
       email: email == kUndefined ? this.email : email as String?,
+      email2: email2 == kUndefined ? this.email2 : email2 as String?,
       imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
       imageAuthorized: imageAuthorized ?? this.imageAuthorized,
     );
@@ -76,6 +88,7 @@ class Child {
       'colorHex': colorHex,
       'avatarText': avatarText,
       'email': email,
+      'email2': email2,
       'imagePath': imagePath,
       'imageAuthorized': imageAuthorized,
     };
@@ -92,6 +105,7 @@ class Child {
       colorHex: map['colorHex'] ?? '#4E9F3D',
       avatarText: map['avatarText'] ?? (map['firstname'] != null && map['firstname'].isNotEmpty ? map['firstname'][0] : 'E'),
       email: map['email'],
+      email2: map['email2'],
       imagePath: map['imagePath'],
       // Absent = fiche creee avant cette fonctionnalite : on ne bloque pas
       // retroactivement des photos deja en usage. Present mais faux = choix

@@ -40,7 +40,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       case StatsPeriod.month:
         return DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
       case StatsPeriod.all:
-      default:
         return null;
     }
   }
@@ -60,7 +59,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return logs.where((l) =>
             l.timestamp.year == now.year && l.timestamp.month == now.month).toList();
       case StatsPeriod.all:
-      default:
         return logs;
     }
   }
@@ -96,7 +94,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       }
       final actType = provider.activityTypeById(act.activityTypeId) ??
           ActivityType(id: '', name: '', spaceId: '', colorHex: '#718096');
-      final space = provider.spaceById(actType.spaceId) ??
+      final space = provider.placeOf(actType) ??
           Space(id: '', name: 'Autre', colorHex: '#718096');
       final cat = space.name.isNotEmpty ? space.name : 'Autre';
       domainCounts[cat] = (domainCounts[cat] ?? 0) + 1;
@@ -209,7 +207,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: Column(
                 children: [
@@ -237,7 +235,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             child: LinearProgressIndicator(
                               value: ratio,
                               minHeight: 8,
-                              backgroundColor: color.withOpacity(0.15),
+                              backgroundColor: color.withValues(alpha: 0.15),
                               color: color,
                             ),
                           ),
@@ -269,7 +267,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
                 ),
                 child: Column(
                   children: sortedDomains.map((entry) {
@@ -293,7 +291,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             child: LinearProgressIndicator(
                               value: ratio,
                               minHeight: 8,
-                              backgroundColor: const Color(0xFF4E9F3D).withOpacity(0.15),
+                              backgroundColor: const Color(0xFF4E9F3D).withValues(alpha: 0.15),
                               color: const Color(0xFF4E9F3D),
                             ),
                           ),
@@ -331,9 +329,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
-              child: ListView.separated(
+              // Material transparent : sans lui, le fond blanc masquait l'effet
+              // de toucher des lignes depliables.
+              child: Material(
+                type: MaterialType.transparency,
+                child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: sortedChildren.length,
@@ -381,7 +383,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     trailing: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange).withOpacity(0.15),
+                        color: (breakdown.aFaire.isEmpty ? const Color(0xFF4E9F3D) : Colors.orange).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -424,6 +426,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   );
                 },
               ),
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -434,7 +437,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
               ),
               child: ListView.separated(
                 shrinkWrap: true,
@@ -453,7 +456,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     ),
                     title: Text(actType.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      provider.spaces.firstWhere((s) => s.id == actType.spaceId, orElse: () => Space(id: '', name: '', colorHex: '')).name,
+                      provider.placeOf(actType)?.name ?? '',
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: Text('$count fois', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -479,7 +482,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   ) {
     final typeById = {for (final t in types) t.id: t};
     final counts = <String, int>{
-      for (final d in EduscolData.domains) d.title: 0,
+      // Domaines actuels a zero ; un ancien domaine n'apparait que s'il sert.
+      for (final d in EduscolData.domainsForCycle(1)) d.title: 0,
     };
     var sansDomaine = 0;
 
@@ -489,7 +493,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       // le libelle ne sert que pour les domaines personnalises.
       final domain = type?.domaineId == null
           ? null
-          : EduscolData.domains.where((d) => d.id == type!.domaineId).firstOrNull;
+          : EduscolData.domainById(type!.domaineId);
       final key = domain?.title ?? type?.domaine ?? '';
       if (key.isEmpty) {
         sansDomaine++;
@@ -525,11 +529,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             children: [
               ...entries.map((entry) {
                 final ratio = total == 0 ? 0.0 : entry.value / total;
-                final domain = EduscolData.domains.firstWhere(
-                  (d) => d.title == entry.key,
-                  orElse: () => EduscolData.domains.first,
-                );
-                final couleur = hexToColor(domain.colorHex);
+                final domain = EduscolData.domainByTitle(entry.key);
+                // Domaine personnalise : couleur neutre.
+                final couleur = hexToColor(domain?.colorHex ?? '#718096');
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
@@ -589,7 +591,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Widget _miniCounter(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
       child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
     );
   }
@@ -633,7 +635,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ? null
           : Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
               child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
             ),
       onTap: () => Navigator.push(
@@ -681,7 +683,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           children: [
             Icon(Icons.stars, color: Colors.orange, size: 22),
             SizedBox(width: 8),
-            Text('Ateliers Obligatoires & Suivi des Retards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Plan de travail & Suivi des Retards', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 12),
@@ -700,7 +702,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Aucun atelier n\'est configuré comme obligatoire.\nPour rendre un atelier obligatoire, allez dans Paramètres > Espaces & Ateliers et cochez "Atelier Obligatoire".',
+                    'Aucun atelier n\'est dans le plan de travail.\nPour en ajouter un, ouvrez Espaces & Ateliers, modifiez l\'atelier et cochez "Plan de travail".',
                     style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFE2E8F0) : Colors.black87),
                   ),
                 ),
@@ -714,10 +716,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             itemCount: mandatoryTypes.length,
             itemBuilder: (context, index) {
               final actType = mandatoryTypes[index];
-              final space = provider.spaces.firstWhere(
-                (s) => s.id == actType.spaceId,
-                orElse: () => Space(id: '', name: 'Non défini', colorHex: ''),
-              );
+              final space = provider.placeOf(actType) ?? Space(id: '', name: 'Non défini', colorHex: '');
 
               final completedChildIds = logs
                   .where((l) => l.activityTypeId == actType.id)
@@ -801,7 +800,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           ),
                           const SizedBox(height: 8),
                           if (missingChildren.isEmpty)
-                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier obligatoire.', style: TextStyle(fontSize: 12, color: kAccessibleGreenText, fontWeight: FontWeight.bold))
+                            const Text('🎉 Bravo ! Tous les élèves ont réalisé cet atelier du plan de travail.', style: TextStyle(fontSize: 12, color: kAccessibleGreenText, fontWeight: FontWeight.bold))
                           else
                             Wrap(
                               spacing: 6,
@@ -890,7 +889,7 @@ class _StatCard extends StatelessWidget {
             // Un cercle blanc franc sur une carte sombre etait trop dur :
             // en mode sombre on utilise une pastille teintee.
             backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? textColor.withOpacity(0.18)
+                ? textColor.withValues(alpha: 0.18)
                 : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
@@ -901,7 +900,7 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.8))),
+                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.8))),
               ],
             ),
           ),

@@ -1,3 +1,4 @@
+import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
 import 'sync_merge.dart';
 
@@ -32,6 +33,10 @@ class SyncReport {
     'activities': 'Observations',
     'activity_types': 'Ateliers',
     'spaces': 'Espaces',
+    'progressions': 'Parcours',
+    'need_groups': 'Groupes de besoin',
+    'carnets': 'Carnet de suivi',
+    'planning': 'Planning',
     'sons_progress': 'Sons',
     'referential_status': 'Compétences',
     'referentials': 'Référentiels',
@@ -81,7 +86,8 @@ class SyncReport {
     'notes': 'Notes',
     'colorHex': 'Couleur',
     'avatarText': 'Initiales',
-    'email': 'E-mail',
+    'email': 'E-mail parent 1',
+    'email2': 'E-mail parent 2',
     'imagePath': 'Photo',
     'imageAuthorized': 'Autorisation photo',
     'childId': 'Élève',
@@ -94,16 +100,21 @@ class SyncReport {
     'audioPath': 'Note vocale',
     'name': 'Nom',
     'spaceId': 'Espace',
+    'progressionId': 'Parcours',
+    'minStatusId': 'Seuil de passage',
     'description': 'Description',
     'domaine': 'Domaine',
     'domaineId': 'Domaine',
+    'sousDomaineId': 'Sous-domaine',
     'objectifs': 'Objectifs',
-    'isObligatory': 'Obligatoire',
+    'isObligatory': 'Plan de travail',
     'obligatoryGroups': 'Groupes concernés',
+    'isDisabled': 'Désactivé',
+    'targetGroups': 'Sections',
     'iconName': 'Icône',
     'position': 'Ordre',
-    'isProgression': 'Suivi de progression',
-    'progressionMinStatusId': 'Seuil de progression',
+    'isProgression': 'Mode parcours',
+    'progressionMinStatusId': 'Seuil du parcours',
     'label': 'Libellé',
     'teacher': 'Enseignant(e)',
     'atsem': 'ATSEM',
@@ -141,7 +152,12 @@ class SyncReport {
         return n.activityType(text);
       case 'spaceId':
         return n.space(text);
+      case 'progressionId':
+        return n.progression(text);
+      case 'sousDomaineId':
+        return EduscolData.subdomainById(text)?.title ?? text;
       case 'evaluationStatusId':
+      case 'minStatusId':
       case 'progressionMinStatusId':
         return n.status(text);
       case 'imagePath':
@@ -176,6 +192,7 @@ class SyncReport {
         return [who, what].join(' · ') + (when.isEmpty ? '' : ' ($when)');
       case 'activity_types':
       case 'spaces':
+      case 'progressions':
         return _str(v['name'], 'Sans nom');
       case 'referentials':
         return _str(v['name'], 'Sans nom');
@@ -215,15 +232,20 @@ class _Names {
         _types = _index(snapshot['activity_types']),
         _refs = _index(snapshot['referentials']),
         _spaces = _index(snapshot['spaces']),
+        _progressions = _index(snapshot['progressions']),
         _statuses = _index(snapshot['evaluation_statuses']);
 
   final Map<String, Map> _children;
   final Map<String, Map> _types;
   final Map<String, Map> _refs;
   final Map<String, Map> _spaces;
+  final Map<String, Map> _progressions;
   final Map<String, Map> _statuses;
 
   String space(String? id) => SyncReport._str(_spaces[id]?['name'], 'Espace supprimé');
+
+  String progression(String? id) =>
+      SyncReport._str(_progressions[id]?['name'], 'Parcours supprimé');
 
   String status(String? id) => SyncReport._str(_statuses[id]?['label'], 'Statut supprimé');
 

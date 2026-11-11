@@ -13,11 +13,11 @@ import 'package:petitpas/providers/app_provider.dart';
 import 'package:petitpas/services/app_database.dart';
 import 'package:petitpas/services/mandatory_ateliers_pdf_service.dart';
 
-/// Plan de travail : vignettes portrait en grille, sans titre d'espace.
+/// Plan de travail : vignettes portrait en grille (3 colonnes), sans titre d'espace.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('15 ateliers obligatoires tiennent sur 2 pages A4 (9 par page)', () async {
+  test('le plan de travail tient 12 vignettes par page A4 portrait', () async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
     SharedPreferences.setMockInitialValues({});
@@ -43,7 +43,6 @@ void main() {
       avatarText: 'LD',
     );
     provider.addOrUpdateChild(child);
-    final avant = provider.activityTypes.where((a) => a.isObligatoryForGroup('PS')).length;
 
     var n = 0;
     for (final domaine in EduscolData.domains) {
@@ -73,7 +72,12 @@ void main() {
     final text = latin1.decode(bytes, allowInvalid: true);
     final pages = RegExp(r'/Type\s*/Page\b').allMatches(text).length;
 
-    // 15 + les ateliers deja obligatoires : 3 colonnes x 3 rangees par page.
-    expect(pages, ((n + avant) / 9).ceil());
+    // Tous les ateliers du plan (ceux de l'exemple + les 15 ajoutes) : 3
+    // colonnes x 4 rangees par page.
+    final total = provider.activityTypes
+        .where((a) => !a.inProgression && a.isObligatoryForGroup('PS'))
+        .length;
+    expect(total, greaterThanOrEqualTo(15));
+    expect(pages, (total / 12).ceil());
   });
 }

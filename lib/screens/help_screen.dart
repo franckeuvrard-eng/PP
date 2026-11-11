@@ -1,9 +1,51 @@
 import 'package:flutter/material.dart';
 
+import '../data/release_notes.dart';
+import 'onboarding_screen.dart';
+import 'whats_new_screen.dart';
+
 /// Aide intégrée : rappel du fonctionnement écran par écran.
 ///
 /// Volontairement hors ligne et sans lien externe : l'application est utilisée
 /// en classe, souvent sans réseau.
+/// Prise en main et nouveautes, en tete de l'Aide. Une etape choisie dans la
+/// liste de parametrage referme l'Aide en la renvoyant a l'ecran principal.
+class _QuickLinks extends StatelessWidget {
+  const _QuickLinks();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.school, color: Color(0xFF4E9F3D)),
+            title: const Text('Prise en main', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Visite des écrans et paramétrage de la classe, pas à pas.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final target = await Navigator.push<SetupTarget>(
+                context,
+                MaterialPageRoute(fullscreenDialog: true, builder: (_) => const OnboardingScreen()),
+              );
+              if (target != null && context.mounted) Navigator.pop(context, target);
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.new_releases, color: Color(0xFF4E9F3D)),
+            title: const Text('Nouveautés', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Ce qui a changé dans la version ${kReleaseNotes.first.version}.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const WhatsNewScreen())),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
 
@@ -16,6 +58,8 @@ class HelpScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: const [
+          _QuickLinks(),
+          SizedBox(height: 8),
           _Intro(),
           SizedBox(height: 8),
           _HelpSection(
@@ -23,18 +67,56 @@ class HelpScreen extends StatelessWidget {
             title: 'Pour bien démarrer',
             steps: [
               'Paramètres > Profil Classe : renseignez le nom de la classe, l\'enseignant et le niveau.',
-              'Paramètres > Espaces & Ateliers : créez vos espaces (coin lecture, motricité...), puis un ou plusieurs ateliers dans chacun.',
+              'Espaces & Ateliers (menu principal) : créez vos espaces (coin lecture, motricité...), puis un ou plusieurs ateliers dans chacun.',
               'Paramètres > Profil Classe > Sections : définissez vos sections (PS, MS, Groupe Rouge...).',
               'Élèves > Ajouter Élève : saisissez-les un par un, ou en une fois via Paramètres > Importer des élèves (Excel).',
-              'Badges QR : imprimez les étiquettes des élèves et des ateliers.',
+              'QR codes (Rapports > QR codes sur iPhone, Badges QR dans la barre latérale sur Mac et iPad) : badges des élèves et étiquettes des ateliers, une ou plusieurs pages par domaine. Les QR des étapes s\'impriment depuis Parcours, une ou plusieurs pages par parcours.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.child_care,
+            title: 'Mode élève (tablette)',
+            steps: [
+              'Scan & Go > « Mode élève » (sur Mac et iPad : bouton « Mode élève » en haut de Scan & Go). L\'enfant touche sa photo (ou scanne son badge), puis l\'atelier qu\'il a fait : les ateliers prévus pour lui aujourd\'hui sont marqués d\'une étoile, les étapes verrouillées ne sont pas proposées.',
+              'La saisie part « à valider », sans niveau. La carte « À valider » de l\'accueil liste les saisies : touchez le niveau atteint, ou supprimez une saisie erronée.',
+              'Pour quitter le mode élève : bouton « Adulte » en haut, puis Face ID ou le code de l\'appareil.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.calendar_view_week,
+            title: 'Planning de la semaine',
+            steps: [
+              'Planning (barre latérale sur Mac et iPad, onglet Ateliers sur iPhone) : pour chaque jour, ajoutez un créneau, choisissez pour qui (toute la classe, une section, un groupe de besoin) et quels ateliers ou étapes.',
+              'Rotation : choisissez des groupes, des jours et des ateliers ; chaque groupe passe à l\'atelier suivant le jour d\'après. « Reprendre la semaine précédente » recopie la semaine d\'avant ; l\'icône PDF imprime le tableau de la semaine.',
+              'Dans Scan & Go, les ateliers prévus aujourd\'hui pour l\'élève sont en tête ; le plan de travail peut ne garder que ce qui est prévu cette semaine.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.menu_book,
+            title: 'Carnet de suivi et synthèse',
+            steps: [
+              'Rapports > Carnet de suivi : choisissez l\'élève (flèches pour passer au suivant) et la période (P1 à P5, dates modifiables). Pour chaque domaine, l\'appli montre les réussites de la période (dernière observation de chaque atelier au niveau le plus abouti) ; ajoutez votre commentaire, au clavier ou en dictée.',
+              'Le PDF reprend les réussites avec leurs photos, vos commentaires, un espace pour le mot de la famille et les signatures.',
+              'Rapports > Synthèse de fin de maternelle : pour chaque sous-domaine du programme, « ne réussit pas encore », « est en voie de réussite » ou « réussit souvent ». L\'appli suggère un niveau d\'après les observations de l\'année ; « Appliquer les suggestions » les reprend d\'un coup. Ajoutez points forts et besoins.',
+              'Dictée : le micro à droite d\'un champ (note d\'observation, description, commentaires) transforme la voix en texte ; touchez-le de nouveau pour arrêter.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.groups,
+            title: 'Groupes de besoin',
+            steps: [
+              'Élèves > Groupes de besoin. L\'onglet Suggestions propose des groupes tirés des observations : les élèves arrivés à la même étape d\'un parcours, ceux au même niveau sur un atelier (hors le niveau le plus abouti), ceux qui n\'ont jamais fait un atelier de leur plan de travail.',
+              '« Enregistrer le groupe » le garde dans Mes groupes ; on peut aussi en créer un à la main, le renommer, changer sa couleur et ses élèves.',
+              'Un groupe se coche d\'un geste partout où l\'on choisit des élèves : « Enregistrer aussi pour » dans Scan & Go, et les rapports (plan de travail, parcours, rapport des élèves). Les sections aussi.',
             ],
           ),
           _HelpSection(
             icon: Icons.qr_code_scanner,
             title: 'Scan & Go : enregistrer une observation',
             steps: [
-              'Scannez le badge de l\'élève puis celui de l\'atelier, dans n\'importe quel ordre.',
-              'Sans badge sous la main, utilisez la sélection manuelle.',
+              'Choisissez d\'abord le mode : « Scanner les QR codes » ou « Sélection manuelle ». Après chaque enregistrement, on enchaîne avec l\'élève suivant (la caméra se rouvre en mode QR).',
+              'Mode QR : scannez le badge de l\'élève et l\'étiquette de l\'atelier ou de l\'étape, dans n\'importe quel ordre.',
+              'Mode manuel : tapez quelques lettres du prénom ou du nom de l\'élève, puis choisissez l\'atelier rangé par domaine et sous-domaine, ou l\'étape rangée par parcours. La recherche trouve aussi un domaine ou un parcours.',
               'Choisissez le niveau d\'évaluation, ajoutez une note écrite ou vocale, et des photos si besoin.',
               'Chaque photo peut recevoir un commentaire, repris dans l\'export PDF.',
               'Saisie groupée : avant de valider, ajoutez d\'autres élèves via « Enregistrer aussi pour ». Une observation est créée pour chacun, avec la même note et les mêmes photos.',
@@ -56,12 +138,25 @@ class HelpScreen extends StatelessWidget {
           ),
           _HelpSection(
             icon: Icons.stars,
-            title: 'Ateliers obligatoires et progression',
+            title: 'Plan de travail',
             steps: [
-              'Dans l\'édition d\'un atelier, activez « Atelier Obligatoire ».',
-              'Sélectionnez ensuite les sections concernées. Si vous n\'en cochez aucune, l\'atelier est obligatoire pour toute la classe.',
-              'Les statistiques et le rapport « Ateliers obligatoires » ne comptabilisent alors que les élèves des sections ciblées.',
-              'Un espace peut en plus être mis en « Mode progression » (Paramètres > Espaces & Ateliers, en modifiant l\'espace) : ses ateliers doivent alors être faits dans l\'ordre, glissé-déposé pour réordonner, et un atelier reste verrouillé pour un élève tant que les précédents n\'ont pas atteint le statut minimum choisi.',
+              'Dans l\'édition d\'un atelier, activez « Plan de travail ».',
+              'Sélectionnez ensuite les sections concernées. Si vous n\'en cochez aucune, l\'atelier est dans le plan de travail de toute la classe.',
+              'Les statistiques et le rapport « Plan de travail » ne comptabilisent alors que les élèves des sections ciblées.',
+            ],
+          ),
+          _HelpSection(
+            icon: Icons.timeline,
+            title: 'Parcours',
+            steps: [
+              'Un parcours est une suite d\'étapes à faire dans l\'ordre (par exemple : couper une bande, puis une ligne droite, puis une courbe). Ce n\'est pas un atelier : il n\'est rangé dans aucun espace.',
+              'Créez-le dans Parcours > onglet Gérer, choisissez le seuil de passage, les sections qui le suivent, puis ajoutez ses étapes avec « Ajouter une étape ». Glissez la poignée ⠿ pour changer leur ordre.',
+              'Dupliquer : l\'icône « copier » d\'un parcours en fait une copie avec toutes ses étapes ; de même pour un espace (avec ses ateliers) et, depuis sa fiche, pour un atelier ou une étape. La copie reprend description, objectifs et photos, sans les observations.',
+              'À surveiller (carte de l\'accueil) : pour chaque élève, les domaines sans observation depuis 2, 3 ou 4 semaines ; et la part du programme travaillée par vos ateliers, avec les objectifs qui n\'en ont aucun.',
+              'Sections : sans section cochée, toute la classe suit le parcours. Sinon seuls les élèves de ces sections apparaissent dans le suivi, le plan de travail et le rapport des parcours.',
+              'Une étape reste verrouillée pour un élève tant que la précédente n\'a pas atteint le seuil de passage.',
+              'L\'écran Parcours (barre latérale sur Mac et iPad, onglet Ateliers sur iPhone) montre le fil : où en est la classe, ou un élève. L\'onglet Parcours de la fiche élève montre la même chose pour lui.',
+              'Frise : le bouton frise de l\'écran Parcours (ou Rapports > Frise d\'un parcours) imprime le parcours en grand, trois étapes par page à mettre bout à bout, vierge pour les pinces des élèves ou avec leurs prénoms.',
             ],
           ),
           _HelpSection(
@@ -78,12 +173,13 @@ class HelpScreen extends StatelessWidget {
             title: 'Rapports et exports',
             steps: [
               'Onglet Rapports : point d\'entrée unique pour tous les documents.',
-              'Ateliers obligatoires (PDF) : liste et statut, pour un ou plusieurs élèves choisis à la fois.',
-              'Fiche atelier (PDF) : description, objectifs et photos légendées d\'un atelier.',
-              'Export RGPD élève : toutes les données personnelles conservées pour un élève choisi.',
+              'Plan de travail (PDF) : les ateliers du plan de travail en vignettes, en paysage, pour un ou plusieurs élèves. Avant l\'export, choisissez d\'afficher ou non le statut et les cases à cocher, et quels statuts inclure (par exemple seulement « Jamais fait »).',
+              'Parcours des élèves (PDF) : le même principe pour les étapes des parcours, avec en plus le choix des parcours.',
+              'Suivi des parcours (PDF ou Excel) : tableau croisé élèves × parcours, avec l\'étape où en est chacun. Le fichier Excel contient aussi une feuille « Données » prête pour un tableau croisé dynamique.',
+              'Fiche atelier ou parcours (PDF) : description, objectifs et photos légendées d\'un atelier, ou d\'un parcours avec toutes ses étapes dans l\'ordre.',
+              'RGPD : l\'export des données d\'un élève, son effacement, la politique de confidentialité, l\'archivage de fin d\'année et la réinitialisation sont regroupés dans Paramètres > RGPD.',
               'Bilan classe (Excel) : toutes les observations de la classe, au format tableur.',
-              'Rapport PDF de la classe : historique détaillé de tous les élèves, avec choix de la période (tout, ce mois, cette semaine, ou personnalisée) et option pour ne garder que l\'occurrence la plus récente de chaque atelier.',
-              'Rapport d\'un élève : aussi accessible depuis sa fiche (icône RGPD dans la barre du haut). L\'analyse des sons figure toujours en tête, quelle que soit la période.',
+              'Rapport des élèves (PDF) : pour un élève, plusieurs ou toute la classe. Choisissez la période (tout, ce mois, cette semaine, ou personnalisée), si l\'analyse des sons et vos référentiels apparaissent, et si les activités sont regroupées par domaine et sous-domaine, puis par parcours (sinon par date). Option pour ne garder que l\'occurrence la plus récente de chaque atelier.',
               'Dans un aperçu PDF, double-tapez une page pour l\'agrandir, puis pincez pour zoomer.',
             ],
           ),
@@ -96,7 +192,7 @@ class HelpScreen extends StatelessWidget {
               'Sauvegardez régulièrement : le ZIP contient les données et les photos.',
               'La restauration remplace l\'intégralité des données existantes.',
               'En fin d\'année : « Passer à l\'année suivante » archive élèves et observations dans un ZIP daté, puis repart sur une classe vide en conservant espaces, ateliers, niveaux et sections. Les archives se retrouvent, se partagent ou se suppriment depuis le même écran.',
-              'Réinitialisation sélective : au bas de l\'onglet Sauvegarde & Sécurité, pour effacer précisément certaines données (élèves, historique, ateliers...) plutôt que tout recommencer.',
+              'Réinitialisation sélective : dans Paramètres > RGPD, pour effacer précisément certaines données (élèves, historique, ateliers...) plutôt que tout recommencer.',
             ],
           ),
           _HelpSection(

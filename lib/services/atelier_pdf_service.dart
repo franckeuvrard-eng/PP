@@ -7,6 +7,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/activity_type.dart';
 import '../models/space.dart';
+import '../models/progression.dart';
+import '../data/eduscol_data.dart';
 import '../providers/app_provider.dart';
 import '../utils/pdf_text.dart';
 import '../utils/pdf_viewer.dart';
@@ -16,7 +18,7 @@ import '../utils/pdf_viewer.dart';
 ///
 /// Sert de support a remettre a l'enfant ou aux familles.
 class AtelierPdfService {
-  static pw.MemoryImage? _imageAt(AppStateProvider provider, String? relPath) {
+  static pw.MemoryImage? imageAt(AppStateProvider provider, String? relPath) {
     final abs = provider.getAbsolutePath(relPath);
     if (abs == null) return null;
     final file = File(abs);
@@ -38,17 +40,54 @@ class AtelierPdfService {
     );
   }
 
+  /// Toutes les photos lisibles d'un atelier, l'illustration principale en
+  /// tete.
+  static List<pw.MemoryImage> imagesOf(AppStateProvider provider, ActivityType atelier) => [
+        for (final relPath in atelier.allPhotoPaths)
+          if (imageAt(provider, relPath) case final image?) image,
+      ];
+
+  /// Mosaique de toutes les photos, chacune entiere, qui remplit la place
+  /// donnee : 1 photo seule, 2 cote a cote, jusqu'a 4 en 2 x 2, au-dela en
+  /// 3 colonnes. A placer dans une zone de hauteur fixe (ou un Expanded).
+  static pw.Widget photoMosaic(List<pw.MemoryImage> images, {double gap = 3}) {
+    final n = images.length;
+    final cols = n == 1 ? 1 : (n <= 4 ? 2 : 3);
+    final rows = (n / cols).ceil();
+    return pw.Column(
+      children: [
+        for (var r = 0; r < rows; r++) ...[
+          if (r > 0) pw.SizedBox(height: gap),
+          pw.Expanded(
+            child: pw.Row(
+              children: [
+                for (var c = 0; c < cols; c++) ...[
+                  if (c > 0) pw.SizedBox(width: gap),
+                  pw.Expanded(
+                    child: r * cols + c < n
+                        ? pw.Image(images[r * cols + c], fit: pw.BoxFit.contain) // photo entiere
+                        : pw.SizedBox(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   /// Vignette d'une photo, surmontant sa legende quand elle en a une.
-  static pw.Widget _photoTile(pw.MemoryImage image, String? caption) {
+  static pw.Widget photoTile(pw.MemoryImage image, String? caption, {double width = 165}) {
     return pw.Container(
-      width: 165,
+      width: width,
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         mainAxisSize: pw.MainAxisSize.min,
         children: [
           pw.Container(
-            width: 165,
-            height: 124,
+            width: width,
+            height: width * 0.75,
             decoration: pw.BoxDecoration(
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
               border: pw.Border.all(color: PdfColors.grey400),
@@ -56,7 +95,7 @@ class AtelierPdfService {
             child: pw.ClipRRect(
               horizontalRadius: 6,
               verticalRadius: 6,
-              child: pw.Image(image, fit: pw.BoxFit.cover),
+              child: pw.Image(image, fit: pw.BoxFit.contain), // photo entiere
             ),
           ),
           if (caption != null) ...[
@@ -77,18 +116,15 @@ class AtelierPdfService {
     required PdfPageFormat format,
   }) async {
     final settings = provider.classSettings;
-    final space = provider.spaces.firstWhere(
-      (s) => s.id == atelier.spaceId,
-      orElse: () => Space(id: '', name: 'Non défini', colorHex: '#718096'),
-    );
+    final space = provider.placeOf(atelier) ?? Space(id: '', name: 'Non défini', colorHex: '#718096');
 
     // La fiche decrit l'atelier seul : les realisations des eleves relevent
     // du rapport individuel, pas de ce support.
     final photoTiles = <pw.Widget>[];
     for (final relPath in atelier.allPhotoPaths) {
-      final image = _imageAt(provider, relPath);
+      final image = imageAt(provider, relPath);
       if (image == null) continue;
-      photoTiles.add(_photoTile(image, atelier.captionFor(relPath)));
+      photoTiles.add(photoTile(image, atelier.captionFor(relPath)));
     }
 
     final doc = pw.Document();
@@ -122,11 +158,14 @@ class AtelierPdfService {
             pw.Text('Espace : ${pdfSafe(space.name)}', style: const pw.TextStyle(fontSize: 11)),
             if (atelier.domaine.isNotEmpty)
               pw.Text('Domaine : ${pdfSafe(atelier.domaine)}', style: const pw.TextStyle(fontSize: 11)),
+            if (EduscolData.subdomainById(atelier.sousDomaineId) != null)
+              pw.Text('Sous-domaine : ${pdfSafe(EduscolData.subdomainById(atelier.sousDomaineId)!.title)}',
+                  style: const pw.TextStyle(fontSize: 11)),
             if (atelier.isObligatory)
               pw.Text(
                 atelier.obligatoryGroups.isEmpty
-                    ? 'Atelier obligatoire pour toute la classe'
-                    : 'Atelier obligatoire pour : ${atelier.obligatoryGroups.map(pdfSafe).join(', ')}',
+                    ? 'Plan de travail de toute la classe'
+                    : 'Plan de travail : ${atelier.obligatoryGroups.map(pdfSafe).join(', ')}',
                 style: pw.TextStyle(
                     fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.orange800),
               ),
@@ -153,6 +192,112 @@ class AtelierPdfService {
     );
 
     return doc.save();
+  }
+
+  /// Fiche d'un parcours : le parcours (sections, seuil de passage) puis
+  /// chacune de ses etapes, dans l'ordre, avec description, objectifs et
+  /// photos legendees.
+  static Future<Uint8List> buildParcoursBytes({
+    required AppStateProvider provider,
+    required Progression parcours,
+    required PdfPageFormat format,
+  }) async {
+    final settings = provider.classSettings;
+    final steps = provider.ateliersInProgressionOrdered(parcours.id);
+    String? threshold;
+    for (final s in provider.evaluationStatuses) {
+      if (s.id == parcours.minStatusId) threshold = s.label;
+    }
+
+    pw.Widget step(int i, ActivityType s) {
+      final tiles = <pw.Widget>[
+        for (final relPath in s.allPhotoPaths)
+          if (imageAt(provider, relPath) case final image?) photoTile(image, s.captionFor(relPath), width: 120),
+      ];
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Divider(color: PdfColors.grey400),
+          pw.Text(pdfSafe('Étape ${i + 1} - ${s.name}'),
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          if (s.domaine.isNotEmpty)
+            pw.Text(
+                'Domaine : ${pdfSafe(s.domaine)}'
+                '${EduscolData.subdomainById(s.sousDomaineId) == null ? '' : ' > ${pdfSafe(EduscolData.subdomainById(s.sousDomaineId)!.title)}'}',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+          if (s.description != null && s.description!.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            pw.Text(pdfSafe(s.description!.trim()), style: const pw.TextStyle(fontSize: 10)),
+          ],
+          if (s.objectifs.isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            ...s.objectifs.map((o) => pw.Bullet(text: pdfSafe(o), style: const pw.TextStyle(fontSize: 9.5))),
+          ],
+          if (tiles.isNotEmpty) ...[
+            pw.SizedBox(height: 6),
+            pw.Wrap(spacing: 8, runSpacing: 8, children: tiles),
+          ],
+          pw.SizedBox(height: 8),
+        ],
+      );
+    }
+
+    final doc = pw.Document();
+    doc.addPage(pw.MultiPage(
+      pageFormat: format,
+      build: (context) => [
+        pw.Header(
+          level: 0,
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Fiche parcours - A petits pas',
+                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(DateFormat('dd/MM/yyyy').format(DateTime.now()), style: const pw.TextStyle(fontSize: 11)),
+            ],
+          ),
+        ),
+        pw.Text(
+          '${pdfSafe(settings.name)} - ${pdfSafe(settings.teacher)} - ${pdfSafe(settings.schoolYear)}',
+          style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic),
+        ),
+        pw.SizedBox(height: 14),
+        pw.Text(pdfSafe(parcours.name), style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        pw.Text('${steps.length} étape(s), à faire dans l\'ordre', style: const pw.TextStyle(fontSize: 11)),
+        pw.Text(
+            parcours.targetGroups.isEmpty
+                ? 'Sections : toute la classe'
+                : 'Sections : ${parcours.targetGroups.map(pdfSafe).join(', ')}',
+            style: const pw.TextStyle(fontSize: 11)),
+        if (threshold != null)
+          pw.Text('On passe à l\'étape suivante au niveau « ${pdfSafe(threshold)} »',
+              style: const pw.TextStyle(fontSize: 11)),
+        if (parcours.description != null && parcours.description!.trim().isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(pdfSafe(parcours.description!.trim()),
+              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey800)),
+        ],
+        pw.SizedBox(height: 10),
+        if (steps.isEmpty)
+          pw.Text('Aucune étape pour l\'instant.', style: const pw.TextStyle(fontSize: 11))
+        else
+          for (final (i, s) in steps.indexed) step(i, s),
+      ],
+    ));
+    return doc.save();
+  }
+
+  static void openParcoursPreview(BuildContext context, AppStateProvider provider, Progression parcours) {
+    final safeName = parcours.name.replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '').trim().replaceAll(' ', '_');
+    openPdfViewer(
+      context,
+      title: 'Fiche - ${parcours.name}',
+      fileName: 'Parcours_${safeName.isEmpty ? 'sans_nom' : safeName}.pdf',
+      build: (format) => buildParcoursBytes(provider: provider, parcours: parcours, format: format),
+      shareSubject: 'Fiche parcours - ${parcours.name}',
+      shareBody: 'Veuillez trouver ci-joint la fiche du parcours ${parcours.name}.',
+    );
   }
 
   /// Ouvre l'apercu imprimable / partageable de la fiche atelier.

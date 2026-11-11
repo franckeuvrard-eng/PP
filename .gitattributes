@@ -1,0 +1,2 @@
+# Scripts executes sur les runners macOS : fins de ligne Unix obligatoires.
+*.sh text eol=lf

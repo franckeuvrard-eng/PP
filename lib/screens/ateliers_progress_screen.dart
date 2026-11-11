@@ -126,7 +126,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
   Widget _summaryChip(String label, int count, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
       child: Text('$count $label', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
     );
   }
@@ -145,14 +145,14 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
   ) {
     final bySpace = <String, List<MapEntry<ActivityType, AtelierEligibilityResult>>>{};
     for (final entry in entries) {
-      (bySpace[entry.key.spaceId] ??= []).add(entry);
+      (bySpace[provider.placeIdOf(entry.key)] ??= []).add(entry);
     }
     final spaceIds = bySpace.keys.toList()
-      ..sort((a, b) => (provider.spaceById(a)?.name ?? '').compareTo(provider.spaceById(b)?.name ?? ''));
+      ..sort((a, b) => (provider.placeById(a)?.name ?? '').compareTo(provider.placeById(b)?.name ?? ''));
 
     return [
       for (final spaceId in spaceIds) ...[
-        _buildSpaceHeader(provider.spaceById(spaceId)),
+        _buildSpaceHeader(provider.placeById(spaceId)),
         ...bySpace[spaceId]!.map((e) => _buildAtelierRow(provider, e.key, e.value, snapshots[e.key.id])),
         const SizedBox(height: 8),
       ],
@@ -178,7 +178,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
     if (eligibility.status == AtelierEligibility.blockedProgression) {
       return Card(
         margin: const EdgeInsets.only(bottom: 8),
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: ListTile(
           dense: true,
           leading: const Icon(Icons.lock_outline, color: Colors.grey),
@@ -206,7 +206,7 @@ class _AteliersProgressScreenState extends State<AteliersProgressScreen> {
             : null,
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
           child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
         ),
         onTap: () => Navigator.push(

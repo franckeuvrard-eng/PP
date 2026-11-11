@@ -4,19 +4,49 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'providers/app_provider.dart';
+import 'providers/cloud_sync_controller.dart';
+import 'services/icloud_sync.dart';
 import 'utils/platform_support.dart';
 import 'widgets/desktop_frame.dart';
+import 'widgets/storage_error_banner.dart';
 import 'screens/help_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/qr_scanner_screen.dart';
 import 'screens/children_manager_screen.dart';
+import 'screens/progressions_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/spaces_workshops_tab.dart';
+import 'screens/ateliers_hub_screen.dart';
+import 'screens/planning_screen.dart';
+import 'widgets/splash_overlay.dart';
 import 'screens/qr_generator_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/whats_new_screen.dart';
+import 'screens/sync_prompts.dart';
+import 'data/release_notes.dart';
+import 'data/seed_ids.dart';
+import 'services/children_import_service.dart';
+
+/// Polices de repli du theme : vide dans l'application (le systeme gere lui-
+/// meme les emojis ; mettre une police emoji en repli la faisait servir a tout
+/// le texte sur iPhone/Mac, avec des espaces geants entre les mots).
+/// Renseigne uniquement par le generateur de captures (moteur de test sans
+/// repli automatique).
+@visibleForTesting
+List<String>? debugThemeFontFallback;
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppStateProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        // Synchronisation iCloud automatique (iPhone, iPad, Mac seulement).
+        ChangeNotifierProvider(
+          create: (context) => CloudSyncController(context.read<AppStateProvider>()),
+          lazy: false,
+        ),
+      ],
       child: const PetitPasApp(),
     ),
   );
@@ -38,6 +68,7 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
+        fontFamilyFallback: debugThemeFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF4E9F3D),
@@ -53,7 +84,7 @@ class PetitPasApp extends StatelessWidget {
         // sert de base commune aux ecrans qui redefinissaient chacun a la
         // main `shape: RoundedRectangleBorder(borderRadius: circular(16))`
         // sur leurs Card.
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.white,
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -66,12 +97,16 @@ class PetitPasApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF2D3748)),
           bodySmall: TextStyle(fontSize: 12, color: Color(0xFF616161)),
         ),
+        // Bandeaux flottants : au-dessus des boutons flottants et de la barre
+        // d'onglets, au lieu de les masquer.
+        snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           elevation: 0,
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Color(0xFF2D3748)),
           titleTextStyle: TextStyle(
+            fontFamily: 'Outfit',
             color: Color(0xFF2D3748),
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -82,6 +117,7 @@ class PetitPasApp extends StatelessWidget {
         useMaterial3: true,
         visualDensity: isDesktopPlatform ? VisualDensity.compact : null,
         fontFamily: 'Outfit',
+        fontFamilyFallback: debugThemeFontFallback,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4E9F3D),
           primary: const Color(0xFF66BB6A),
@@ -92,7 +128,7 @@ class PetitPasApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         cardColor: const Color(0xFF1E293B),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: const Color(0xFF1E293B),
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -104,6 +140,7 @@ class PetitPasApp extends StatelessWidget {
           scrolledUnderElevation: 1,
           iconTheme: IconThemeData(color: Colors.white),
           titleTextStyle: TextStyle(
+            fontFamily: 'Outfit',
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -126,12 +163,13 @@ class PetitPasApp extends StatelessWidget {
           bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
           titleMedium: TextStyle(color: Colors.white),
         ),
-        dialogTheme: const DialogTheme(
+        dialogTheme: const DialogThemeData(
           backgroundColor: Color(0xFF1E293B),
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          titleTextStyle: TextStyle(fontFamily: 'Outfit', color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           contentTextStyle: TextStyle(color: Color(0xFFCBD5E1)),
         ),
         snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
           backgroundColor: Color(0xFF334155),
           contentTextStyle: TextStyle(color: Colors.white),
         ),
@@ -150,9 +188,9 @@ class PetitPasApp extends StatelessWidget {
       // bonne partie des tailles d'accessibilite.
       builder: (context, child) => MediaQuery.withClampedTextScaling(
         maxScaleFactor: 1.8,
-        child: child ?? const SizedBox.shrink(),
+        child: StorageErrorBanner(child: child ?? const SizedBox.shrink()),
       ),
-      home: const LockScreen(),
+      home: const SplashOverlay(child: LockScreen()),
     );
   }
 }
@@ -215,10 +253,24 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
       _isAuthenticated = true;
       return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    // Face ID attend la fin de l'animation d'ouverture : sa fenetre la
+    // recouvrait, et on ne la voyait jamais.
+    if (SplashOverlay.done.value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    } else {
+      void start() {
+        if (!SplashOverlay.done.value) return;
+        SplashOverlay.done.removeListener(start);
+        if (mounted) _authenticate();
+      }
+
+      SplashOverlay.done.addListener(start);
+    }
   }
 
   Future<void> _authenticate() async {
+    // Jamais deux demandes Face ID a la fois, ni apres le deverrouillage.
+    if (_isAuthenticating || _isAuthenticated) return;
     bool authenticated = false;
     try {
       setState(() {
@@ -226,11 +278,13 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
       });
       authenticated = await auth.authenticate(
         localizedReason: 'Veuillez vous authentifier pour accéder à l\'espace enseignant.',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: false,
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: false,
       );
+    } on LocalAuthException catch (e) {
+      // Annulation, pas de code configure, trop d'essais… : l'ecran reste
+      // verrouille et propose de reessayer.
+      debugPrint('Auth error: ${e.code} ${e.description}');
     } on PlatformException catch (e) {
       debugPrint('Auth error: $e');
     } on MissingPluginException catch (e) {
@@ -253,9 +307,35 @@ class _LockScreenState extends State<LockScreen> with WidgetsBindingObserver {
     }
 
     if (!provider.isLoaded) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF4E9F3D),
-        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      // Prolonge l'ecran de demarrage iOS (LaunchScreen.storyboard) a
+      // l'identique : meme creme, empreinte a la meme place (image carree
+      // ajustee au plus petit cote, empreinte sur 84 % de sa hauteur), pour
+      // qu'il n'y ait ni flash ni saut pendant le chargement des donnees.
+      return Scaffold(
+        backgroundColor: kSplashCream,
+        body: LayoutBuilder(builder: (context, c) {
+          final side = c.biggest.shortestSide;
+          return Stack(children: [
+            Center(
+              child: SizedBox(
+                height: side * 0.842,
+                child: Image.asset('assets/images/splash_foot.png', fit: BoxFit.contain),
+              ),
+            ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 48,
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFFE8833A)),
+                ),
+              ),
+            ),
+          ]);
+        }),
       );
     }
 
@@ -303,13 +383,32 @@ class MainNavigationFrame extends StatefulWidget {
 class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
+  /// Barre laterale (ordinateur, iPad), dans l'ordre affiche ; [_desktopOrder]
+  /// donne l'ecran de [_screens] correspondant.
   static const _destinations = [
     DesktopDestination(label: 'Accueil', icon: Icons.home_outlined, selectedIcon: Icons.home),
     DesktopDestination(label: 'Scan & Go', icon: Icons.qr_code_2, selectedIcon: Icons.qr_code_2),
     DesktopDestination(label: 'Élèves', icon: Icons.people_outline, selectedIcon: Icons.people),
+    DesktopDestination(label: 'Espaces & Ateliers', icon: Icons.space_dashboard_outlined, selectedIcon: Icons.space_dashboard),
+    DesktopDestination(label: 'Parcours', icon: Icons.timeline, selectedIcon: Icons.timeline),
+    DesktopDestination(label: 'Planning', icon: Icons.calendar_view_week_outlined, selectedIcon: Icons.calendar_view_week),
+    DesktopDestination(label: 'Rapports', icon: Icons.description_outlined, selectedIcon: Icons.description),
     DesktopDestination(label: 'Badges QR', icon: Icons.print_outlined, selectedIcon: Icons.print),
     DesktopDestination(label: 'Paramètres', icon: Icons.tune, selectedIcon: Icons.tune),
   ];
+  static const _desktopOrder = [0, 1, 2, _spacesIndex, _progressionsIndex, _planningIndex, _reportsIndex, 3, 4];
+
+  /// Barre du bas (iPhone), dans l'ordre affiche. Espaces & Ateliers et
+  /// Parcours y sont reunis dans l'onglet Ateliers ; Rapports (QR codes
+  /// compris) s'ouvre depuis la tuile de l'accueil.
+  static const _phoneOrder = [0, 1, 2, _hubIndex, 4];
+
+  static const _badgesIndex = 3;
+  static const _progressionsIndex = 5;
+  static const _reportsIndex = 6;
+  static const _spacesIndex = 7;
+  static const _hubIndex = 8;
+  static const _planningIndex = 9;
 
   final List<Widget> _screens = const [
     HomeDashboardScreen(),
@@ -317,16 +416,137 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     ChildrenManagerScreen(),
     QrGeneratorScreen(),
     SettingsScreen(),
+    ProgressionsScreen(),
+    ReportsScreen(),
+    SpacesWorkshopsScreen(),
+    AteliersHubScreen(),
+    PlanningScreen(),
   ];
+
+  int get _desktopIndex {
+    final i = _desktopOrder.indexOf(_currentIndex);
+    return i < 0 ? 0 : i;
+  }
+
+  void _selectDesktop(int i) => _select(_desktopOrder[i]);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showIntroIfNeeded());
+  }
+
+  /// Premier lancement : prise en main. Apres une mise a jour : nouveautes
+  /// de la version, une seule fois. Une classe deja utilisee n'a pas besoin
+  /// de la visite guidee.
+  Future<void> _showIntroIfNeeded() async {
+    final app = context.read<AppStateProvider>();
+    if (app.loadFailed) return;
+    final latest = kReleaseNotes.first.version;
+    final seenBefore = app.releaseNotesSeen;
+    if (!app.onboardingDone) {
+      app.markOnboardingDone();
+      final usedAlready = app.children.any((c) => !kSeedChildIds.contains(c.id)) ||
+          app.activities.any((a) => !kSeedActivityIds.contains(a.id));
+      if (!usedAlready) {
+        app.markReleaseNotesSeen(latest);
+        await _openOnboarding();
+        return;
+      }
+    }
+    if (seenBefore == latest) return;
+    app.markReleaseNotesSeen(latest);
+    final unseen = <ReleaseNote>[];
+    for (final n in kReleaseNotes) {
+      if (n.version == seenBefore) break;
+      unseen.add(n);
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => WhatsNewScreen(notes: unseen)),
+    );
+  }
+
+  Future<void> _openOnboarding({bool checklist = false}) async {
+    final target = await Navigator.push<SetupTarget>(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => OnboardingScreen(startOnChecklist: checklist),
+      ),
+    );
+    await _goToSetup(target);
+  }
+
+  /// Etape choisie dans la liste de parametrage.
+  Future<void> _goToSetup(SetupTarget? target) async {
+    if (target == null || !mounted) return;
+    void settings(int tab) => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SettingsScreen(initialTab: tab, standalone: true)),
+        );
+    switch (target) {
+      case SetupTarget.classProfile:
+        settings(0);
+      case SetupTarget.spaces:
+        if (usesDesktopLayout(MediaQuery.sizeOf(context).width)) {
+          _select(_spacesIndex);
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SpacesWorkshopsScreen()));
+        }
+      case SetupTarget.security:
+        settings(2);
+      case SetupTarget.students:
+        _select(2);
+      case SetupTarget.badges:
+        if (usesDesktopLayout(MediaQuery.sizeOf(context).width)) {
+          _select(_badgesIndex);
+        } else {
+          _openPhonePage(const QrGeneratorScreen(standalone: true));
+        }
+      case SetupTarget.importStudents:
+        _select(2);
+        await ChildrenImportService.pickAndImport(
+            context: context, provider: context.read<AppStateProvider>());
+    }
+  }
+
+  /// Synchro iCloud (absente hors iPhone/iPad/Mac et dans certains tests).
+  CloudSyncController? _cloud;
+
+  /// Situation en attente deja signalee : une seule fenetre par situation.
+  CloudSyncOutcome? _promptedFor;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_cloud != null) return;
+    try {
+      _cloud = Provider.of<CloudSyncController>(context, listen: false)
+        ..addListener(_onCloudChanged);
+    } on ProviderNotFoundException {
+      // Pas de synchro iCloud dans cet arbre.
+    }
+  }
+
+  /// La synchro automatique attend une decision (suppressions nombreuses,
+  /// modifications des deux cotes) : on previent au lieu d'attendre en silence.
+  void _onCloudChanged() {
+    final cloud = _cloud;
+    if (cloud == null || !cloud.needsAttention) return;
+    final outcome = cloud.lastOutcome;
+    if (identical(outcome, _promptedFor)) return;
+    _promptedFor = outcome;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) promptPendingCloudSync(context, cloud);
+    });
   }
 
   @override
   void dispose() {
+    _cloud?.removeListener(_onCloudChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -343,11 +563,58 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
 
   void _select(int index) => setState(() => _currentIndex = index);
 
-  void _openHelp() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+  void _openPhonePage(Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  Future<void> _openHelp() async {
+    final target = await Navigator.push<SetupTarget>(
+        context, MaterialPageRoute(builder: (_) => const HelpScreen()));
+    await _goToSetup(target);
   }
 
-  /// Barre de menus de macOS : Cmd+1..5 pour changer de page, Cmd+? pour l'aide.
+  /// Synchronisation iCloud immediate (tirer pour actualiser, Cmd+R sur Mac),
+  /// suivie d'un message court sur ce qui s'est passe.
+  Future<void> _refresh() async {
+    final outcome = await context.read<CloudSyncController>().refreshNow();
+    if (!mounted) return;
+    if (outcome == null) {
+      final enabled = context.read<AppStateProvider>().iCloudSyncEnabled;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(enabled
+              ? 'Données en cours de chargement : réessayez dans un instant.'
+              : 'La synchronisation iCloud est désactivée (Paramètres › Sauvegarde & Sécurité).')));
+      return;
+    }
+    final received = outcome.summary?.changes.where((c) => c.onLocal).length ?? 0;
+    final text = switch (outcome.status) {
+      CloudSyncStatus.synced =>
+        received > 0 ? '$received changement(s) reçu(s) via iCloud.' : 'Synchronisé avec iCloud.',
+      CloudSyncStatus.upToDate => 'Déjà à jour.',
+      CloudSyncStatus.needsConfirmation || CloudSyncStatus.needsResolution =>
+        'Synchronisation en attente de votre accord : Paramètres › Sauvegarde & Sécurité › '
+            'Synchroniser avec un autre appareil.',
+      CloudSyncStatus.unavailable => 'iCloud n’est pas disponible sur cet appareil.',
+      CloudSyncStatus.retryLater => 'iCloud est occupé : nouvel essai dans un instant.',
+      CloudSyncStatus.error => 'Échec de la synchronisation : ${outcome.message}',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Tirer vers le bas sur les ecrans principaux (iPhone, iPad) pour
+  /// synchroniser sans attendre.
+  Widget _refreshable(Widget child) {
+    if (!CloudSyncController.isSupported || isMacOSPlatform) return child;
+    return RefreshIndicator(
+      color: const Color(0xFF4E9F3D),
+      // Les listes des ecrans sont imbriquees (onglets, Scaffold) : toute
+      // liste verticale tiree en haut declenche l'actualisation.
+      notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+      onRefresh: _refresh,
+      child: child,
+    );
+  }
+
+  /// Barre de menus de macOS : Cmd+1..9 pour changer de page, Cmd+? pour l'aide.
   /// Sur les autres plateformes, `PlatformMenuBar` ne fait rien et les memes
   /// raccourcis passent par Ctrl+1..5 ([desktopNavigationShortcuts]).
   List<PlatformMenuItem> _macMenus() {
@@ -357,6 +624,10 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
       LogicalKeyboardKey.digit3,
       LogicalKeyboardKey.digit4,
       LogicalKeyboardKey.digit5,
+      LogicalKeyboardKey.digit6,
+      LogicalKeyboardKey.digit7,
+      LogicalKeyboardKey.digit8,
+      LogicalKeyboardKey.digit9,
     ];
     return [
       const PlatformMenu(
@@ -373,10 +644,32 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             PlatformMenuItem(
               label: _destinations[i].label,
               shortcut: SingleActivator(digits[i], meta: true),
-              onSelected: () => _select(i),
+              onSelected: () => _selectDesktop(i),
             ),
         ],
       ),
+      PlatformMenu(
+        label: 'Présentation',
+        menus: [
+          PlatformMenuItem(
+            label: 'Afficher/Masquer la barre latérale',
+            // Raccourci standard de macOS pour la barre laterale.
+            shortcut: const SingleActivator(LogicalKeyboardKey.keyS, meta: true, control: true),
+            onSelected: () => context.read<AppStateProvider>().toggleSidebar(),
+          ),
+        ],
+      ),
+      if (CloudSyncController.isSupported)
+        PlatformMenu(
+          label: 'Synchronisation',
+          menus: [
+            PlatformMenuItem(
+              label: 'Synchroniser maintenant',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyR, meta: true),
+              onSelected: _refresh,
+            ),
+          ],
+        ),
       PlatformMenu(
         label: 'Aide',
         menus: [
@@ -393,17 +686,19 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
   Widget _buildDesktop(AppStateProvider appProvider) {
     final frame = DesktopFrame(
       destinations: _destinations,
-      currentIndex: _currentIndex,
-      onSelected: _select,
+      currentIndex: _desktopIndex,
+      onSelected: _selectDesktop,
       className: appProvider.classSettings.name,
       onHelp: _openHelp,
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _refreshable(IndexedStack(index: _currentIndex, children: _screens)),
+      collapsed: appProvider.sidebarCollapsed,
+      onToggleCollapsed: appProvider.toggleSidebar,
     );
     if (isMacOSPlatform) {
       return PlatformMenuBar(menus: _macMenus(), child: frame);
     }
     return CallbackShortcuts(
-      bindings: desktopNavigationShortcuts(_destinations.length, _select),
+      bindings: desktopNavigationShortcuts(_destinations.length, _selectDesktop),
       child: Focus(autofocus: true, child: frame),
     );
   }
@@ -416,7 +711,7 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
     // second critere evite de rebasculer sur la barre d'onglets mobile quand
     // l'utilisateur reduit la fenetre un peu trop.
     final width = MediaQuery.sizeOf(context).width;
-    if (width >= kDesktopBreakpoint || (isDesktopPlatform && width >= 600)) {
+    if (usesDesktopLayout(width)) {
       return _buildDesktop(appProvider);
     }
 
@@ -433,42 +728,42 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
               child: const Icon(Icons.child_care, color: Colors.white, size: 22),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('A petits pas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text(
-                  appProvider.classSettings.name,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
-                ),
-              ],
+            // Flexible : avec l'icone Rapports, la barre du haut d'un petit
+            // telephone ne laisse plus la place au titre entier.
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('A petits pas',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(
+                    appProvider.classSettings.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF4E9F3D), fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Color(0xFFFF7043)),
-            onPressed: () {
-              setState(() => _currentIndex = 1);
-            },
-            tooltip: 'Scan Express',
-          ),
+          // Rapports et QR codes s'ouvrent depuis la tuile de l'accueil.
           IconButton(
             icon: const Icon(Icons.help_outline),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpScreen()));
-            },
             tooltip: 'Aide',
+            onPressed: () => _openPhonePage(const HelpScreen()),
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: _refreshable(IndexedStack(
+        // Page de la barre laterale sans onglet ici : retour a l'accueil.
+        index: _phoneOrder.contains(_currentIndex) ? _currentIndex : 0,
         children: _screens,
-      ),
+      )),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        currentIndex: _phoneOrder.contains(_currentIndex) ? _phoneOrder.indexOf(_currentIndex) : 0,
+        onTap: (i) => setState(() => _currentIndex = _phoneOrder[i]),
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF4E9F3D),
         unselectedItemColor: const Color(0xFF718096),
@@ -490,9 +785,9 @@ class _MainNavigationFrameState extends State<MainNavigationFrame> with WidgetsB
             label: 'Élèves',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.print_outlined),
-            activeIcon: Icon(Icons.print),
-            label: 'Badges QR',
+            icon: Icon(Icons.space_dashboard_outlined),
+            activeIcon: Icon(Icons.space_dashboard),
+            label: 'Ateliers',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.tune),

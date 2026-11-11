@@ -1,11 +1,8 @@
-import 'dart:typed_data';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
 
+import '../utils/file_export.dart';
 import '../models/child.dart';
 import '../providers/app_provider.dart';
 import '../utils/color_utils.dart';
@@ -19,7 +16,8 @@ class ChildrenImportService {
     'Nom',
     'Date de naissance (jj/mm/aaaa)',
     'Section / Groupe',
-    'Email des parents',
+    'Email parent 1',
+    'Email parent 2 (facultatif)',
     'Autorisation image (oui/non)',
     'Notes',
   ];
@@ -49,7 +47,8 @@ class ChildrenImportService {
         xl.TextCellValue('Martin'),
         xl.TextCellValue('12/04/2023'),
         xl.TextCellValue(exempleSection),
-        xl.TextCellValue('parents.leo@example.com'),
+        xl.TextCellValue('parent1.leo@example.com'),
+        xl.TextCellValue(''),
         xl.TextCellValue('Non'),
         xl.TextCellValue('Exemple à remplacer ou supprimer'),
       ]);
@@ -68,15 +67,17 @@ class ChildrenImportService {
       final rawBytes = excel.encode();
       if (rawBytes == null) throw Exception('Erreur lors de la génération du modèle.');
 
-      final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/APetitPas_Modele_Import_Eleves.xlsx');
-      await file.writeAsBytes(bytes);
-
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      final outcome = await exportFile(
+        fileName: 'APetitPas_Modele_Import_Eleves.xlsx',
+        bytes: rawBytes,
+        mimeType: kXlsxMime,
         subject: 'Modèle d\'import élèves A petits pas',
+        origin: context.mounted ? shareOriginOf(context) : null,
       );
+      if (outcome == ExportOutcome.saved && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Modèle enregistré. Remplissez-le puis utilisez « Importer ».')));
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -93,17 +94,14 @@ class ChildrenImportService {
     required AppStateProvider provider,
   }) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
-        allowMultiple: false,
       );
-      if (result == null || result.files.isEmpty) return;
+      if (picked == null) return;
 
-      final path = result.files.first.path;
-      if (path == null) return;
-
-      final bytes = await File(path).readAsBytes();
+      // Lecture via XFile : fonctionne aussi sans chemin local (iCloud Drive…).
+      final bytes = await picked.xFile.readAsBytes();
       final excel = xl.Excel.decodeBytes(bytes);
       if (excel.tables.isEmpty) throw Exception('Le fichier ne contient aucune feuille.');
 
@@ -138,6 +136,7 @@ class ChildrenImportService {
             : null;
         final group = _cellText(row, columns['group']).trim();
         final email = _cellText(row, columns['email']).trim();
+        final email2 = _cellText(row, columns['email2']).trim();
         final notes = _cellText(row, columns['notes']).trim();
         // Toute valeur autre que "oui" (y compris vide ou illisible) laisse
         // l'autorisation a son defaut prudent : non accordee.
@@ -170,6 +169,7 @@ class ChildrenImportService {
           colorHex: '#4E9F3D',
           avatarText: firstname[0].toUpperCase(),
           email: email.isEmpty ? null : email,
+          email2: email2.isEmpty ? null : email2,
           imageAuthorized: imageAuthorized,
         );
         newChildren.add(child);
@@ -254,7 +254,9 @@ class ChildrenImportService {
       } else if (header.contains('section') || header.contains('groupe')) {
         columns['group'] = col;
       } else if (header.contains('mail')) {
-        columns['email'] = col;
+        // Premiere colonne d'email : parent 1 ; la suivante : parent 2.
+        // Les anciens modeles (une seule colonne) restent lisibles.
+        columns[columns.containsKey('email') ? 'email2' : 'email'] = col;
       } else if (header.contains('autorisation')) {
         columns['imageAuthorized'] = col;
       } else if (header.contains('note') || header.contains('remarque')) {

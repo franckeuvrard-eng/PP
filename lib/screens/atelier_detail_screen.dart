@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../widgets/photo_thumb.dart';
+import '../widgets/age_chip.dart';
+import '../data/eduscol_data.dart';
 import '../models/activity_type.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_pdf_service.dart';
@@ -19,8 +22,12 @@ class AtelierDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer cet atelier ?'),
-        content: Text('« ${current.name} » sera définitivement supprimé.'),
+        title: Text(current.inProgression ? 'Supprimer cette étape ?' : 'Supprimer cet atelier ?'),
+        content: Text(() {
+          final n = provider.activityCountForType(current.id);
+          return '« ${current.name} » sera définitivement supprimé'
+              '${n == 0 ? '.' : ', ainsi que ses $n observation(s).'}';
+        }()),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           ElevatedButton(
@@ -42,7 +49,7 @@ class AtelierDetailScreen extends StatelessWidget {
     return Consumer<AppStateProvider>(
       builder: (context, provider, _) {
         final current = provider.activityTypeById(atelier.id) ?? atelier;
-        final space = provider.spaceById(current.spaceId);
+        final space = provider.placeOf(current);
         final color = hexToColor(current.colorHex);
 
         return Scaffold(
@@ -55,12 +62,38 @@ class AtelierDetailScreen extends StatelessWidget {
                 onPressed: () => AtelierPdfService.openPreview(context, provider, current),
               ),
               IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: current.inProgression ? "Dupliquer l'étape" : "Dupliquer l'atelier",
+                onPressed: () {
+                  final copy = provider.duplicateActivityType(current.id);
+                  if (copy == null) return;
+                  // Ouvre la copie, prete a etre renommee ou modifiee.
+                  Navigator.pushReplacement(
+                      context, MaterialPageRoute(builder: (_) => AtelierDetailScreen(atelier: copy)));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('« ${copy.name} » créé (sans les observations).')));
+                },
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit),
                 tooltip: 'Modifier',
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => AtelierEditScreen(activityType: current)),
                 ),
+              ),
+              if (!current.inProgression) IconButton(
+                icon: Icon(current.isDisabled ? Icons.visibility : Icons.visibility_off),
+                tooltip: current.isDisabled ? "Réactiver l'atelier" : "Désactiver l'atelier",
+                onPressed: () {
+                  final disable = !current.isDisabled;
+                  provider.setActivityTypeDisabled(current.id, disable);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(disable
+                        ? "« ${current.name} » est désactivé : il n'apparaît plus dans Espaces & Ateliers."
+                        : '« ${current.name} » est réactivé.'),
+                  ));
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.delete_forever, color: Colors.red),
@@ -95,17 +128,31 @@ class AtelierDetailScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (current.isDisabled) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '🚫 Désactivé · masqué dans Espaces & Ateliers',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: kMutedTextColor),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (current.isObligatory)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.12),
+                      color: Colors.orange.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       current.obligatoryGroups.isEmpty
-                          ? '⭐ Obligatoire · toute la classe'
-                          : '⭐ Obligatoire · ${current.obligatoryGroups.join(', ')}',
+                          ? '⭐ Plan de travail · toute la classe'
+                          : '⭐ Plan de travail · ${current.obligatoryGroups.join(', ')}',
                       style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
                     ),
                   ),
@@ -114,14 +161,30 @@ class AtelierDetailScreen extends StatelessWidget {
                   const Text('Domaine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   Text('📚 ${current.domaine}'),
+                  if (EduscolData.subdomainById(current.sousDomaineId) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, left: 4),
+                      child: Text('↳ ${EduscolData.subdomainById(current.sousDomaineId)!.title}',
+                          style: const TextStyle(color: kMutedTextColor)),
+                    ),
                 ],
                 if (current.objectifs.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const Text('Objectifs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kMutedTextColor)),
                   const SizedBox(height: 4),
                   ...current.objectifs.map((o) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text('• $o'),
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text('• $o'),
+                            // Tranche d'age du programme (absente pour un
+                            // objectif personnalise ou d'un ancien programme).
+                            for (final l in EduscolData.levelsForText(o)) AgeChip(level: l),
+                          ],
+                        ),
                       )),
                 ],
                 if (current.description != null && current.description!.trim().isNotEmpty) ...[
@@ -146,11 +209,11 @@ class AtelierDetailScreen extends StatelessWidget {
                         return ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: absPath != null && File(absPath).existsSync()
-                              ? Image.file(File(absPath), width: 96, height: 96, fit: BoxFit.cover)
+                              ? PhotoThumb(path: absPath, size: 96, radius: 12)
                               : Container(
                                   width: 96,
                                   height: 96,
-                                  color: Theme.of(context).colorScheme.surfaceVariant,
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   child: const Icon(Icons.broken_image, size: 24),
                                 ),
                         );

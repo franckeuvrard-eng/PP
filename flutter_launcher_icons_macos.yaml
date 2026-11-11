@@ -1,0 +1,10 @@
+# Icone macOS : meme image que l'iPhone, arrondie aux proportions Mac
+# (assets/images/app_icon_macos.png, cf. tool/make_macos_icon.dart).
+# Configuration a part : la principale (pubspec.yaml) cible iOS et Windows.
+flutter_launcher_icons:
+  android: false
+  ios: false
+  image_path: "assets/images/app_icon_macos.png"
+  macos:
+    generate: true
+    image_path: "assets/images/app_icon_macos.png"

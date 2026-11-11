@@ -5,26 +5,21 @@ on:
   workflow_call:
 
 env:
-  IOS_DEPLOYMENT_TARGET: '14.0'
+  # Minimum de Flutter 3.47 (tout appareil sous iOS 14 peut passer en iOS 15).
+  IOS_DEPLOYMENT_TARGET: '15.0'
 
 jobs:
   build-ios:
-    # Runner epingle : macos-14 embarque Xcode 15.x, compatible Flutter 3.19.
-    # macos-latest bascule sur Xcode 16.x, incompatible avec Flutter 3.19.
-    runs-on: macos-14
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Select Xcode 15.4
-        run: |
-          ls /Applications | grep -i '^Xcode' || true
-          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+        uses: actions/checkout@v7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.47.7'
           channel: 'stable'
 
       - name: Toolchain diagnostics
@@ -37,34 +32,13 @@ jobs:
           dart --version
 
       - name: Recreate iOS platform files
+        # Partage avec testflight.yml (completion du projet, cible iOS).
         run: |
-          mv ios/Runner/Info.plist Info.plist.bak
-          flutter create --project-name=petitpas --platforms=ios .
-          mv Info.plist.bak ios/Runner/Info.plist
+          bash scripts/prepare_ios.sh "${IOS_DEPLOYMENT_TARGET}"
+          # Build de test non signe (installation par SideStore/AltStore).
           echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
-          # flutter create regenere le test/widget_test.dart du template, qui
-          # reference MyApp() alors que la classe racine est PetitPasApp :
-          # il ferait echouer 'flutter analyze'. On ne supprime que ce
-          # fichier-la, les tests du depot doivent survivre.
-          rm -f test/widget_test.dart
-
-      - name: Normalize iOS deployment target
-        # flutter create reecrit project.pbxproj et AppFrameworkInfo.plist avec 12.0.
-        # On realigne tout sur la meme valeur que le Podfile pour eviter
-        # "module has a minimum deployment target of iOS X".
-        run: |
-          T="${IOS_DEPLOYMENT_TARGET}"
-          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = ${T};/g" ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' "s|<string>12.0</string>|<string>${T}</string>|g" ios/Flutter/AppFrameworkInfo.plist
-          echo "IPHONEOS_DEPLOYMENT_TARGET=${T}" >> ios/Flutter/Release.xcconfig
-          echo "--- pbxproj ---"
-          grep -n 'IPHONEOS_DEPLOYMENT_TARGET' ios/Runner.xcodeproj/project.pbxproj
-          echo "--- AppFrameworkInfo.plist ---"
-          grep -n -A1 'MinimumOSVersion' ios/Flutter/AppFrameworkInfo.plist
-          echo "--- Podfile ---"
-          grep -n 'platform :ios' ios/Podfile
 
       - name: Validate storyboards
         # xcodebuild remonte "Command CompileStoryboard failed with a nonzero
@@ -133,14 +107,14 @@ jobs:
           zip -r "PetitPas_v${{ steps.version.outputs.app_version }}.ipa" Payload
 
       - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PetitPas-v${{ steps.version.outputs.app_version }}-iOS-IPA
           path: PetitPas_v${{ steps.version.outputs.app_version }}.ipa
 
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-diagnostics
           if-no-files-found: warn

@@ -105,7 +105,7 @@ class _RadarChartPainter extends CustomPainter {
       }
     }
     dataPath.close();
-    canvas.drawPath(dataPath, Paint()..color = color.withOpacity(0.25));
+    canvas.drawPath(dataPath, Paint()..color = color.withValues(alpha: 0.25));
     canvas.drawPath(
       dataPath,
       Paint()

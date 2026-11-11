@@ -37,11 +37,11 @@ class AtelierEligibilityResult {
 
 /// Determine si un atelier peut etre propose a un eleve donne, en combinant
 /// deux regles independantes :
-///  - la section de l'eleve doit correspondre au ciblage de l'atelier
-///    (champ [ActivityType.obligatoryGroups] / [ActivityType.isObligatory]) ;
-///  - si l'espace de l'atelier est en mode progression, les ateliers
-///    precedents (par [ActivityType.position]) doivent deja avoir atteint
-///    le niveau minimum choisi pour cet espace (Space.progressionMinStatusId).
+///  - le ciblage par section ([ActivityType.obligatoryGroups]) dit pour qui
+///    l'atelier est obligatoire ; il reste accessible (facultatif) a tous ;
+///  - si l'atelier est un jalon d'une progression, les jalons precedents
+///    (par [ActivityType.position]) doivent deja avoir atteint le seuil de
+///    passage de la progression (Progression.minStatusId).
 ///
 /// Reutilise a l'identique par le scan, la saisie manuelle et le suivi par
 /// atelier : c'est la seule source de verite pour cette regle.
@@ -51,7 +51,7 @@ class AtelierEligibilityService {
     required Child child,
     required ActivityType atelier,
   }) {
-    final sectionResult = _evaluateSection(child, atelier);
+    final sectionResult = _evaluateSection(provider, child, atelier);
     if (sectionResult.status == AtelierEligibility.blockedSection) {
       return sectionResult;
     }
@@ -62,7 +62,19 @@ class AtelierEligibilityService {
     return sectionResult;
   }
 
-  static AtelierEligibilityResult _evaluateSection(Child child, ActivityType atelier) {
+  static AtelierEligibilityResult _evaluateSection(
+      AppStateProvider provider, Child child, ActivityType atelier) {
+    // Etape d'un parcours : les sections se reglent sur le parcours. Hors
+    // section l'etape reste proposee, avec un avertissement.
+    final parcours = provider.progressionById(atelier.progressionId);
+    if (parcours != null) {
+      return parcours.concernsGroup(child.group)
+          ? const AtelierEligibilityResult(status: AtelierEligibility.allowed)
+          : AtelierEligibilityResult(
+              status: AtelierEligibility.allowedWithWarning,
+              message: "Le parcours « ${parcours.name} » n'est pas prévu pour la section de cet élève.",
+            );
+    }
     if (!atelier.isObligatory) {
       return const AtelierEligibilityResult(
         status: AtelierEligibility.allowedWithWarning,
@@ -74,13 +86,10 @@ class AtelierEligibilityService {
       // Configure explicitement pour toute la classe.
       return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
     }
-    if (child.group != null && atelier.obligatoryGroups.contains(child.group)) {
-      return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
-    }
-    return const AtelierEligibilityResult(
-      status: AtelierEligibility.blockedSection,
-      message: "Cet atelier n'est pas configuré pour la section de cet élève.",
-    );
+    // Obligatoire pour certaines sections seulement : pour les autres il reste
+    // accessible, simplement facultatif. Le reserver aux sections ciblees
+    // empechait jusqu'ici les autres eleves d'y etre observes.
+    return const AtelierEligibilityResult(status: AtelierEligibility.allowed);
   }
 
   static AtelierEligibilityResult? _evaluateProgression(
@@ -88,19 +97,19 @@ class AtelierEligibilityService {
     Child child,
     ActivityType atelier,
   ) {
-    final space = provider.spaceById(atelier.spaceId);
-    if (space == null || !space.isProgression) return null;
+    final progression = provider.progressionById(atelier.progressionId);
+    if (progression == null) return null;
     if (atelier.position < 0) return null;
 
     final priorAteliers = provider
-        .ateliersInSpaceOrdered(space.id)
+        .ateliersInProgressionOrdered(progression.id)
         .where((a) => a.position >= 0 && a.position < atelier.position)
         .toList();
     if (priorAteliers.isEmpty) return null;
 
     final missing = <ActivityType>[];
     for (final prior in priorAteliers) {
-      if (!_meetsThreshold(provider, child.id, prior.id, space.progressionMinStatusId)) {
+      if (!meetsThreshold(provider, child.id, prior.id, progression.minStatusId)) {
         missing.add(prior);
       }
     }
@@ -119,7 +128,7 @@ class AtelierEligibilityService {
   /// d'evaluation sont configures (voir AppStateProvider.evaluationStatuses,
   /// generalement du moins au plus abouti). Sans seuil configure, retombe sur
   /// le dernier niveau de la liste.
-  static bool _meetsThreshold(
+  static bool meetsThreshold(
     AppStateProvider provider,
     String childId,
     String activityTypeId,

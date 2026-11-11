@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,48 +6,7 @@ import 'package:petitpas/services/sync_merge.dart';
 import 'package:petitpas/services/sync_report.dart';
 import 'package:petitpas/services/sync_service.dart';
 
-Map<String, dynamic> snap(List<Map<String, dynamic>> children,
-        {Map<String, dynamic>? sons}) =>
-    {
-      'children': children,
-      'activities': [],
-      'spaces': [],
-      'activity_types': [],
-      'evaluation_statuses': [],
-      'referentials': [],
-      'class_settings': {'name': 'A'},
-      'sections': ['PS'],
-      'sons_progress': sons ?? {},
-      'referential_status': {},
-    };
-
-class FakeHost implements SyncHost {
-  FakeHost(this.id, this.data);
-  final String id;
-  Map<String, dynamic> data;
-  final media = <String, Uint8List>{};
-  final bases = <String, Map<String, String>>{};
-
-  @override
-  Future<String> syncDeviceId() async => id;
-  @override
-  Future<String> syncDeviceName() async => 'appareil-$id';
-  @override
-  Future<Map<String, dynamic>> syncSnapshot() async =>
-      Map<String, dynamic>.from(json.decode(json.encode(data)) as Map);
-  @override
-  Future<void> syncApply(Map<String, dynamic> s) async => data = Map<String, dynamic>.from(s);
-  @override
-  Future<List<String>> syncMediaList() async => media.keys.toList();
-  @override
-  Future<Uint8List?> syncReadMedia(String p) async => media[p];
-  @override
-  Future<void> syncWriteMedia(String p, Uint8List b) async => media[p] = b;
-  @override
-  Future<Map<String, String>?> syncLoadBase(String p) async => bases[p];
-  @override
-  Future<void> syncSaveBase(String p, Map<String, String> f) async => bases[p] = f;
-}
+import 'support/sync_fakes.dart';
 
 void main() {
   const alice = {'id': 'a', 'name': 'Alice'};
@@ -67,6 +26,31 @@ void main() {
       expect(en0, greaterThan(lanAddressScore('pdp_ip0', '10.120.4.7')));
       expect(en0, greaterThan(lanAddressScore('utun3', '10.8.0.2')));
       expect(en0, greaterThan(lanAddressScore('bridge100', '192.168.2.1')));
+    });
+  });
+
+  test('referencedMedia : chemins relatifs et anciens chemins absolus', () {
+    final refs = referencedMedia({
+      'children': [
+        {'imagePath': 'profiles/a.jpg'},
+        {'imagePath': null},
+      ],
+      'activity_types': [
+        {'imagePath': r'C:\Users\x\Documents\workshops\w.jpg', 'photoPaths': ['ateliers/p.jpg']},
+      ],
+      'activities': [
+        {'photoPaths': ['activities/o.jpg'], 'audioPath': '/var/mobile/Documents/audio/n.m4a'},
+        {'photoPaths': ['../../etc/passwd']},
+      ],
+      'class_settings': {'logoPath': 'settings/logo.png'},
+    });
+    expect(refs, {
+      'profiles/a.jpg',
+      'workshops/w.jpg',
+      'ateliers/p.jpg',
+      'activities/o.jpg',
+      'audio/n.m4a',
+      'settings/logo.png',
     });
   });
 
@@ -134,10 +118,15 @@ void main() {
 
   group('SyncServer / SyncClient', () {
     test('synchronisation complete sur le reseau local', () async {
-      final mac = FakeHost('mac', snap([alice]));
-      final phone = FakeHost('phone', snap([bob]));
+      final mac = FakeHost('mac', snap([alice])
+        ..['activities'] = [
+          {'id': 'x', 'childId': 'a', 'audioPath': 'audio/x.m4a'}
+        ]);
+      final phone = FakeHost('phone', snap([{...bob, 'imagePath': 'profiles/b.jpg'}]));
       phone.media['profiles/b.jpg'] = Uint8List.fromList([1, 2, 3]);
       mac.media['audio/x.m4a'] = Uint8List.fromList([9]);
+      // Plus utilisee par aucune donnee (supprimee) : ne doit pas voyager.
+      mac.media['profiles/ancienne.jpg'] = Uint8List.fromList([7]);
 
       final server = SyncServer(mac);
       final started = await server.start();
@@ -150,6 +139,7 @@ void main() {
       expect((phone.data['children'] as List).length, 2);
       expect(mac.media.keys, contains('profiles/b.jpg'));
       expect(phone.media.keys, contains('audio/x.m4a'));
+      expect(phone.media.keys, isNot(contains('profiles/ancienne.jpg')));
       expect(summary.mediaDownloaded, 1);
       expect(summary.mediaUploaded, 1);
 
@@ -161,7 +151,7 @@ void main() {
       expect((phone.data['children'] as List).map((c) => c['name']), ['Robert']);
     });
 
-    test('conflit : choix champ par champ, ou annulation sans rien modifier', () async {
+    test('champs differents modifies de chaque cote : fusion sans question', () async {
       const lea = {'id': 'l', 'firstname': 'Léa', 'birthdate': '2021-03-12', 'notes': ''};
       final mac = FakeHost('mac', snap([lea]));
       final phone = FakeHost('phone', snap([lea]));
@@ -172,12 +162,38 @@ void main() {
           hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
       await SyncClient(phone).sync(pairing); // etablit la base commune
 
-      // Meme fiche modifiee des deux cotes, sur des champs differents.
       phone.data = snap([{...lea, 'birthdate': '2021-03-15'}]);
       mac.data = snap([{...lea, 'notes': 'Allergie'}]);
+      var asked = false;
+      final summary = await SyncClient(phone).sync(pairing, resolveConflicts: (c, _, __) async {
+        asked = true;
+        return null;
+      });
+      expect(asked, isFalse);
+      expect(summary.conflicts, 0);
+      for (final host in [mac, phone]) {
+        final child = (host.data['children'] as List).single as Map;
+        expect(child['birthdate'], '2021-03-15');
+        expect(child['notes'], 'Allergie');
+      }
+    });
+
+    test('meme champ modifie des deux cotes : choix, ou annulation sans rien modifier', () async {
+      const lea = {'id': 'l', 'firstname': 'Léa', 'birthdate': '2021-03-12', 'notes': ''};
+      final mac = FakeHost('mac', snap([lea]));
+      final phone = FakeHost('phone', snap([lea]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+      await SyncClient(phone).sync(pairing);
+
+      // Date changee des deux cotes (conflit), notes changees sur le Mac seul.
+      phone.data = snap([{...lea, 'birthdate': '2021-03-15'}]);
+      mac.data = snap([{...lea, 'birthdate': '2021-03-20', 'notes': 'Allergie'}]);
 
       List<MergeConflict>? seen;
-      // Annulation : aucun des deux appareils ne change.
       await expectLater(
         SyncClient(phone).sync(pairing, resolveConflicts: (c, _, __) async {
           seen = c;
@@ -185,19 +201,136 @@ void main() {
         }),
         throwsA(isA<SyncException>()),
       );
-      expect(seen!.single.differingFields.toSet(), {'birthdate', 'notes'});
-      expect((mac.data['children'] as List).single['notes'], 'Allergie');
+      expect(seen!.single.differingFields, ['birthdate']);
+      expect((mac.data['children'] as List).single['birthdate'], '2021-03-20');
       expect((phone.data['children'] as List).single['birthdate'], '2021-03-15');
 
-      // Date de naissance de l'iPhone, notes du Mac : les deux sont gardees.
+      // Date du Mac choisie ; les notes du Mac arrivent d'elles-memes.
       final summary = await SyncClient(phone).sync(pairing,
-          resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'notes'})});
+          resolveConflicts: (c, _, __) async => {c.single.id: c.single.combine({'birthdate'})});
       for (final host in [mac, phone]) {
         final child = (host.data['children'] as List).single as Map;
-        expect(child['birthdate'], '2021-03-15');
+        expect(child['birthdate'], '2021-03-20');
         expect(child['notes'], 'Allergie');
       }
       expect(summary.conflicts, 1);
+    });
+
+    test('accord de l\'appareil qui recoit : refus, puis acceptation memorisee', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final phone = FakeHost('phone', snap([bob]));
+      final asked = <String>[];
+      var answer = false;
+      final server = SyncServer(mac)
+        ..onConsentRequest = (name) async {
+          asked.add(name);
+          return answer;
+        };
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+
+      await expectLater(SyncClient(phone).sync(pairing), throwsA(isA<SyncException>()));
+      expect(asked, ['appareil-phone']);
+      expect((mac.data['children'] as List).length, 1);
+      expect((phone.data['children'] as List).length, 1);
+
+      answer = true;
+      await SyncClient(phone).sync(pairing);
+      await SyncClient(phone).sync(pairing); // deja accepte : pas de nouvelle question
+      expect(asked.length, 2);
+      expect((mac.data['children'] as List).length, 2);
+    });
+
+    test('sans accord, les donnees ne sont pas lisibles meme avec le jeton', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final c = HttpClient();
+      addTearDown(() => c.close(force: true));
+      final req = await c.getUrl(Uri.parse('http://127.0.0.1:${started.port}/snapshot'));
+      req.headers.set('authorization', 'Bearer ${started.token}');
+      final res = await req.close();
+      await res.drain<void>();
+      expect(res.statusCode, 403);
+    });
+
+    test('sauvegarde impossible d\'un cote ou de l\'autre : rien n\'est modifie', () async {
+      final mac = FakeHost('mac', snap([alice]));
+      final phone = FakeHost('phone', snap([bob]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+
+      for (final failing in [phone, mac]) {
+        failing.backupFails = true;
+        await expectLater(SyncClient(phone).sync(pairing), throwsA(isA<SyncException>()));
+        failing.backupFails = false;
+        expect((mac.data['children'] as List).map((c) => c['id']), ['a']);
+        expect((phone.data['children'] as List).map((c) => c['id']), ['b']);
+      }
+
+      await SyncClient(phone).sync(pairing);
+      expect(mac.backups, 1);
+      expect(phone.backups, 2); // une par tentative arrivee jusqu'a l'echec du Mac, puis la bonne
+    });
+
+    test('appareil remis a zero : re-rempli, l\'autre ne perd rien, quel que soit le lanceur',
+        () async {
+      for (final resetIsClient in [true, false]) {
+        final mac = FakeHost('mac', snap([alice, bob]));
+        final phone = FakeHost('phone', snap([alice, bob]));
+        final server = SyncServer(mac);
+        final started = await server.start();
+        final pairing = SyncPairing(
+            hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+        await SyncClient(phone).sync(pairing); // base commune etablie
+
+        // Remise a zero d'un appareil : donnees videes, base oubliee.
+        final reset = resetIsClient ? phone : mac;
+        final other = resetIsClient ? mac : phone;
+        reset.data = snap([]);
+        reset.bases.clear();
+
+        await SyncClient(phone).sync(pairing);
+        expect((other.data['children'] as List).length, 2, reason: 'resetIsClient=$resetIsClient');
+        expect((reset.data['children'] as List).length, 2, reason: 'resetIsClient=$resetIsClient');
+        await server.stop();
+      }
+    });
+
+    test('apercu obligatoire : suppressions annoncees, refus sans rien modifier', () async {
+      final mac = FakeHost('mac', snap([alice, bob]));
+      final phone = FakeHost('phone', snap([alice, bob]));
+      final server = SyncServer(mac);
+      final started = await server.start();
+      addTearDown(server.stop);
+      final pairing = SyncPairing(
+          hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: 'mac');
+      await SyncClient(phone).sync(pairing);
+
+      // Suppression volontaire sur l'iPhone (sans remise a zero).
+      phone.data = snap([alice]);
+      SyncSummary? seen;
+      await expectLater(
+        SyncClient(phone).sync(pairing, confirmChanges: (p) async {
+          seen = p;
+          return false;
+        }),
+        throwsA(isA<SyncException>()),
+      );
+      final deletedOnMac = seen!.changes
+          .where((c) => !c.onLocal && c.kind == ChangeKind.deleted)
+          .map((c) => c.key);
+      expect(deletedOnMac, ['b']);
+      expect((mac.data['children'] as List).length, 2); // refus : rien ecrit
+
+      await SyncClient(phone).sync(pairing, confirmChanges: (_) async => true);
+      expect((mac.data['children'] as List).length, 1);
     });
 
     test('compte rendu detaille sur les deux appareils', () async {

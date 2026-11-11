@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/child.dart';
+import '../providers/app_provider.dart';
 
 /// Selection d'un ou plusieurs eleves, pour une action en masse (rapport,
 /// export...). Calque sur le dialogue "Autres eleves concernes" du scan
@@ -10,6 +12,22 @@ Future<List<Child>?> showChildMultiSelectDialog(
   Set<String>? initialSelection,
 }) {
   final selection = Set<String>.from(initialSelection ?? const {});
+  // Raccourcis : chaque section et chaque groupe de besoin coche (ou
+  // decoche) tous ses eleves d'un geste.
+  final shortcuts = <(String, Set<String>)>[
+    for (final section in {for (final c in children) if (c.group != null && c.group!.isNotEmpty) c.group!})
+      (section, {for (final c in children) if (c.group == section) c.id}),
+  ];
+  try {
+    final provider = Provider.of<AppStateProvider>(context, listen: false);
+    final known = {for (final c in children) c.id};
+    for (final g in provider.needGroups) {
+      final ids = {for (final id in g.childIds) if (known.contains(id)) id};
+      if (ids.isNotEmpty) shortcuts.add((g.name, ids));
+    }
+  } on ProviderNotFoundException {
+    // Pas de donnees de classe dans cet arbre (tests) : sections seules.
+  }
   return showDialog<List<Child>>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
@@ -20,6 +38,30 @@ Future<List<Child>?> showChildMultiSelectDialog(
           height: 420,
           child: Column(
             children: [
+              if (shortcuts.isNotEmpty)
+                SizedBox(
+                  height: 44,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final (label, ids) in shortcuts)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: Text(label),
+                            selected: selection.containsAll(ids),
+                            onSelected: (_) => setSt(() {
+                              if (selection.containsAll(ids)) {
+                                selection.removeAll(ids);
+                              } else {
+                                selection.addAll(ids);
+                              }
+                            }),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(

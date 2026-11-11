@@ -5,12 +5,12 @@ import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import '../utils/file_export.dart';
 import '../models/child.dart';
 import '../models/activity_type.dart';
 import '../models/activity.dart';
@@ -21,7 +21,12 @@ import '../models/referential.dart';
 import '../models/school_year_archive.dart';
 import '../data/eduscol_data.dart';
 import '../data/sons_data.dart';
+import '../models/progression.dart';
+import '../models/need_group.dart';
+import '../models/carnet_entry.dart';
+import '../models/planning_slot.dart';
 import '../services/app_database.dart';
+import '../services/progression_migration.dart';
 import '../services/reminder_service.dart';
 
 /// Suffixe des sauvegardes automatiques faites juste avant une synchronisation.
@@ -133,6 +138,14 @@ class AppStateProvider extends ChangeNotifier {
   /// persistait des la premiere modification.
   bool _loadFailed = false;
 
+  /// Cause technique de l'echec de chargement, montree dans le bandeau.
+  String? _loadError;
+
+  /// Derniere ecriture en base qui a echoue : l'ecran montrait la saisie,
+  /// mais elle n'est pas sur le disque. Affiche dans un bandeau sur toutes
+  /// les pages (une base inaccessible passait jusqu'ici inapercue).
+  String? _storageError;
+
   final AppDatabase _db;
 
   /// Suivi « Analyse des sons » : idEleve -> son -> statut.
@@ -184,6 +197,172 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Espace correspondant a un identifiant, ou null.
   Space? spaceById(String? id) => id == null ? null : _spaceById[id];
+
+  /// Progressions (parcours ordonnes d'ateliers).
+  List<Progression> _progressions = [];
+  List<Progression> get progressions => List.unmodifiable(_progressions);
+
+  /// Groupes de besoin enregistres, par nom.
+  List<NeedGroup> _needGroups = [];
+  List<NeedGroup> get needGroups => List.unmodifiable(
+      _needGroups.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
+
+  NeedGroup? needGroupById(String? id) {
+    for (final g in _needGroups) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  void saveNeedGroup(NeedGroup group) {
+    final i = _needGroups.indexWhere((g) => g.id == group.id);
+    if (i >= 0) {
+      _needGroups[i] = group;
+    } else {
+      _needGroups.add(group);
+    }
+    _write(_db.saveNeedGroup(group));
+    _notify();
+  }
+
+  void deleteNeedGroup(String id) {
+    _needGroups.removeWhere((g) => g.id == id);
+    _write(_db.deleteNeedGroup(id));
+    _notify();
+  }
+
+  /// Carnet de suivi : saisies de l'enseignant par eleve et par periode.
+  List<CarnetEntry> _carnets = [];
+
+  CarnetEntry carnetFor(String childId, String period) {
+    final id = CarnetEntry.idFor(childId, period);
+    for (final e in _carnets) {
+      if (e.id == id) return e;
+    }
+    return CarnetEntry(childId: childId, period: period);
+  }
+
+  void saveCarnet(CarnetEntry entry) {
+    final i = _carnets.indexWhere((e) => e.id == entry.id);
+    if (i >= 0) {
+      _carnets[i] = entry;
+    } else {
+      _carnets.add(entry);
+    }
+    _write(_db.saveCarnet(entry));
+    _notify();
+  }
+
+  /// Planning des ateliers : creneaux par jour et par groupe.
+  List<PlanningSlot> _planning = [];
+
+  List<PlanningSlot> planningForWeek(String week) =>
+      _planning.where((s) => s.week == week).toList()..sort((a, b) => a.day.compareTo(b.day));
+
+  void savePlanningSlot(PlanningSlot slot) {
+    final i = _planning.indexWhere((s) => s.id == slot.id);
+    if (i >= 0) {
+      _planning[i] = slot;
+    } else {
+      _planning.add(slot);
+    }
+    _write(_db.savePlanningSlot(slot));
+    _notify();
+  }
+
+  void deletePlanningSlot(String id) {
+    _planning.removeWhere((s) => s.id == id);
+    _write(_db.deletePlanningSlot(id));
+    _notify();
+  }
+
+  /// Vrai si le creneau concerne cet eleve (toute la classe, sa section ou
+  /// un de ses groupes de besoin).
+  bool slotConcerns(PlanningSlot slot, Child child) {
+    if (slot.target == PlanningSlot.allClass) return true;
+    if (slot.target.startsWith('section:')) return child.group == slot.target.substring(8);
+    if (slot.target.startsWith('group:')) {
+      return needGroupById(slot.target.substring(6))?.childIds.contains(child.id) ?? false;
+    }
+    return false;
+  }
+
+  /// Ateliers prevus pour l'eleve un jour donne.
+  Set<String> plannedAteliersFor(Child child, DateTime day) => {
+        for (final s in _planning)
+          if (s.week == PlanningSlot.weekOf(day) && s.day == day.weekday && slotConcerns(s, child))
+            ...s.atelierIds,
+      };
+
+  /// Ateliers prevus pour l'eleve dans la semaine de [day].
+  Set<String> plannedAteliersForWeek(Child child, DateTime day) => {
+        for (final s in _planning)
+          if (s.week == PlanningSlot.weekOf(day) && slotConcerns(s, child)) ...s.atelierIds,
+      };
+
+  /// Libelle d'une cible de creneau.
+  String planningTargetLabel(String target) {
+    if (target == PlanningSlot.allClass) return 'Toute la classe';
+    if (target.startsWith('section:')) return target.substring(8);
+    if (target.startsWith('group:')) return needGroupById(target.substring(6))?.name ?? 'Groupe supprimé';
+    return target;
+  }
+
+  /// Retire un eleve (supprime) de ses groupes.
+  void _removeChildFromGroups(String childId) {
+    for (var i = 0; i < _needGroups.length; i++) {
+      final g = _needGroups[i];
+      if (!g.childIds.contains(childId)) continue;
+      final updated = g.copyWith(childIds: [for (final c in g.childIds) if (c != childId) c]);
+      _needGroups[i] = updated;
+      _write(_db.saveNeedGroup(updated));
+    }
+  }
+
+  Progression? progressionById(String? id) {
+    if (id == null) return null;
+    for (final p in _progressions) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  /// Espace ou progression d'un atelier, sous forme d'espace pour
+  /// l'affichage (nom, couleur, icone). Null s'il n'est rattache a rien.
+  Space? placeOf(ActivityType atelier) => placeById(placeIdOf(atelier));
+
+  /// Identifiant du rangement d'un atelier (progression sinon espace), pour
+  /// regrouper les ateliers par espace / progression.
+  String placeIdOf(ActivityType atelier) =>
+      atelier.inProgression ? atelier.progressionId! : atelier.spaceId;
+
+  /// Espace, ou progression presentee comme un espace, par identifiant.
+  Space? placeById(String? id) {
+    final space = spaceById(id);
+    if (space != null) return space;
+    final p = progressionById(id);
+    return p == null
+        ? null
+        : Space(id: p.id, name: p.name, colorHex: p.colorHex, iconName: p.iconName,
+            description: p.description);
+  }
+
+  /// Ou se trouve un atelier : son espace, ou sa progression. Un atelier est
+  /// dans l'un ou l'autre, jamais les deux. Null s'il n'est rattache a rien.
+  AtelierContainer? containerOf(ActivityType atelier) {
+    if (atelier.inProgression) {
+      final p = progressionById(atelier.progressionId);
+      return p == null
+          ? null
+          : AtelierContainer(id: p.id, name: p.name, colorHex: p.colorHex,
+              iconName: p.iconName, isProgression: true);
+    }
+    final s = spaceById(atelier.spaceId);
+    return s == null
+        ? null
+        : AtelierContainer(id: s.id, name: s.name, colorHex: s.colorHex,
+            iconName: s.iconName, isProgression: false);
+  }
 
   /// Observations d'un eleve, de la plus recente a la plus ancienne.
   List<ActivityLog> activitiesForChild(String childId) =>
@@ -277,7 +456,20 @@ class AppStateProvider extends ChangeNotifier {
 
   /// Libelle affichable d'une observation, robuste a la suppression du niveau.
   String? statusLabel(ActivityLog log) =>
-      statusById(log.evaluationStatusId)?.label ?? log.legacyStatusLabel;
+      statusById(log.evaluationStatusId)?.label ??
+      log.legacyStatusLabel ??
+      (log.pendingValidation ? 'À valider' : null);
+
+  /// Observations saisies par les eleves (mode tablette), a valider.
+  List<ActivityLog> get pendingLogs =>
+      _activities.where((l) => l.pendingValidation).toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  /// L'adulte valide une saisie d'eleve en lui donnant un niveau.
+  void validateLog(String id, String? statusId) {
+    final i = _activities.indexWhere((l) => l.id == id);
+    if (i < 0) return;
+    updateActivityLog(_activities[i].copyWith(evaluationStatusId: statusId, pendingValidation: false));
+  }
   List<String> get sections => List.unmodifiable(_sections);
 
   void setSections(List<String> sections) {
@@ -290,8 +482,9 @@ class AppStateProvider extends ChangeNotifier {
     _notify();
   }
 
-  /// Renomme une section et reporte le changement sur les eleves et les
-  /// ateliers concernes, pour ne pas laisser de references orphelines.
+  /// Renomme une section et reporte le changement sur les eleves, les
+  /// ateliers et les parcours concernes, pour ne pas laisser de references
+  /// orphelines.
   void renameSection(String from, String to) {
     final target = to.trim();
     if (target.isEmpty || from == target) return;
@@ -318,6 +511,16 @@ class AppStateProvider extends ChangeNotifier {
       _write(_db.saveActivityType(updated));
     }
 
+    for (var i = 0; i < _progressions.length; i++) {
+      final p = _progressions[i];
+      if (!p.targetGroups.contains(from)) continue;
+      final updated = p.copyWith(
+        targetGroups: [for (final g in p.targetGroups) if (g == from) target else g],
+      );
+      _progressions[i] = updated;
+      _write(_db.saveProgression(updated));
+    }
+
     _write(_db.setSetting('sections', json.encode(_sections)));
     _notify();
   }
@@ -332,6 +535,16 @@ class AppStateProvider extends ChangeNotifier {
   /// vide, et rien ne doit etre saisi avant une restauration.
   bool get loadFailed => _loadFailed;
 
+  String? get loadError => _loadError;
+
+  String? get storageError => _storageError;
+
+  /// L'utilisateur a pris connaissance du bandeau d'erreur d'enregistrement.
+  void dismissStorageError() {
+    _storageError = null;
+    notifyListeners();
+  }
+
   /// Vrai une fois les preferences relues du disque.
   ///
   /// L'ecran de verrouillage doit attendre ce signal : autrement il lirait
@@ -342,6 +555,45 @@ class AppStateProvider extends ChangeNotifier {
   void setBiometricLockEnabled(bool enabled) {
     _biometricLockEnabled = enabled;
     _write(_db.setSetting('biometric_lock_enabled', enabled.toString()));
+    _notify();
+  }
+
+  /// Panneau lateral replie (Mac, PC, iPad en grand ecran) : icones seules.
+  bool _sidebarCollapsed = false;
+  bool get sidebarCollapsed => _sidebarCollapsed;
+
+  void toggleSidebar() {
+    _sidebarCollapsed = !_sidebarCollapsed;
+    _write(_db.setSetting('sidebar_collapsed', _sidebarCollapsed.toString()));
+    _notify();
+  }
+
+  /// Prise en main deja vue (ou inutile : classe deja utilisee).
+  bool _onboardingDone = false;
+  bool get onboardingDone => _onboardingDone;
+
+  void markOnboardingDone() {
+    _onboardingDone = true;
+    _write(_db.setSetting('onboarding_done', 'true'));
+  }
+
+  /// Derniere version dont les nouveautes ont ete montrees.
+  String? _releaseNotesSeen;
+  String? get releaseNotesSeen => _releaseNotesSeen;
+
+  void markReleaseNotesSeen(String version) {
+    _releaseNotesSeen = version;
+    _write(_db.setSetting('release_notes_seen', version));
+  }
+
+  /// Synchronisation automatique via iCloud (iPhone, iPad, Mac). Active par
+  /// defaut ; sans effet si iCloud est indisponible.
+  bool _iCloudSyncEnabled = true;
+  bool get iCloudSyncEnabled => _iCloudSyncEnabled;
+
+  void setICloudSyncEnabled(bool enabled) {
+    _iCloudSyncEnabled = enabled;
+    _write(_db.setSetting('icloud_sync_enabled', enabled.toString()));
     _notify();
   }
 
@@ -522,13 +774,16 @@ class AppStateProvider extends ChangeNotifier {
   /// remonter une exception asynchrone non capturee, qui ferait crasher
   /// l'application pour une simple ecriture manquee.
   void _write(Future<void> operation) {
-    operation.catchError(
-      (Object e) => debugPrint('Echec d\'ecriture en base : $e'),
-    );
+    operation.catchError((Object e) {
+      debugPrint('Echec d\'ecriture en base : $e');
+      _storageError = '$e';
+      notifyListeners();
+    });
   }
 
   Future<void> _load() async {
     _loadFailed = false;
+    _loadError = null;
     try {
       _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
 
@@ -571,6 +826,10 @@ class AppStateProvider extends ChangeNotifier {
         _spaces = spaces;
         _activityTypes = types;
         _activities = activities;
+        _progressions = await _db.readProgressions();
+        _needGroups = await _db.readNeedGroups();
+        _carnets = await _db.readCarnets();
+        _planning = await _db.readPlanning();
         _sonsProgress = await _db.readSons();
         _referentials = await _db.readReferentials();
         _referentialStatus = await _db.readAllReferentialStatuses();
@@ -608,6 +867,10 @@ class AppStateProvider extends ChangeNotifier {
           }
         }
         _biometricLockEnabled = settings['biometric_lock_enabled'] != 'false';
+        _iCloudSyncEnabled = settings['icloud_sync_enabled'] != 'false';
+        _onboardingDone = settings['onboarding_done'] == 'true';
+        _sidebarCollapsed = settings['sidebar_collapsed'] == 'true';
+        _releaseNotesSeen = settings['release_notes_seen'];
         _reminderEnabled = settings['reminder_enabled'] == 'true';
         _reminderHour = int.tryParse(settings['reminder_hour'] ?? '') ?? _reminderHour;
         _reminderMinute = int.tryParse(settings['reminder_minute'] ?? '') ?? _reminderMinute;
@@ -624,14 +887,17 @@ class AppStateProvider extends ChangeNotifier {
       _activities.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       await _migrateStatusLabels();
       await _migrateDomainIds();
+      await _migrateLegacyProgressions();
 
       // Entretien en arriere-plan : ni l'un ni l'autre ne doit retarder
       // l'affichage de l'application.
-      unawaited(_maybeAutoBackup(settings['last_auto_backup']));
+      _startupBackup = _maybeAutoBackup(settings['last_auto_backup']);
+      unawaited(_startupBackup);
       unawaited(purgeOrphanPhotos());
       unawaited(_scheduleReminderIfEnabled());
     } catch (e) {
       debugPrint('Erreur au chargement des donnees : $e');
+      _loadError = '$e';
       // L'application doit demarrer plutot que rester bloquee sur l'ecran
       // d'attente : l'enseignante a besoin d'atteindre la restauration.
       // En revanche elle ne doit surtout pas voir la classe d'exemple des
@@ -658,6 +924,10 @@ class AppStateProvider extends ChangeNotifier {
       activities: _activities,
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
+      progressions: _progressions,
+      needGroups: _needGroups,
+      carnets: _carnets,
+      planning: _planning,
     );
   }
 
@@ -670,7 +940,11 @@ class AppStateProvider extends ChangeNotifier {
 
   // ─── SAUVEGARDE AUTOMATIQUE & ENTRETIEN DU STOCKAGE ───
 
+  /// Sauvegardes conservees : les quotidiennes et celles d'avant
+  /// synchronisation sont comptees a part, pour que plusieurs synchros dans
+  /// la journee ne fassent pas disparaitre l'etat du matin.
   static const int _maxAutoBackups = 5;
+  static const int _maxSyncBackups = 10;
 
   /// Repertoire des sauvegardes automatiques, dans les documents de
   /// l'application : elles survivent ainsi a un redemarrage et sont reprises
@@ -687,7 +961,9 @@ class AppStateProvider extends ChangeNotifier {
   /// Ne contient pas les photos : l'objectif est de proteger le travail de
   /// saisie sans saturer le stockage de l'appareil. L'export ZIP manuel reste
   /// la sauvegarde complete.
-  Future<void> _writeAutoBackup({bool beforeSync = false}) async {
+  ///
+  /// Renvoie false si la sauvegarde n'a pas pu etre ecrite.
+  Future<bool> _writeAutoBackup({bool beforeSync = false}) async {
     try {
       final dir = await _autoBackupDir();
       final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
@@ -698,6 +974,10 @@ class AppStateProvider extends ChangeNotifier {
         'class_settings': _classSettings.toMap(),
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'progressions': _progressions.map((p) => p.toMap()).toList(),
+        'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+        'carnets': _carnets.map((e) => e.toMap()).toList(),
+        'planning': _planning.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -711,17 +991,32 @@ class AppStateProvider extends ChangeNotifier {
           .listSync()
           .whereType<File>()
           .where((f) => f.path.endsWith('.json'))
+          .where((f) => f.path.contains(kSyncBackupSuffix) == beforeSync)
           .toList()
         ..sort((a, b) => b.path.compareTo(a.path));
-      for (final old in backups.skip(_maxAutoBackups)) {
+      for (final old in backups.skip(beforeSync ? _maxSyncBackups : _maxAutoBackups)) {
         await old.delete();
       }
-      await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
+      // Seule la quotidienne compte pour « une par jour ».
+      if (!beforeSync) {
+        await _db.setSetting('last_auto_backup', DateTime.now().toIso8601String());
+      }
+      return true;
     } catch (e) {
       debugPrint('Echec de la sauvegarde automatique : $e');
-      return;
+      return false;
     }
   }
+
+  /// Sauvegarde du demarrage, lancee sans attendre pour ne pas retarder
+  /// l'ouverture de l'application.
+  Future<void>? _startupBackup;
+
+  /// Attend la fin de la sauvegarde du demarrage. Pour les tests : supprimer
+  /// le dossier des documents pendant qu'elle s'ecrit la ferait echouer
+  /// (« Directory listing failed » dans les journaux).
+  @visibleForTesting
+  Future<void> whenStartupBackupDone() async => _startupBackup;
 
   /// Sauvegarde au plus une fois par jour, au demarrage.
   Future<void> _maybeAutoBackup(String? lastIso) async {
@@ -759,6 +1054,9 @@ class AppStateProvider extends ChangeNotifier {
   /// Remplace l'etat de l'application par une sauvegarde JSON (sans les
   /// medias). Partage par la restauration automatique et la synchronisation.
   Future<void> _applyBackupMap(Map<String, dynamic> data) async {
+    // Donnees d'une version <= 1.4 : espaces « mode progression » convertis.
+    data = migrateSpaceProgressions(data);
+    final progressions = _decodeProgressions(data);
     final classSettings = ClassSettings.fromMap(data['class_settings']);
     final children = (data['children'] as List).map((c) => Child.fromMap(c)).toList();
     final spaces = (data['spaces'] as List? ?? []).map((s) => Space.fromMap(s)).toList();
@@ -780,6 +1078,10 @@ class AppStateProvider extends ChangeNotifier {
     _classSettings = classSettings;
     _children = children;
     _spaces = spaces;
+    _progressions = progressions;
+    if (data['need_groups'] is List) _needGroups = _decodeNeedGroups(data);
+    if (data['carnets'] is List) _carnets = _decodeCarnets(data);
+    if (data['planning'] is List) _planning = _decodePlanning(data);
     _activityTypes = activityTypes;
     _activities = activities;
     _evaluationStatuses = evaluationStatuses;
@@ -797,8 +1099,14 @@ class AppStateProvider extends ChangeNotifier {
       activities: _activities,
       evaluationStatuses: _evaluationStatuses,
       sons: _sonsProgress,
+      progressions: _progressions,
+      needGroups: _needGroups,
+      carnets: _carnets,
+      planning: _planning,
     );
     await _restoreReferentialsFrom(data);
+    // Photos des donnees restaurees, si elles etaient parties a la corbeille.
+    await restoreMediaFromTrash();
     _notify();
   }
 
@@ -851,12 +1159,16 @@ class AppStateProvider extends ChangeNotifier {
     return await file.exists() ? file : null;
   }
 
-  Future<bool> shareArchive(SchoolYearArchive archive) async {
+  /// [origin] : bouton touche, pour ancrer le partage sur iPad.
+  Future<bool> shareArchive(SchoolYearArchive archive, {Rect? origin}) async {
     final file = await archiveFile(archive);
     if (file == null) return false;
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/zip')],
+    await exportFile(
+      fileName: archive.fileName,
+      bytes: await file.readAsBytes(),
+      mimeType: 'application/zip',
       subject: 'Archive A petits pas ${archive.schoolYear}',
+      origin: origin,
     );
     return true;
   }
@@ -922,11 +1234,17 @@ class AppStateProvider extends ChangeNotifier {
     await _db.saveArchive(archive);
     await _db.clearTable('children');
     await _db.clearTable('activities');
+    // Les groupes de besoin reunissent des eleves : ils partent avec eux (et
+    // restent dans l'archive de l'annee).
+    await _db.clearTable('need_groups');
+    await _db.clearTable('carnets');
     await _db.clearAllSons();
     await _db.clearAllReferentialStatuses();
 
     _children = [];
     _activities = [];
+    _needGroups = [];
+    _carnets = [];
     _sonsProgress = {};
     // Les referentiels eux-memes (comme les ateliers) se reutilisent d'une
     // annee sur l'autre : seul le statut de chaque eleve est efface.
@@ -948,10 +1266,41 @@ class AppStateProvider extends ChangeNotifier {
   ///
   /// Supprimer une observation ou un atelier laissait jusqu'ici ses fichiers
   /// en place : le stockage ne faisait que croitre.
+  ///
+  /// Les fichiers ne sont pas effaces mais deplaces dans la corbeille des
+  /// medias ([_mediaTrashDir]), videe apres [_mediaTrashRetention] : une
+  /// synchronisation ou une suppression malheureuse ne doit jamais faire
+  /// perdre de photos (restaurer une sauvegarde les fait revenir).
   Future<int> purgeOrphanPhotos() async {
     try {
       _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
-      final referenced = <String>{
+      final referenced = _referencedMedia();
+
+      var removed = 0;
+      for (final subDir in _mediaSubDirs) {
+        final dir = Directory('$_docsDirPath/$subDir');
+        if (!await dir.exists()) continue;
+        for (final file in dir.listSync().whereType<File>()) {
+          final name = file.path.split(Platform.pathSeparator).last;
+          if (referenced.contains('$subDir/$name')) continue;
+          await _moveToMediaTrash(file, subDir, name);
+          removed++;
+        }
+      }
+      if (removed > 0) debugPrint('Photos orphelines mises a la corbeille : $removed');
+      await _emptyOldMediaTrash();
+      return removed;
+    } catch (e) {
+      debugPrint('Echec de la purge des photos : $e');
+      return 0;
+    }
+  }
+
+  /// Corbeille des photos et notes vocales, sous les documents de l'app.
+  static const _mediaTrashDir = 'corbeille_medias';
+  static const _mediaTrashRetention = Duration(days: 60);
+
+  Set<String> _referencedMedia() => <String>{
         for (final c in _children)
           if (c.imagePath != null && c.imagePath!.isNotEmpty) c.imagePath!,
         for (final a in _activityTypes) ...a.allPhotoPaths,
@@ -962,21 +1311,47 @@ class AppStateProvider extends ChangeNotifier {
           _classSettings.logoPath!,
       }.map(_normalizeRelPath).toSet();
 
-      var removed = 0;
-      for (final subDir in _mediaSubDirs) {
-        final dir = Directory('$_docsDirPath/$subDir');
-        if (!await dir.exists()) continue;
-        for (final file in dir.listSync().whereType<File>()) {
-          final name = file.path.split(Platform.pathSeparator).last;
-          if (referenced.contains('$subDir/$name')) continue;
-          await file.delete();
-          removed++;
-        }
+  Future<void> _moveToMediaTrash(File file, String subDir, String name) async {
+    final target = File('$_docsDirPath/$_mediaTrashDir/$subDir/$name');
+    await target.parent.create(recursive: true);
+    try {
+      await file.rename(target.path);
+    } on FileSystemException {
+      await file.copy(target.path);
+      await file.delete();
+    }
+    // Date de mise a la corbeille, pour la duree de conservation.
+    await target.setLastModified(DateTime.now());
+  }
+
+  Future<void> _emptyOldMediaTrash() async {
+    final trash = Directory('$_docsDirPath/$_mediaTrashDir');
+    if (!await trash.exists()) return;
+    final limit = DateTime.now().subtract(_mediaTrashRetention);
+    for (final f in trash.listSync(recursive: true).whereType<File>()) {
+      if (f.lastModifiedSync().isBefore(limit)) await f.delete();
+    }
+  }
+
+  /// Remet en place, depuis la corbeille, les photos et notes vocales
+  /// utilisees par les donnees actuelles mais absentes du disque (apres une
+  /// restauration de sauvegarde ou une synchronisation qui les reutilise).
+  Future<int> restoreMediaFromTrash() async {
+    try {
+      _docsDirPath ??= (await getApplicationDocumentsDirectory()).path;
+      var restored = 0;
+      for (final rel in _referencedMedia()) {
+        final current = File('$_docsDirPath/$rel');
+        final trashed = File('$_docsDirPath/$_mediaTrashDir/$rel');
+        if (await current.exists() || !await trashed.exists()) continue;
+        await current.parent.create(recursive: true);
+        await trashed.rename(current.path);
+        restored++;
       }
-      if (removed > 0) debugPrint('Photos orphelines supprimees : $removed');
-      return removed;
+      if (restored > 0) debugPrint('Medias recuperes de la corbeille : $restored');
+      return restored;
     } catch (e) {
-      debugPrint('Echec de la purge des photos : $e');
+      debugPrint('Echec de la recuperation des medias : $e');
       return 0;
     }
   }
@@ -1073,6 +1448,25 @@ class AppStateProvider extends ChangeNotifier {
       return '$subDir/$filename';
     } catch (e, stack) {
       debugPrint('[Photo Exception] Failed to pick/save photo: $e\n$stack');
+      return null;
+    }
+  }
+
+  /// Enregistre une image deja prete (ex. collee depuis le presse-papiers)
+  /// dans Documents/[subDir] ; renvoie son chemin relatif, ou null.
+  Future<String?> saveImageBytesToDocs(Uint8List bytes, String subDir) async {
+    try {
+      if (_docsDirPath == null) {
+        final directory = await getApplicationDocumentsDirectory();
+        _docsDirPath = directory.path;
+      }
+      final targetDir = Directory('$_docsDirPath/$subDir');
+      if (!await targetDir.exists()) await targetDir.create(recursive: true);
+      final filename = '${subDir}_colle_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await File('${targetDir.path}/$filename').writeAsBytes(bytes, flush: true);
+      return '$subDir/$filename';
+    } catch (e) {
+      debugPrint('[Photo] enregistrement de l\'image collee impossible : $e');
       return null;
     }
   }
@@ -1176,6 +1570,10 @@ class AppStateProvider extends ChangeNotifier {
       'class_settings': _classSettings.toMap(),
       'children': _children.map((c) => c.toMap()).toList(),
       'spaces': _spaces.map((s) => s.toMap()).toList(),
+      'progressions': _progressions.map((p) => p.toMap()).toList(),
+      'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+      'carnets': _carnets.map((e) => e.toMap()).toList(),
+      'planning': _planning.map((p) => p.toMap()).toList(),
       'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
       'activities': _activities.map((l) => l.toMap()).toList(),
       'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1206,20 +1604,19 @@ class AppStateProvider extends ChangeNotifier {
     return zipBytes;
   }
 
-  Future<void> exportFullBackup() async {
+  /// Sur ordinateur : « Enregistrer sous… » ; sur iPhone/iPad : partage ancre
+  /// sur [origin] (bouton touche).
+  Future<ExportOutcome> exportFullBackup({Rect? origin}) async {
     try {
       final zipBytes = await _buildBackupArchiveBytes();
-
-      final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final zipPath = '${tempDir.path}/petitpas_backup_$timestamp.zip';
-      await File(zipPath).writeAsBytes(zipBytes);
-
-      // 4. Share
-      await Share.shareXFiles(
-        [XFile(zipPath, mimeType: 'application/zip')],
+      return await exportFile(
+        fileName: 'petitpas_backup_$timestamp.zip',
+        bytes: zipBytes,
+        mimeType: 'application/zip',
         subject: 'Sauvegarde A petits pas',
         text: 'Backup complet A petits pas incluant toutes les données et photos.',
+        origin: origin,
       );
     } catch (e) {
       debugPrint('Export error: $e');
@@ -1235,18 +1632,14 @@ class AppStateProvider extends ChangeNotifier {
         _docsDirPath = directory.path;
       }
 
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['zip'],
-        allowMultiple: false,
       );
+      if (picked == null) return 'cancelled';
 
-      if (result == null || result.files.isEmpty) return 'cancelled';
-
-      final zipPath = result.files.first.path;
-      if (zipPath == null) return 'error';
-
-      final bytes = await File(zipPath).readAsBytes();
+      // Lecture via XFile : fonctionne aussi sans chemin local (iCloud Drive…).
+      final bytes = await picked.xFile.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
 
       // Find backup.json
@@ -1260,7 +1653,8 @@ class AppStateProvider extends ChangeNotifier {
       if (jsonFile == null) return 'invalid';
 
       final jsonStr = utf8.decode(jsonFile.content as Uint8List);
-      final data = json.decode(jsonStr) as Map<String, dynamic>;
+      final data = migrateSpaceProgressions(json.decode(jsonStr) as Map<String, dynamic>);
+      final progressions = data['progressions'] != null ? _decodeProgressions(data) : _progressions;
 
       // Tout decoder dans des variables locales d'abord : si un champ attendu
       // manque (fichier partiel ou trafique a la main), l'exception part avant
@@ -1309,6 +1703,10 @@ class AppStateProvider extends ChangeNotifier {
       _classSettings = classSettings;
       _children = children;
       _spaces = spaces;
+      _progressions = progressions;
+      if (data['need_groups'] is List) _needGroups = _decodeNeedGroups(data);
+      if (data['carnets'] is List) _carnets = _decodeCarnets(data);
+      if (data['planning'] is List) _planning = _decodePlanning(data);
       _activityTypes = activityTypes;
       _activities = activities;
       _evaluationStatuses = evaluationStatuses;
@@ -1332,6 +1730,10 @@ class AppStateProvider extends ChangeNotifier {
         activities: _activities,
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
+        progressions: _progressions,
+        needGroups: _needGroups,
+        carnets: _carnets,
+        planning: _planning,
       );
       await _restoreReferentialsFrom(data);
       _notify();
@@ -1351,6 +1753,10 @@ class AppStateProvider extends ChangeNotifier {
         'class_settings': _classSettings.toMap(),
         'children': _children.map((c) => c.toMap()).toList(),
         'spaces': _spaces.map((s) => s.toMap()).toList(),
+        'progressions': _progressions.map((p) => p.toMap()).toList(),
+        'need_groups': _needGroups.map((g) => g.toMap()).toList(),
+        'carnets': _carnets.map((e) => e.toMap()).toList(),
+        'planning': _planning.map((p) => p.toMap()).toList(),
         'activity_types': _activityTypes.map((a) => a.toMap()).toList(),
         'activities': _activities.map((l) => l.toMap()).toList(),
         'evaluation_statuses': _evaluationStatuses.map((s) => s.toMap()).toList(),
@@ -1360,11 +1766,23 @@ class AppStateProvider extends ChangeNotifier {
         'referential_status': _referentialStatusAsMap(),
       };
 
-  /// Applique un jeu de donnees fusionne. Une sauvegarde automatique est faite
-  /// avant, pour pouvoir revenir en arriere depuis les reglages.
+  /// Sauvegarde « avant synchronisation », pour pouvoir revenir en arriere
+  /// depuis les reglages. Leve une exception si elle echoue : la
+  /// synchronisation ne doit pas continuer sans filet.
+  Future<void> backupBeforeSync() async {
+    if (!await _writeAutoBackup(beforeSync: true)) {
+      throw StateError('la sauvegarde d’avant synchronisation n’a pas pu être écrite');
+    }
+  }
+
+  /// Applique un jeu de donnees fusionne (sauvegarde deja faite par
+  /// [backupBeforeSync]).
+  ///
+  /// Les photos et notes vocales qui ne servent plus (supprimees sur l'autre
+  /// appareil) sont ensuite effacees ici aussi.
   Future<void> applySyncSnapshot(Map<String, dynamic> data) async {
-    await _writeAutoBackup(beforeSync: true);
     await _applyBackupMap(data);
+    await purgeOrphanPhotos();
   }
 
   Future<String> syncDeviceId() async {
@@ -1464,7 +1882,9 @@ class AppStateProvider extends ChangeNotifier {
         if (entry.value.containsKey(id)) entry.key: Map<String, SonStatut>.from(entry.value[id]!),
     };
 
+    final groupIds = [for (final g in _needGroups) if (g.childIds.contains(id)) g.id];
     _children.removeWhere((c) => c.id == id);
+    _removeChildFromGroups(id);
     _sonsProgress.remove(id);
     for (final byChild in _referentialStatus.values) {
       byChild.remove(id);
@@ -1472,12 +1892,44 @@ class AppStateProvider extends ChangeNotifier {
     _write(_db.deleteChildCascade(id));
     _notify();
     unawaited(_scheduleReminderIfEnabled());
-    return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus);
+    return DeletedChild(child: child, sons: sons, referentialStatus: referentialStatus, groupIds: groupIds);
+  }
+
+  /// Droit a l'effacement (RGPD) : la fiche, le suivi des sons et des
+  /// referentiels, et toutes les observations de l'eleve. Ses photos et
+  /// notes vocales qui ne servent plus a personne (une observation de groupe
+  /// garde les siennes) partent a la corbeille des medias, videe apres
+  /// 60 jours.
+  ///
+  /// Une sauvegarde est faite avant ; si elle echoue, rien n'est efface et la
+  /// methode renvoie -1. Sinon, le nombre d'observations effacees.
+  Future<int> eraseChildData(String id) async {
+    if (!await _writeAutoBackup()) return -1;
+    final logs = _activities.where((l) => l.childId == id).toList();
+    deleteChild(id);
+    for (final e in _carnets.where((e) => e.childId == id).toList()) {
+      _carnets.remove(e);
+      _write(_db.deleteCarnet(e.id));
+    }
+    for (final log in logs) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+    await purgeOrphanPhotos();
+    return logs.length;
   }
 
   /// Retablit un eleve supprime, avec son suivi des sons et des referentiels.
   void restoreChild(DeletedChild deleted) {
     _children.add(deleted.child);
+    for (final gid in deleted.groupIds) {
+      final g = needGroupById(gid);
+      if (g == null || g.childIds.contains(deleted.child.id)) continue;
+      final updated = g.copyWith(childIds: [...g.childIds, deleted.child.id]);
+      _needGroups[_needGroups.indexWhere((x) => x.id == gid)] = updated;
+      _write(_db.saveNeedGroup(updated));
+    }
     if (deleted.sons.isNotEmpty) {
       _sonsProgress[deleted.child.id] = Map<String, SonStatut>.from(deleted.sons);
     }
@@ -1511,11 +1963,16 @@ class AppStateProvider extends ChangeNotifier {
   void deleteSpace(String id) {
     _spaces.removeWhere((s) => s.id == id);
     // Also remove ateliers in this space
-    final orphanIds = _activityTypes.where((a) => a.spaceId == id).map((a) => a.id).toList();
+    final orphanIds = _activityTypes.where((a) => a.spaceId == id).map((a) => a.id).toSet();
     _activityTypes.removeWhere((a) => a.spaceId == id);
     _write(_db.deleteSpace(id));
     for (final atelierId in orphanIds) {
       _write(_db.deleteActivityType(atelierId));
+    }
+    // Leurs observations aussi : sinon elles resteraient orphelines.
+    for (final log in _activities.where((l) => orphanIds.contains(l.activityTypeId)).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
     }
     _notify();
   }
@@ -1533,75 +1990,134 @@ class AppStateProvider extends ChangeNotifier {
 
   void addOrUpdateActivityType(ActivityType actType) => saveActivityType(actType);
 
+  // ─── DUPLICATION ───
+  // Une copie reprend tout le contenu (description, objectifs, photos et
+  // legendes, reglages) mais aucune observation : elle demarre vierge. Les
+  // photos sont partagees avec l'original (memes fichiers) : supprimer l'un
+  // ne les efface pas tant que l'autre s'en sert.
+
+  int _dupSeq = 0;
+  String _newId(String prefix) => '${prefix}_${DateTime.now().microsecondsSinceEpoch}_${_dupSeq++}';
+
+  /// Duplique un atelier (ou une etape, ajoutee en fin de son parcours).
+  ActivityType? duplicateActivityType(String id, {String? spaceId, String? progressionId, bool keepName = false}) {
+    final src = activityTypeById(id);
+    if (src == null) return null;
+    final inProgression = progressionId != null || (spaceId == null && src.inProgression);
+    final targetProgression = progressionId ?? (inProgression ? src.progressionId : null);
+    final copy = src.copyWith(
+      id: _newId('act'),
+      name: keepName ? src.name : '${src.name} (copie)',
+      spaceId: inProgression ? '' : (spaceId ?? src.spaceId),
+      progressionId: targetProgression,
+      position: inProgression ? nextPositionInProgression(targetProgression!) : -1,
+    );
+    saveActivityType(copy);
+    return copy;
+  }
+
+  /// Duplique un espace avec tous ses ateliers.
+  Space? duplicateSpace(String id) {
+    final src = spaceById(id);
+    if (src == null) return null;
+    final copy = src.copyWith(id: _newId('space'), name: '${src.name} (copie)');
+    addOrUpdateSpace(copy);
+    for (final a in ateliersInSpace(id)) {
+      duplicateActivityType(a.id, spaceId: copy.id, keepName: true);
+    }
+    return copy;
+  }
+
+  /// Duplique un parcours avec ses etapes, dans le meme ordre.
+  Progression? duplicateProgression(String id) {
+    final src = progressionById(id);
+    if (src == null) return null;
+    final copy = Progression(
+      id: _newId('prog'),
+      name: '${src.name} (copie)',
+      colorHex: src.colorHex,
+      iconName: src.iconName,
+      description: src.description,
+      minStatusId: src.minStatusId,
+      targetGroups: src.targetGroups,
+    );
+    saveProgression(copy);
+    for (final s in ateliersInProgressionOrdered(id)) {
+      duplicateActivityType(s.id, progressionId: copy.id, keepName: true);
+    }
+    return copy;
+  }
+
+  /// Desactive (ou reactive) un atelier sans toucher a ses observations.
+  void setActivityTypeDisabled(String id, bool disabled) {
+    final current = activityTypeById(id);
+    if (current == null || current.isDisabled == disabled) return;
+    saveActivityType(current.copyWith(isDisabled: disabled));
+  }
+
+  /// Supprime l'atelier ET ses observations : elles restaient jusqu'ici
+  /// orphelines (« Atelier inconnu »), impossibles a rattacher ou a nettoyer.
   void deleteActivityType(String id) {
     _activityTypes.removeWhere((a) => a.id == id);
     _write(_db.deleteActivityType(id));
+    for (final log in _activities.where((l) => l.activityTypeId == id).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
     _notify();
   }
 
-  /// Ateliers d'un espace, tries par position (mode progression).
-  List<ActivityType> ateliersInSpaceOrdered(String spaceId) {
-    final list = _activityTypes.where((a) => a.spaceId == spaceId).toList();
+  /// Nombre d'observations d'un atelier (pour prevenir avant suppression).
+  int activityCountForType(String id) => _activities.where((l) => l.activityTypeId == id).length;
+
+  /// Observations dont l'eleve ou l'atelier n'existe plus.
+  List<ActivityLog> get orphanActivities {
+    final childIds = {for (final c in _children) c.id};
+    final typeIds = {for (final t in _activityTypes) t.id};
+    return _activities
+        .where((l) => !childIds.contains(l.childId) || !typeIds.contains(l.activityTypeId))
+        .toList();
+  }
+
+  /// Supprime les observations orphelines, apres une sauvegarde automatique
+  /// (restaurable). Renvoie le nombre supprime, ou -1 si la sauvegarde a echoue.
+  Future<int> purgeOrphanActivities() async {
+    final orphans = orphanActivities;
+    if (orphans.isEmpty) return 0;
+    if (!await _writeAutoBackup()) return -1;
+    for (final log in orphans) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+    await purgeOrphanPhotos(); // leurs photos partent a la corbeille (60 jours)
+    return orphans.length;
+  }
+
+  /// Ateliers d'un espace, par ordre alphabetique.
+  List<ActivityType> ateliersInSpace(String spaceId) {
+    final list = _activityTypes.where((a) => !a.inProgression && a.spaceId == spaceId).toList();
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  }
+
+  /// Jalons d'une progression, dans l'ordre.
+  List<ActivityType> ateliersInProgressionOrdered(String progressionId) {
+    final list = _activityTypes.where((a) => a.progressionId == progressionId).toList();
     list.sort((a, b) => a.position.compareTo(b.position));
     return list;
   }
 
-  /// Position libre suivante dans un espace : permet a un atelier nouvellement
-  /// cree de s'ajouter en fin de liste plutot qu'en tete (-1).
-  int nextPositionForSpace(String spaceId) {
-    final positions = _activityTypes.where((a) => a.spaceId == spaceId).map((a) => a.position);
+  /// Rang libre suivant dans une progression (nouveau jalon en fin de fil).
+  int nextPositionInProgression(String progressionId) {
+    final positions =
+        _activityTypes.where((a) => a.progressionId == progressionId).map((a) => a.position);
     if (positions.isEmpty) return 0;
-    final maxPos = positions.reduce((a, b) => a > b ? a : b);
-    return maxPos + 1;
+    return positions.reduce((a, b) => a > b ? a : b) + 1;
   }
 
-  /// Active/desactive le mode progression d'un espace. A l'activation, les
-  /// ateliers encore sans position (-1) recoivent un rang sequentiel selon
-  /// leur ordre courant, pour donner un point de depart stable au tri manuel,
-  /// et le niveau minimum pour debloquer le suivant est fixe si aucun ne
-  /// l'etait deja (par defaut le dernier niveau configure, generalement le
-  /// plus abouti).
-  void setSpaceProgression(String spaceId, bool value, {String? minStatusId}) {
-    final space = _spaceById[spaceId];
-    if (space == null) return;
-    if (value) {
-      final unpositioned = _activityTypes.where((a) => a.spaceId == spaceId && a.position < 0).toList();
-      var next = nextPositionForSpace(spaceId);
-      if (next < 0) next = 0;
-      for (final atelier in unpositioned) {
-        final index = _activityTypes.indexWhere((a) => a.id == atelier.id);
-        final updated = atelier.copyWith(position: next);
-        _activityTypes[index] = updated;
-        _write(_db.saveActivityType(updated));
-        next++;
-      }
-    }
-    final resolvedMinStatusId = value
-        ? (minStatusId ??
-            space.progressionMinStatusId ??
-            (_evaluationStatuses.isNotEmpty ? _evaluationStatuses.last.id : null))
-        : space.progressionMinStatusId;
-    final updatedSpace = space.copyWith(isProgression: value, progressionMinStatusId: resolvedMinStatusId);
-    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
-    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
-    _write(_db.saveSpace(updatedSpace));
-    _notify();
-  }
-
-  /// Change le niveau minimum a atteindre pour debloquer l'atelier suivant
-  /// dans un espace en mode progression.
-  void setSpaceProgressionMinStatus(String spaceId, String? statusId) {
-    final space = _spaceById[spaceId];
-    if (space == null) return;
-    final updatedSpace = space.copyWith(progressionMinStatusId: statusId);
-    final spaceIndex = _spaces.indexWhere((s) => s.id == spaceId);
-    if (spaceIndex >= 0) _spaces[spaceIndex] = updatedSpace;
-    _write(_db.saveSpace(updatedSpace));
-    _notify();
-  }
-
-  /// Reordonne les ateliers d'un espace suite a un glisser-deposer.
-  void reorderAteliersInSpace(String spaceId, List<String> orderedActivityTypeIds) {
+  /// Reordonne les jalons d'une progression (glisser-deposer).
+  void reorderAteliersInProgression(String progressionId, List<String> orderedActivityTypeIds) {
     for (var i = 0; i < orderedActivityTypeIds.length; i++) {
       final index = _activityTypes.indexWhere((a) => a.id == orderedActivityTypeIds[i]);
       if (index < 0) continue;
@@ -1611,6 +2127,72 @@ class AppStateProvider extends ChangeNotifier {
     }
     _notify();
   }
+
+  void saveProgression(Progression progression) {
+    final index = _progressions.indexWhere((p) => p.id == progression.id);
+    if (index >= 0) {
+      _progressions[index] = progression;
+    } else {
+      _progressions.add(progression);
+    }
+    _write(_db.saveProgression(progression));
+    _notify();
+  }
+
+  /// Supprime une progression avec ses jalons et leurs observations (un
+  /// atelier de progression n'existe pas hors de sa progression).
+  void deleteProgression(String id) {
+    _progressions.removeWhere((p) => p.id == id);
+    _write(_db.deleteProgression(id));
+    final ateliers = _activityTypes.where((a) => a.progressionId == id).map((a) => a.id).toSet();
+    _activityTypes.removeWhere((a) => ateliers.contains(a.id));
+    for (final atelierId in ateliers) {
+      _write(_db.deleteActivityType(atelierId));
+    }
+    for (final log in _activities.where((l) => ateliers.contains(l.activityTypeId)).toList()) {
+      _activities.remove(log);
+      _write(_db.deleteActivity(log.id));
+    }
+    _notify();
+  }
+
+  /// Observations des jalons d'une progression (pour prevenir avant suppression).
+  int activityCountForProgression(String id) {
+    final ateliers = _activityTypes.where((a) => a.progressionId == id).map((a) => a.id).toSet();
+    return _activities.where((l) => ateliers.contains(l.activityTypeId)).length;
+  }
+
+  /// Convertit, une seule fois, les espaces « mode progression » d'une base
+  /// creee par une version <= 1.4. Sauvegarde automatique avant, restaurable.
+  Future<void> _migrateLegacyProgressions() async {
+    if (!_spaces.any((s) => s.isProgression)) return;
+    if (!await _writeAutoBackup()) {
+      debugPrint('Migration des progressions reportee : sauvegarde impossible.');
+      return;
+    }
+    await _applyBackupMap(buildSyncSnapshot());
+    debugPrint('Migration des progressions : ${_progressions.length} progression(s).');
+  }
+
+  List<PlanningSlot> _decodePlanning(Map<String, dynamic> data) => [
+        for (final p in (data['planning'] as List?) ?? const [])
+          if (p is Map) PlanningSlot.fromMap(Map<String, dynamic>.from(p)),
+      ];
+
+  List<CarnetEntry> _decodeCarnets(Map<String, dynamic> data) => [
+        for (final e in (data['carnets'] as List?) ?? const [])
+          if (e is Map) CarnetEntry.fromMap(Map<String, dynamic>.from(e)),
+      ];
+
+  List<NeedGroup> _decodeNeedGroups(Map<String, dynamic> data) => [
+        for (final g in (data['need_groups'] as List?) ?? const [])
+          if (g is Map) NeedGroup.fromMap(Map<String, dynamic>.from(g)),
+      ];
+
+  List<Progression> _decodeProgressions(Map<String, dynamic> data) => [
+        for (final p in (data['progressions'] as List?) ?? const [])
+          if (p is Map) Progression.fromMap(Map<String, dynamic>.from(p)),
+      ];
 
   void logActivity(ActivityLog activity) {
     _activities.insert(0, activity);
@@ -1688,7 +2270,7 @@ class AppStateProvider extends ChangeNotifier {
     for (var i = 0; i < _activityTypes.length; i++) {
       final a = _activityTypes[i];
       if (a.domaineId != null || a.domaine.isEmpty) continue;
-      final match = EduscolData.domains.where((d) => d.title == a.domaine).firstOrNull;
+      final match = EduscolData.domainByTitle(a.domaine);
       if (match == null) continue;
       final updated = a.copyWith(domaineId: match.id);
       _activityTypes[i] = updated;
@@ -1751,10 +2333,18 @@ class AppStateProvider extends ChangeNotifier {
     bool clearSpaces = false,
     bool clearPhotos = false,
   }) async {
-    await _writeAutoBackup();
+    // Sans sauvegarde, pas d'effacement : il serait irrattrapable.
+    if (!await _writeAutoBackup()) return false;
+
+    // Un appareil remis a zero repart comme neuf pour la synchronisation :
+    // sans etat commun memorise, la prochaine synchro le re-remplit depuis
+    // l'autre appareil au lieu de propager l'effacement chez lui.
+    await _db.deleteSettingsWithPrefix('sync_base_');
 
     if (clearChildren) {
       _children = [];
+      _needGroups = [];
+      _carnets = [];
       _sonsProgress = {};
       for (final byChild in _referentialStatus.values) {
         byChild.clear();
@@ -1771,6 +2361,7 @@ class AppStateProvider extends ChangeNotifier {
       _evaluationStatuses = List<EvaluationStatus>.from(EvaluationStatus.defaults);
     }
     if (clearSpaces) {
+      _progressions = [];
       _spaces = [
         Space(id: 'space_1', name: 'Coin Arts Visuels', colorHex: '#FF7043', iconName: 'palette'),
         Space(id: 'space_2', name: 'Espace Motricité', colorHex: '#4E9F3D', iconName: 'fitness_center'),
@@ -1801,6 +2392,10 @@ class AppStateProvider extends ChangeNotifier {
         activities: _activities,
         evaluationStatuses: _evaluationStatuses,
         sons: _sonsProgress,
+        progressions: _progressions,
+        needGroups: _needGroups,
+        carnets: _carnets,
+        planning: _planning,
       );
     } catch (e) {
       debugPrint('Echec de la RAZ selective : $e');
@@ -1817,10 +2412,12 @@ class AppStateProvider extends ChangeNotifier {
         final directory = await getApplicationDocumentsDirectory();
         _docsDirPath = directory.path;
       }
+      // A la corbeille plutot qu'effacees : recuperables pendant 60 jours.
       for (final subDir in _mediaSubDirs) {
         final dir = Directory('$_docsDirPath/$subDir');
-        if (await dir.exists()) {
-          await dir.delete(recursive: true);
+        if (!await dir.exists()) continue;
+        for (final file in dir.listSync().whereType<File>()) {
+          await _moveToMediaTrash(file, subDir, file.path.split(Platform.pathSeparator).last);
         }
       }
     } catch (e) {
@@ -1838,9 +2435,30 @@ class DeletedChild {
   /// eleve avait un statut enregistre.
   final Map<String, Map<String, SonStatut>> referentialStatus;
 
+  /// Groupes de besoin dont l'eleve faisait partie.
+  final List<String> groupIds;
+
   const DeletedChild({
     required this.child,
     required this.sons,
     this.referentialStatus = const {},
+    this.groupIds = const [],
   });
+}
+
+/// Espace ou progression contenant un atelier (cf. AppStateProvider.containerOf).
+class AtelierContainer {
+  const AtelierContainer({
+    required this.id,
+    required this.name,
+    required this.colorHex,
+    required this.iconName,
+    required this.isProgression,
+  });
+
+  final String id;
+  final String name;
+  final String colorHex;
+  final String? iconName;
+  final bool isProgression;
 }

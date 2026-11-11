@@ -12,6 +12,7 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import '../data/sons_data.dart';
 import '../models/referential.dart';
+import 'progressions_screen.dart';
 import '../services/child_data_export_service.dart';
 import 'atelier_history_screen.dart';
 import 'ateliers_progress_screen.dart';
@@ -36,7 +37,7 @@ class ChildProfileScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text('${currentChild.firstname} ${currentChild.lastname ?? ""}'),
@@ -45,6 +46,7 @@ class ChildProfileScreen extends StatelessWidget {
               Tab(icon: Icon(Icons.person), text: 'Profil'),
               Tab(icon: Icon(Icons.history), text: 'Activités'),
               Tab(icon: Icon(Icons.checklist), text: 'Acquis'),
+              Tab(icon: Icon(Icons.timeline), text: 'Parcours'),
             ],
           ),
           actions: [
@@ -82,6 +84,7 @@ class ChildProfileScreen extends StatelessWidget {
             _buildProfileTab(context, provider, currentChild, isDark),
             _buildActivitiesTab(context, provider, currentChild, childLogs, isDark),
             _buildAcquisTab(context, provider, currentChild),
+            _buildProgressionsTab(provider, currentChild),
           ],
         ),
       ),
@@ -125,8 +128,8 @@ class ChildProfileScreen extends StatelessWidget {
           _buildInfoCard(
             context,
             icon: Icons.email,
-            label: 'Email des parents',
-            value: child.email ?? 'Non renseigné',
+            label: child.parentEmails.length > 1 ? 'Emails des parents' : 'Email des parents',
+            value: child.parentEmails.isEmpty ? 'Non renseigné' : child.parentEmails.join('\n'),
             isDark: isDark,
           ),
           _buildInfoCard(
@@ -234,16 +237,16 @@ class ChildProfileScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
           Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
+          Text(label, style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.8))),
         ],
       ),
     );
@@ -256,6 +259,31 @@ class ChildProfileScreen extends StatelessWidget {
         SonStatut.enCours => const Color(0xFFF9A825),
         SonStatut.acquis => const Color(0xFF388E3C),
       };
+
+  /// Où en est l'élève dans chaque progression (fil et jalons).
+  Widget _buildProgressionsTab(AppStateProvider provider, Child child) {
+    if (provider.progressions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Aucun parcours. Créez-en dans Parcours › Gérer.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: kMutedTextColor),
+          ),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final p in provider.progressions) ...[
+          ProgressionCard(progression: p, child: child),
+          const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
 
   Widget _buildAcquisTab(BuildContext context, AppStateProvider provider, Child child) {
     final tous = SonsData.tous;
@@ -354,7 +382,7 @@ class ChildProfileScreen extends StatelessWidget {
                             constraints: const BoxConstraints(minWidth: 54, minHeight: 54),
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: couleur.withOpacity(0.15),
+                              color: couleur.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: couleur, width: 2),
                             ),
@@ -488,7 +516,7 @@ class ChildProfileScreen extends StatelessWidget {
                             constraints: const BoxConstraints(minHeight: 44),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: couleur.withOpacity(0.15),
+                              color: couleur.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: couleur, width: 2),
                             ),
@@ -537,7 +565,7 @@ class ChildProfileScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: couleur.withOpacity(0.15),
+        color: couleur.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -592,10 +620,7 @@ class ChildProfileScreen extends StatelessWidget {
           (a) => a.id == log.activityTypeId,
           orElse: () => ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096'),
         );
-        final space = provider.spaces.firstWhere(
-          (s) => s.id == actType.spaceId,
-          orElse: () => Space(id: '', name: 'Espace inconnu', colorHex: '#718096'),
-        );
+        final space = provider.placeOf(actType) ?? Space(id: '', name: 'Espace inconnu', colorHex: '#718096');
 
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
@@ -643,7 +668,7 @@ class ChildProfileScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                          color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -655,11 +680,11 @@ class ChildProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.15),
+                            color: Colors.orange.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
-                            '⭐ Obligatoire',
+                            '⭐ Plan de travail',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                         ),
@@ -667,7 +692,7 @@ class ChildProfileScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -703,7 +728,7 @@ class ChildProfileScreen extends StatelessWidget {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: couleur?.withOpacity(0.15) ??
+                          color: couleur?.withValues(alpha: 0.15) ??
                               (isDark ? const Color(0xFF334155) : Colors.grey.shade200),
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -766,7 +791,11 @@ class ChildProfileScreen extends StatelessWidget {
                   SnackBar(
                     content: Text('${child.firstname} a été supprimé(e)'),
                     backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 8),
+                    duration: const Duration(seconds: 5),
+                    // Avec une action, Flutter garderait le bandeau indefiniment (et il
+                    // masquait des boutons) : disparition automatique, au-dessus du contenu.
+                    persist: false,
+                    behavior: SnackBarBehavior.floating,
                     action: SnackBarAction(
                       label: 'Annuler',
                       textColor: Colors.white,

@@ -9,14 +9,13 @@ class Space {
   final String? description;
   final String? iconName;
 
-  /// Vrai si les ateliers de cet espace doivent etre faits dans l'ordre
-  /// (voir [ActivityType.position]) : un atelier reste verrouille tant que
-  /// les precedents n'ont pas atteint [progressionMinStatusId] chez l'eleve.
+  /// Ancien « mode progression » d'un espace (versions <= 1.4). Lu seulement
+  /// pour la migration : un tel espace devient une Progression (cf.
+  /// migrateSpaceProgressions). Toujours faux dans les donnees actuelles.
   final bool isProgression;
 
-  /// Identifiant du niveau d'evaluation minimum (voir EvaluationStatus) a
-  /// atteindre sur un atelier pour debloquer le suivant. Null tant que le
-  /// mode progression n'a jamais ete configure sur cet espace.
+  /// Ancien seuil du mode progression (versions <= 1.4), repris comme
+  /// Progression.minStatusId par la migration.
   final String? progressionMinStatusId;
 
   Space({

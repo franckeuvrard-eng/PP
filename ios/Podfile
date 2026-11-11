@@ -1,7 +1,7 @@
 # Cible de deploiement unique du projet : doit rester alignee avec
 # IPHONEOS_DEPLOYMENT_TARGET (project.pbxproj) et MinimumOSVersion
 # (Flutter/AppFrameworkInfo.plist), sinon Xcode echoue au link des pods.
-platform :ios, '14.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

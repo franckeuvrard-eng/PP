@@ -61,16 +61,13 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
         ? provider.children
         : provider.children.where((c) => c.group == _section).toList();
 
-    // Meme regle de ciblage par section que le scan/la saisie manuelle
-    // (AtelierEligibilityService), mais sans le verrou de progression : ici
-    // on choisit seulement les colonnes du tableau, le verrou se juge par
-    // eleve dans chaque cellule.
-    final ateliers = provider.activityTypes.where((a) {
-      if (_section == _kAllSections) return true;
-      return !a.isObligatory || a.isObligatoryForGroup(_section);
-    }).toList()
+    // Colonnes du tableau ; le verrou de progression se juge par eleve dans
+    // chaque cellule (AtelierEligibilityService).
+    // Tous les ateliers, quelle que soit la section : un atelier obligatoire
+    // pour une section reste accessible (facultatif) aux autres.
+    final ateliers = provider.activityTypes.toList()
       ..sort((a, b) {
-        final spaceCompare = (provider.spaceById(a.spaceId)?.name ?? '').compareTo(provider.spaceById(b.spaceId)?.name ?? '');
+        final spaceCompare = (provider.placeOf(a)?.name ?? '').compareTo(provider.placeOf(b)?.name ?? '');
         return spaceCompare != 0 ? spaceCompare : a.name.compareTo(b.name);
       });
 
@@ -129,7 +126,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
           },
           children: [
             TableRow(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceVariant),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
               children: [
                 const SizedBox(height: rowHeight),
                 for (final atelier in ateliers)
@@ -202,7 +199,7 @@ class _AteliersClassProgressScreenState extends State<AteliersClassProgressScree
             width: 16,
             height: 16,
             decoration: BoxDecoration(
-              color: snapshot.hasLogInPeriod ? color : color.withOpacity(0.25),
+              color: snapshot.hasLogInPeriod ? color : color.withValues(alpha: 0.25),
               shape: BoxShape.circle,
               border: snapshot.hasLogInPeriod ? null : Border.all(color: color, width: 1.5),
             ),

@@ -5,10 +5,11 @@ import '../providers/app_provider.dart';
 
 /// Politique de confidentialité (RGPD) de l'application.
 ///
-/// L'application ne communique avec aucun serveur : toutes les données sont
-/// stockees localement sur l'appareil de l'enseignant. Le responsable du
-/// traitement est donc l'etablissement / l'enseignant, pas l'editeur de
-/// l'application, qui n'a aucun acces aux donnees.
+/// Les donnees sont stockees sur les appareils de l'enseignant et, s'il
+/// l'active, dans son propre iCloud ; l'editeur n'exploite aucun serveur et
+/// n'a acces a aucune donnee. Le responsable du traitement est donc
+/// l'etablissement / l'enseignant. Texte a garder aligne avec la page
+/// publique docs/confidentialite.html (exigee par l'App Store).
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
 
@@ -33,13 +34,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vos données restent sur cet appareil',
+                  Text('Vos données restent chez vous',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   SizedBox(height: 6),
                   Text(
                     'A petits pas est un outil de suivi pédagogique utilisé en classe. '
-                    'L\'application ne communique avec aucun serveur et l\'éditeur '
-                    'n\'a accès à aucune des données saisies.',
+                    'Les données restent sur vos appareils et, si vous l\'activez, dans '
+                    'votre propre iCloud. L\'éditeur n\'exploite aucun serveur et n\'a '
+                    'accès à aucune des données saisies.',
                     style: TextStyle(fontSize: 13, height: 1.35),
                   ),
                 ],
@@ -85,9 +87,18 @@ class PrivacyPolicyScreen extends StatelessWidget {
             icon: Icons.storage,
             title: 'Stockage',
             paragraphs: [
-              'Toutes les données sont stockées uniquement sur cet appareil, dans '
-                  'une base de données locale. Aucun serveur, aucun cloud de '
-                  'l\'éditeur n\'est utilisé.',
+              'Les données sont stockées sur l\'appareil, dans une base de données '
+                  'locale. Aucun serveur de l\'éditeur n\'est utilisé.',
+              'Synchronisation iCloud (iPhone, iPad, Mac), si elle est activée : les '
+                  'données et photos sont copiées dans l\'espace iCloud Drive privé de '
+                  'l\'application, sur le compte iCloud personnel de l\'enseignant. Apple '
+                  'les héberge (chiffrées en transit et au repos) ; ni l\'éditeur ni les '
+                  'autres utilisateurs n\'y ont accès. Elle se désactive dans '
+                  'Paramètres > Sauvegarde & Sécurité > Synchroniser avec un autre appareil.',
+              'Synchronisation Wi-Fi (par exemple avec un PC Windows) : les données '
+                  'passent directement d\'un appareil à l\'autre sur le réseau local, '
+                  'sans internet, et seulement après accord explicite sur l\'appareil '
+                  'qui les reçoit.',
             ],
           ),
           const _PolicySection(
@@ -127,7 +138,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
             title: 'Destinataires',
             paragraphs: [
               'Aucun tiers n\'a accès aux données, sauf action volontaire de '
-                  'l\'enseignant (par exemple le partage d\'un export avec une famille).',
+                  'l\'enseignant (par exemple le partage d\'un export avec une famille). '
+                  'Apple n\'intervient que comme hébergeur de l\'iCloud de l\'enseignant, '
+                  'si la synchronisation iCloud est activée.',
+              'L\'application ne contient ni publicité, ni outil de mesure '
+                  'd\'audience, ni traceur.',
             ],
           ),
           const _PolicySection(
@@ -139,6 +154,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   'd\'opposition sur les données la concernant (ou concernant son enfant).',
               'Ces droits s\'exercent directement auprès de l\'établissement / '
                   'l\'enseignant identifié plus haut, seul détenteur des données.',
+            ],
+          ),
+          const _PolicySection(
+            icon: Icons.mail_outline,
+            title: 'Contact de l\'éditeur',
+            paragraphs: [
+              'Franck Euvrard — franck.euvrard71@gmail.com',
+              'Version en ligne : https://franckeuvrard-eng.github.io/PP/confidentialite.html',
             ],
           ),
         ],

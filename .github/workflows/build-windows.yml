@@ -6,18 +6,18 @@ on:
 
 jobs:
   build-windows:
-    # Epingle sur VS 2022 : Flutter 3.19 ne reconnait pas les versions plus
-    # recentes de Visual Studio (windows-latest) et retombe sur le generateur
-    # CMake "Visual Studio 16 2019", absent du runner.
+    # VS 2022 et non windows-latest (VS 2026) : local_auth_windows compile
+    # encore avec l'option /await, que VS 2026 refuse desormais.
     runs-on: windows-2022
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.47.7'
           channel: 'stable'
 
       - name: Recreate Windows platform files
@@ -30,6 +30,11 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: App icon
+        # Remplace l'icone Flutter par celle de l'application (pubspec.yaml,
+        # section flutter_launcher_icons > windows).
+        run: dart run flutter_launcher_icons
 
       - name: Analyze Dart code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -64,13 +69,33 @@ jobs:
 
       - name: Package
         # Le dossier Release contient l'.exe ET les DLL / donnees : il faut
-        # tout livrer ensemble, l'.exe seul ne demarre pas.
+        # tout livrer ensemble, l'.exe seul ne demarre pas. Version portable,
+        # en plus de l'installateur.
         shell: pwsh
         run: |
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip"
 
+      - name: Build installer
+        # Inno Setup 6 est preinstalle sur l'image windows-2022 (l'installer
+        # nous-memes restait bloque) : installateur classique, raccourcis et
+        # desinstallation depuis les Parametres Windows. Script :
+        # windows_config/petitpas.iss.
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
+            Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) absent de l'image du runner" }
+          $release = Resolve-Path build\windows\x64\runner\Release
+          $icon = Resolve-Path windows\runner\resources\app_icon.ico
+          & $iscc "/DAppVersion=${{ steps.version.outputs.app_version }}" "/DSourceDir=$release" "/DIconFile=$icon" "/O$PWD" windows_config\petitpas.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue ($LASTEXITCODE)" }
+          Get-ChildItem PetitPas_*_Setup.exe
+
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PetitPas-v${{ steps.version.outputs.app_version }}-Windows
-          path: PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip
+          path: |
+            PetitPas_v${{ steps.version.outputs.app_version }}_Windows_Setup.exe
+            PetitPas_v${{ steps.version.outputs.app_version }}_Windows.zip

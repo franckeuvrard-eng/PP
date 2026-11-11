@@ -181,6 +181,26 @@ void main() {
     });
   });
 
+  test('atelier désactivé : conservé à la sauvegarde, actif par défaut', () {
+    final a = ActivityType(id: 'a1', name: 'Pâte à sel', spaceId: 's1', colorHex: '#4E9F3D');
+    expect(a.isDisabled, isFalse);
+    // Donnees d'une version anterieure, sans le champ.
+    expect(ActivityType.fromMap(a.toMap()..remove('isDisabled')).isDisabled, isFalse);
+    final off = a.copyWith(isDisabled: true);
+    expect(ActivityType.fromMap(off.toMap()).isDisabled, isTrue);
+    expect(off.copyWith(name: 'Pâte à modeler').isDisabled, isTrue);
+  });
+
+  test('sous-domaine : enregistre, absent des anciennes donnees', () {
+    final a = ActivityType(
+        id: 'a1', name: 'Aimants', spaceId: 's1', colorHex: '#00BCD4',
+        domaineId: 'd6_vivant_matiere', sousDomaineId: 'c1_v2');
+    expect(ActivityType.fromMap(a.toMap()).sousDomaineId, 'c1_v2');
+    expect(ActivityType.fromMap(a.toMap()..remove('sousDomaineId')).sousDomaineId, isNull);
+    expect(a.copyWith(name: 'Aimants !').sousDomaineId, 'c1_v2');
+    expect(a.copyWith(sousDomaineId: null).sousDomaineId, isNull);
+  });
+
   test('allPhotoPaths place l\'illustration en tête', () {
     final a = ActivityType(
       id: 'a1',

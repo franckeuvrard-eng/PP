@@ -9,8 +9,12 @@ import '../models/space.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'statistics_screen.dart';
-import 'edit_activity_log_screen.dart';
 import 'reports_screen.dart';
+import 'coverage_screen.dart';
+import 'pending_validation_screen.dart';
+import '../services/coverage_service.dart';
+import '../widgets/desktop_frame.dart';
+import 'edit_activity_log_screen.dart';
 import '../widgets/voice_note_play_button.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -43,6 +47,9 @@ class HomeDashboardScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SingleChildScrollView(
+      // Defilable meme quand tout tient a l'ecran (peu d'observations du
+      // jour) : sinon « tirer pour actualiser » ne reagissait pas.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,21 +88,75 @@ class HomeDashboardScreen extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 12),
-
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF4E9F3D),
-                child: Icon(Icons.description, color: Colors.white),
+          // Saisies du mode eleve en attente de validation.
+          if (provider.pendingLogs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF8E24AA),
+                    child: Icon(Icons.child_care, color: Colors.white),
+                  ),
+                  title: Text('À valider (${provider.pendingLogs.length})',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Saisies des élèves en mode tablette : donnez-leur un niveau.'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const PendingValidationScreen())),
+                ),
               ),
-              title: const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Ateliers obligatoires, fiches PDF, exports RGPD et Excel.'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
             ),
-          ),
+
+          // A surveiller : domaines delaisses et programme non couvert.
+          Builder(builder: (context) {
+            final gaps = CoverageService.domainGaps(provider);
+            final childCount = {for (final g in gaps) g.child.id}.length;
+            final (done, total) = CoverageService.objectiveCoverage(provider);
+            return Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: childCount > 0 ? Colors.orange : const Color(0xFF4E9F3D),
+                    child: Icon(childCount > 0 ? Icons.notification_important : Icons.task_alt,
+                        color: Colors.white),
+                  ),
+                  title: const Text('À surveiller', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text([
+                    childCount == 0
+                        ? 'Chaque élève a été vu dans chaque domaine ces 3 semaines.'
+                        : '$childCount élève(s) sans observation depuis 3 semaines dans un domaine.',
+                    'Programme : $done objectifs sur $total travaillés.',
+                  ].join('\n')),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CoverageScreen())),
+                ),
+              ),
+            );
+          }),
+
+          // iPhone : les Rapports (et les QR codes) s'ouvrent d'ici ; sur Mac
+          // et iPad ils sont dans la barre laterale.
+          if (!usesDesktopLayout(MediaQuery.sizeOf(context).width)) ...[
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF4E9F3D),
+                  child: Icon(Icons.description, color: Colors.white),
+                ),
+                title: const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Plan de travail, suivi des parcours, QR codes, exports.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 20),
 
@@ -119,7 +180,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(40),
                     child: Text(
                       'Aucune activité enregistrée aujourd\'hui.',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                     ),
                   ),
                 )
@@ -135,7 +196,7 @@ class HomeDashboardScreen extends StatelessWidget {
                         Child(id: '', firstname: 'Élève inconnu', colorHex: '#718096', avatarText: '?');
                     final actType = provider.activityTypeById(act.activityTypeId) ??
                         ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '#718096');
-                    final space = provider.spaceById(actType.spaceId) ??
+                    final space = provider.placeOf(actType) ??
                         Space(id: '', name: '', colorHex: '#718096');
 
                     return Card(
@@ -217,7 +278,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF4E9F3D).withOpacity(0.12),
+                                            color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
@@ -229,17 +290,17 @@ class HomeDashboardScreen extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.15),
+                                            color: Colors.orange.withValues(alpha: 0.15),
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: const Text(
-                                            '⭐ Obligatoire',
+                                            '⭐ Plan de travail',
                                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
                                           ),
                                         ),
                                       Text(
                                         '• ${DateFormat('HH:mm').format(act.timestamp)}',
-                                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                                       ),
                                     ],
                                   ),
@@ -250,7 +311,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surfaceVariant,
+                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -273,7 +334,7 @@ class HomeDashboardScreen extends StatelessWidget {
                                       ),
                                       child: Text(
                                         act.note!,
-                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                                       ),
                                     ),
                                   ],
@@ -332,11 +393,15 @@ class HomeDashboardScreen extends StatelessWidget {
                                               margin: const EdgeInsets.only(right: 8),
                                               child: ClipRRect(
                                                 borderRadius: BorderRadius.circular(12),
-                                                child: Image.file(
-                                                  File(resolvedPath),
+                                                child: Container(
                                                   width: 90,
                                                   height: 90,
-                                                  fit: BoxFit.cover,
+                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  child: Image.file(
+                                                    File(resolvedPath),
+                                                    fit: BoxFit.contain, // photo entiere
+                                                    cacheWidth: 270,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -371,7 +436,7 @@ class HomeDashboardScreen extends StatelessWidget {
           CircleAvatar(
             // Pastille teintee en mode sombre : un cercle blanc franc sur la
             // carte sombre etait trop contraste.
-            backgroundColor: isDark ? textColor.withOpacity(0.18) : Colors.white,
+            backgroundColor: isDark ? textColor.withValues(alpha: 0.18) : Colors.white,
             foregroundColor: textColor,
             child: Icon(icon),
           ),
@@ -380,7 +445,7 @@ class HomeDashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
-              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withOpacity(0.8))),
+              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.8))),
             ],
           ),
         ],
@@ -432,6 +497,11 @@ class _LoadFailureBanner extends StatelessWidget {
             'Sauvegarde & Sécurité, ou réessayez.',
             style: TextStyle(color: Colors.white, fontSize: 12),
           ),
+          if (provider.loadError != null) ...[
+            const SizedBox(height: 6),
+            SelectableText('Détail : ${provider.loadError}',
+                style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          ],
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,

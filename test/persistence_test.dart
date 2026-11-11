@@ -50,7 +50,15 @@ void main() {
     await databaseFactory.deleteDatabase(await cheminBase(nomBase));
   });
 
+  // Applications creees par le test : leur sauvegarde du demarrage doit
+  // etre finie avant de supprimer le dossier temporaire.
+  final crees = <AppStateProvider>[];
+
   tearDown(() async {
+    for (final app in crees) {
+      await app.whenStartupBackupDone();
+    }
+    crees.clear();
     await databaseFactory.deleteDatabase(await cheminBase(nomBase));
     if (await racine.exists()) {
       try {
@@ -62,12 +70,15 @@ void main() {
     }
   });
 
-  AppStateProvider creerProvider({String? nom, String? documentsPath}) =>
-      AppStateProvider(
-        database: AppDatabase(fileName: nom ?? nomBase),
-        documentsPath: documentsPath ?? racine.path,
-        autoLoad: false,
-      );
+  AppStateProvider creerProvider({String? nom, String? documentsPath}) {
+    final app = AppStateProvider(
+      database: AppDatabase(fileName: nom ?? nomBase),
+      documentsPath: documentsPath ?? racine.path,
+      autoLoad: false,
+    );
+    crees.add(app);
+    return app;
+  }
 
   group('Migration de schema', () {
     test('une base v1 est reprise sans perdre ses donnees', () async {
@@ -433,6 +444,15 @@ void main() {
       await SyncClient(ProviderSyncHost(phone)).sync(SyncPairing(
           hosts: const ['127.0.0.1'], port: started.port, token: started.token, name: ''));
       expect(phone.children.any((c) => c.id == 'child_sync'), isFalse);
+
+      // La photo n'est plus utilisee : a la corbeille, pas effacee...
+      expect(await phone.readSyncMedia('profiles/lea.jpg'), isNull);
+      // ...et restaurer la sauvegarde d'avant synchro la fait revenir.
+      final avantSynchro = (await phone.listAutoBackups())
+          .firstWhere((f) => f.path.contains(kSyncBackupSuffix));
+      expect(await phone.restoreAutoBackup(avantSynchro), isTrue);
+      expect(phone.children.any((c) => c.id == 'child_sync'), isTrue);
+      expect(await phone.readSyncMedia('profiles/lea.jpg'), Uint8List.fromList([7, 7, 7]));
     });
   });
 }

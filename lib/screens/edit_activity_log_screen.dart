@@ -7,6 +7,7 @@ import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../models/space.dart';
 import '../utils/color_utils.dart';
+import '../widgets/dictation_button.dart';
 import '../widgets/voice_note_field.dart';
 
 class EditActivityLogScreen extends StatefulWidget {
@@ -48,10 +49,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppStateProvider>(context);
 
-    final space = provider.spaces.firstWhere(
-      (s) => s.id == widget.actType.spaceId,
-      orElse: () => Space(id: '', name: 'Espace non défini', colorHex: '#718096'),
-    );
+    final space = provider.placeOf(widget.actType) ?? Space(id: '', name: 'Espace non défini', colorHex: '#718096');
 
     return Scaffold(
       appBar: AppBar(
@@ -79,7 +77,11 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                             SnackBar(
                               content: const Text('Observation supprimée'),
                               backgroundColor: Colors.red,
-                              duration: const Duration(seconds: 8),
+                              duration: const Duration(seconds: 5),
+                              // Avec une action, Flutter garderait le bandeau indefiniment (et il
+                              // masquait des boutons) : disparition automatique, au-dessus du contenu.
+                              persist: false,
+                              behavior: SnackBarBehavior.floating,
                               action: SnackBarAction(
                                 label: 'Annuler',
                                 textColor: Colors.white,
@@ -139,7 +141,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: hexToColor(space.colorHex).withOpacity(0.15),
+                            color: hexToColor(space.colorHex).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -186,7 +188,7 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
                 return ChoiceChip(
                   label: Text(status.label),
                   selected: isSelected,
-                  selectedColor: couleur.withOpacity(0.2),
+                  selectedColor: couleur.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: isSelected ? couleur : Theme.of(context).colorScheme.onSurface,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -209,10 +211,11 @@ class _EditActivityLogScreenState extends State<EditActivityLogScreen> {
 
             TextField(
               controller: _noteController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Notes / Observations de l\'enseignant',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
+                suffixIcon: DictationButton(controller: _noteController),
               ),
               maxLines: 4,
             ),

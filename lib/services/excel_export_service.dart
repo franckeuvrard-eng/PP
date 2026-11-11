@@ -1,10 +1,7 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:excel/excel.dart' as xl;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import '../utils/file_export.dart';
 import '../models/activity.dart';
 import '../models/activity_type.dart';
 import '../models/child.dart';
@@ -42,7 +39,7 @@ class ExcelExportService {
       for (final log in logs) {
         final actType = provider.activityTypeById(log.activityTypeId) ??
             ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
-        final space = provider.spaceById(actType.spaceId) ??
+        final space = provider.placeOf(actType) ??
             Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
@@ -59,17 +56,14 @@ class ExcelExportService {
       final rawBytes = excel.encode();
       if (rawBytes == null) throw Exception('Erreur lors de la génération du fichier Excel.');
 
-      final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getTemporaryDirectory();
       final sanitizedName = '${child.firstname}_${child.lastname ?? ""}'.replaceAll(RegExp(r'[^\w\-]'), '_');
       final fileName = 'APetitPas_Activites_${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-      final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(bytes);
-
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      await exportFile(
+        fileName: fileName,
+        bytes: rawBytes,
+        mimeType: kXlsxMime,
         subject: 'Export Excel A petits pas — ${child.firstname}',
-        sharePositionOrigin: sharePositionOrigin,
+        origin: sharePositionOrigin,
       );
     } catch (e) {
       if (context.mounted) {
@@ -117,7 +111,7 @@ class ExcelExportService {
         final child = childMap[log.childId];
         final actType = provider.activityTypeById(log.activityTypeId) ??
             ActivityType(id: '', name: 'Atelier inconnu', spaceId: '', colorHex: '');
-        final space = provider.spaceById(actType.spaceId) ??
+        final space = provider.placeOf(actType) ??
             Space(id: '', name: 'Non défini', colorHex: '');
         sheet.appendRow(<xl.CellValue?>[
           xl.TextCellValue(DateFormat('dd/MM/yyyy HH:mm').format(log.timestamp)),
@@ -136,16 +130,12 @@ class ExcelExportService {
       final rawBytes = excel.encode();
       if (rawBytes == null) throw Exception('Erreur lors du traitement du fichier Excel.');
 
-      final bytes = Uint8List.fromList(rawBytes);
-      final tempDir = await getTemporaryDirectory();
-      final fileName = 'APetitPas_Bilan_Classe_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-      final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(bytes);
-
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      await exportFile(
+        fileName: 'APetitPas_Bilan_Classe_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        bytes: rawBytes,
+        mimeType: kXlsxMime,
         subject: 'Bilan Classe A petits pas (Excel)',
-        sharePositionOrigin: sharePositionOrigin,
+        origin: sharePositionOrigin,
       );
     } catch (e) {
       if (context.mounted) {

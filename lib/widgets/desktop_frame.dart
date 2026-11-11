@@ -2,9 +2,16 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/platform_support.dart';
+
 /// Largeur a partir de laquelle on bascule sur la mise en page ordinateur
 /// (barre laterale a la place de la barre d'onglets du bas).
 const double kDesktopBreakpoint = 840;
+
+/// Mise en page ordinateur (barre laterale) : fenetre large, ou plateforme
+/// de bureau (Mac, Windows) quelle que soit la largeur : Espaces & Ateliers et
+/// Parcours n'y ont leur entree que dans la barre laterale.
+bool usesDesktopLayout(double width) => width >= kDesktopBreakpoint || isDesktopPlatform;
 
 /// Largeur maximale du contenu : au-dela, les listes et formulaires pensees
 /// pour un telephone deviennent illisibles (lignes de 1500 px).
@@ -50,6 +57,8 @@ class DesktopFrame extends StatelessWidget {
     required this.className,
     required this.onHelp,
     required this.body,
+    this.collapsed = false,
+    this.onToggleCollapsed,
   });
 
   final List<DesktopDestination> destinations;
@@ -59,8 +68,21 @@ class DesktopFrame extends StatelessWidget {
   final VoidCallback onHelp;
   final Widget body;
 
+  /// Panneau replie : icones seules, pour laisser la place au contenu.
+  final bool collapsed;
+  final VoidCallback? onToggleCollapsed;
+
   static const _green = Color(0xFF4E9F3D);
   static const double _railWidth = 240;
+
+  static Widget _logo() => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _green,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.child_care, color: Colors.white, size: 22),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -69,35 +91,41 @@ class DesktopFrame extends StatelessWidget {
       body: Row(
         children: [
           NavigationRail(
-            extended: true,
+            extended: !collapsed,
             minExtendedWidth: _railWidth,
             selectedIndex: currentIndex,
             onDestinationSelected: onSelected,
             backgroundColor: theme.cardColor,
-            indicatorColor: _green.withOpacity(0.15),
+            indicatorColor: _green.withValues(alpha: 0.15),
             selectedIconTheme: const IconThemeData(color: _green),
-            selectedLabelTextStyle: const TextStyle(
+            // A partir du theme : garde la police de l'app (un TextStyle nu la perdait).
+            selectedLabelTextStyle: theme.textTheme.labelLarge?.copyWith(
                 color: _green, fontWeight: FontWeight.bold, fontSize: 14),
-            unselectedLabelTextStyle: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+            unselectedLabelTextStyle: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14),
             // Largeur fixe : le rail donne a `leading` une largeur non bornee,
             // incompatible avec l'Expanded du titre.
-            leading: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
+            leading: collapsed
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 24, 0, 12),
+                    child: Column(children: [
+                      _logo(),
+                      const SizedBox(height: 8),
+                      IconButton(
+                        tooltip: 'Afficher le panneau',
+                        icon: const Icon(Icons.keyboard_double_arrow_right),
+                        onPressed: onToggleCollapsed,
+                      ),
+                    ]),
+                  )
+                : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 4, 20),
               child: SizedBox(
-                width: _railWidth - 32,
+                width: _railWidth - 20,
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _green,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.child_care,
-                          color: Colors.white, size: 22),
-                    ),
+                    _logo(),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -117,6 +145,12 @@ class DesktopFrame extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (onToggleCollapsed != null)
+                      IconButton(
+                        tooltip: 'Masquer le panneau',
+                        icon: const Icon(Icons.keyboard_double_arrow_left, size: 20),
+                        onPressed: onToggleCollapsed,
+                      ),
                   ],
                 ),
               ),
@@ -126,19 +160,32 @@ class DesktopFrame extends StatelessWidget {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: TextButton.icon(
-                    onPressed: onHelp,
-                    icon: const Icon(Icons.help_outline, size: 20),
-                    label: const Text('Aide'),
-                  ),
+                  child: collapsed
+                      ? IconButton(
+                          tooltip: 'Aide',
+                          onPressed: onHelp,
+                          icon: const Icon(Icons.help_outline),
+                        )
+                      : TextButton.icon(
+                          onPressed: onHelp,
+                          icon: const Icon(Icons.help_outline, size: 20),
+                          label: const Text('Aide'),
+                        ),
                 ),
               ),
             ),
             destinations: [
               for (var i = 0; i < destinations.length; i++)
                 NavigationRailDestination(
-                  icon: Icon(destinations[i].icon),
-                  selectedIcon: Icon(destinations[i].selectedIcon),
+                  // Replie, les libelles disparaissent : ils passent en infobulle.
+                  icon: collapsed
+                      ? Tooltip(message: destinations[i].label, child: Icon(destinations[i].icon))
+                      : Icon(destinations[i].icon),
+                  selectedIcon: collapsed
+                      ? Tooltip(
+                          message: destinations[i].label,
+                          child: Icon(destinations[i].selectedIcon))
+                      : Icon(destinations[i].selectedIcon),
                   label: Text(destinations[i].label),
                   padding: const EdgeInsets.symmetric(vertical: 2),
                 ),

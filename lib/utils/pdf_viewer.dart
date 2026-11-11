@@ -37,7 +37,7 @@ void openPdfViewer(
           children: [
             Container(
               width: double.infinity,
-              color: const Color(0xFF4E9F3D).withOpacity(0.12),
+              color: const Color(0xFF4E9F3D).withValues(alpha: 0.12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: const Row(
                 children: [
