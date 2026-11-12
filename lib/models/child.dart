@@ -24,6 +24,12 @@ class Child {
   /// accord implicite.
   final bool imageAuthorized;
 
+  /// Etape ou l'eleve demarre chacun de ses parcours : identifiant du parcours
+  /// -> identifiant de l'etape (un [ActivityType]). Absent : il commence au
+  /// debut. Les etapes avant celle-ci ne lui sont pas demandees (ni verrou,
+  /// ni retard), sans qu'aucune observation ne soit inventee.
+  final Map<String, String> parcoursStarts;
+
   Child({
     required this.id,
     required this.firstname,
@@ -37,6 +43,7 @@ class Child {
     this.email2,
     this.imagePath,
     this.imageAuthorized = false,
+    this.parcoursStarts = const {},
   });
 
   /// Adresses des parents renseignees (0, 1 ou 2), sans doublon.
@@ -60,6 +67,7 @@ class Child {
     Object? email2 = kUndefined,
     Object? imagePath = kUndefined,
     bool? imageAuthorized,
+    Map<String, String>? parcoursStarts,
   }) {
     return Child(
       id: id ?? this.id,
@@ -74,6 +82,7 @@ class Child {
       email2: email2 == kUndefined ? this.email2 : email2 as String?,
       imagePath: imagePath == kUndefined ? this.imagePath : imagePath as String?,
       imageAuthorized: imageAuthorized ?? this.imageAuthorized,
+      parcoursStarts: parcoursStarts ?? this.parcoursStarts,
     );
   }
 
@@ -91,6 +100,9 @@ class Child {
       'email2': email2,
       'imagePath': imagePath,
       'imageAuthorized': imageAuthorized,
+      // Omis quand vide : une fiche sans depart personnalise reste identique
+      // a celle des versions precedentes (synchro, sauvegardes).
+      if (parcoursStarts.isNotEmpty) 'parcoursStarts': parcoursStarts,
     };
   }
 
@@ -111,6 +123,12 @@ class Child {
       // retroactivement des photos deja en usage. Present mais faux = choix
       // explicite de l'enseignant, respecte tel quel.
       imageAuthorized: map.containsKey('imageAuthorized') ? (map['imageAuthorized'] ?? false) : true,
+      parcoursStarts: map['parcoursStarts'] is Map
+          ? {
+              for (final e in (map['parcoursStarts'] as Map).entries)
+                if (e.key is String && e.value is String) e.key as String: e.value as String,
+            }
+          : const {},
     );
   }
 

@@ -9,10 +9,12 @@ import '../models/progression.dart';
 import '../providers/app_provider.dart';
 import '../services/atelier_eligibility_service.dart';
 import '../services/parcours_progress.dart';
+import '../services/parcours_start.dart';
 import '../services/parcours_frise_pdf_service.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'atelier_detail_screen.dart';
+import 'parcours_start_screen.dart';
 import 'progressions_settings_tab.dart';
 import '../services/qr_sheets_pdf_service.dart';
 
@@ -60,6 +62,14 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
           title: const Text('Parcours'),
           actions: [
             if (progression != null) ...[
+              IconButton(
+                icon: const Icon(Icons.fast_forward),
+                tooltip: 'Démarrer des élèves en cours de parcours',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ParcoursStartScreen(progression: progression)),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.qr_code_2),
                 tooltip: 'QR codes des étapes',
@@ -320,7 +330,7 @@ class ProgressionCard extends StatelessWidget {
 }
 
 /// Etat d'un jalon pour un eleve.
-enum _JalonState { validated, current, locked }
+enum _JalonState { validated, current, locked, skipped }
 
 /// Le fil : horizontal quand la place le permet (Mac, iPad), vertical sinon.
 class ProgressionTrack extends StatelessWidget {
@@ -388,8 +398,10 @@ class ProgressionTrack extends StatelessWidget {
       after = isFinish ? Colors.transparent : color.withValues(alpha: 0.5);
     } else {
       final step = data.stepOf(child!.id);
-      before = i == 0 ? Colors.transparent : (i <= step ? color : muted);
-      after = isFinish ? Colors.transparent : (i < step ? color : muted);
+      final start = data.startOf(child!.id);
+      // Avant le depart de l'eleve, le fil reste grise : il n'a pas a le faire.
+      before = i == 0 ? Colors.transparent : (i <= step && i > start ? color : muted);
+      after = isFinish ? Colors.transparent : (i < step && i >= start ? color : muted);
     }
 
     final dot = isFinish ? _finishDot(context, data, color) : _jalonDot(context, data, i, color);
@@ -485,6 +497,9 @@ class ProgressionTrack extends StatelessWidget {
       case _JalonState.locked:
         return _circle(Theme.of(context).disabledColor.withValues(alpha: 0.25),
             Icon(Icons.lock, color: Theme.of(context).disabledColor, size: 20));
+      case _JalonState.skipped:
+        return _circle(Theme.of(context).disabledColor.withValues(alpha: 0.15),
+            Icon(Icons.skip_next, color: Theme.of(context).disabledColor, size: 22));
     }
   }
 
@@ -510,8 +525,10 @@ class ProgressionTrack extends StatelessWidget {
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13));
 
     if (child == null) {
-      final total = data.children.length;
-      final validated = data.validatedCount(atelier.id);
+      // Seuls comptent les eleves pour qui l'etape est demandee (ceux qui
+      // demarrent plus loin n'ont pas a la faire).
+      final total = data.concernedCount(i);
+      final validated = data.validatedCount(atelier.id, i);
       final here = data.childrenAtStep(i);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,6 +576,9 @@ class ProgressionTrack extends StatelessWidget {
           ),
         if (state == _JalonState.locked)
           const Text('Verrouillé', style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+        if (state == _JalonState.skipped)
+          Text('Non demandé : ${child!.firstname} démarre plus loin',
+              style: const TextStyle(fontSize: 12, color: kMutedTextColor)),
         if (log != null)
           Padding(
             padding: const EdgeInsets.only(top: 2),
@@ -642,9 +662,15 @@ class _TrackData {
       '$childId\u0000$atelierId',
       () => AtelierEligibilityService.meetsThreshold(provider, childId, atelierId, progression.minStatusId));
 
+  /// Rang de la premiere etape demandee a cet eleve (0 : le debut du parcours).
+  int startOf(String childId) {
+    final child = provider.childById(childId);
+    return child == null ? 0 : ParcoursStart.indexFor(child, progression.id, jalons);
+  }
+
   /// Rang du premier jalon pas encore valide (= jalons.length : termine).
   int stepOf(String childId) => _steps.putIfAbsent(childId, () {
-        for (var i = 0; i < jalons.length; i++) {
+        for (var i = startOf(childId); i < jalons.length; i++) {
           if (!validated(childId, jalons[i].id)) return i;
         }
         return jalons.length;
@@ -652,6 +678,7 @@ class _TrackData {
 
   _JalonState stateOf(String childId, int i) {
     final step = stepOf(childId);
+    if (i < startOf(childId)) return _JalonState.skipped;
     if (i < step) return _JalonState.validated;
     if (i == step) return _JalonState.current;
     return _JalonState.locked;
@@ -659,7 +686,11 @@ class _TrackData {
 
   List<Child> childrenAtStep(int i) => [for (final c in children) if (stepOf(c.id) == i) c];
 
-  int validatedCount(String atelierId) => children.where((c) => validated(c.id, atelierId)).length;
+  /// Eleves pour qui l'etape de rang [i] est demandee.
+  int concernedCount(int i) => children.where((c) => startOf(c.id) <= i).length;
+
+  int validatedCount(String atelierId, int i) =>
+      children.where((c) => startOf(c.id) <= i && validated(c.id, atelierId)).length;
 
   ActivityLog? latestLog(String childId, String atelierId) {
     final logs = provider.activitiesForChild(childId).where((l) => l.activityTypeId == atelierId);

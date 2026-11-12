@@ -90,6 +90,7 @@ class SyncReport {
     'email2': 'E-mail parent 2',
     'imagePath': 'Photo',
     'imageAuthorized': 'Autorisation photo',
+    'parcoursStarts': 'Départs en cours de parcours',
     'childId': 'Élève',
     'activityTypeId': 'Atelier',
     'timestamp': 'Date',

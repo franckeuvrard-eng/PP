@@ -10,6 +10,7 @@ import '../services/atelier_pdf_service.dart';
 import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import 'atelier_edit_screen.dart';
+import 'bulk_validation_screen.dart';
 
 /// Fiche en lecture seule d'un atelier : la liste des ateliers dans les
 /// réglages ne montre plus que l'essentiel, tout le détail est ici, à un tap.
@@ -126,6 +127,22 @@ class AtelierDetailScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                // Meme niveau pour plusieurs eleves d'un coup (classe, section
+                // ou groupe de besoin), sans repasser par la saisie individuelle.
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => BulkValidationScreen(atelier: current)),
+                    ),
+                    icon: const Icon(Icons.groups),
+                    label: Text(current.inProgression
+                        ? 'Valider cette étape pour plusieurs élèves'
+                        : 'Valider cet atelier pour plusieurs élèves'),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (current.isDisabled) ...[

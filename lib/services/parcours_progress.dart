@@ -3,6 +3,7 @@ import '../models/child.dart';
 import '../models/progression.dart';
 import '../providers/app_provider.dart';
 import 'atelier_eligibility_service.dart';
+import 'parcours_start.dart';
 
 /// Ou en est un eleve dans un parcours.
 class ParcoursPosition {
@@ -32,7 +33,11 @@ class ParcoursProgress {
     required List<ActivityType> steps,
     required String childId,
   }) {
-    for (var i = 0; i < steps.length; i++) {
+    // Un eleve qui demarre en cours de parcours est « a l'etape » de son
+    // depart : les etapes avant lui comptent comme franchies.
+    final child = provider.childById(childId);
+    final start = child == null ? 0 : ParcoursStart.indexFor(child, parcours.id, steps);
+    for (var i = start; i < steps.length; i++) {
       if (!AtelierEligibilityService.meetsThreshold(
           provider, childId, steps[i].id, parcours.minStatusId)) {
         return ParcoursPosition(step: i, total: steps.length, current: steps[i]);

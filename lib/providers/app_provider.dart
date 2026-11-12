@@ -2201,6 +2201,72 @@ class AppStateProvider extends ChangeNotifier {
     unawaited(_scheduleReminderIfEnabled());
   }
 
+  /// Meme observation (atelier, niveau, note, date) pour plusieurs eleves d'un
+  /// coup : un enregistrement distinct par eleve, une seule mise a jour de
+  /// l'ecran. Renvoie les observations creees, pour pouvoir les annuler.
+  List<ActivityLog> logActivityForChildren({
+    required Iterable<String> childIds,
+    required String activityTypeId,
+    String? evaluationStatusId,
+    String? note,
+    DateTime? timestamp,
+  }) {
+    final stamp = timestamp ?? DateTime.now();
+    final created = <ActivityLog>[];
+    var offset = 0;
+    for (final childId in childIds.toSet()) {
+      if (_childById[childId] == null) continue;
+      final log = ActivityLog(
+        // millisecondsSinceEpoch seul se repeterait dans la boucle : on decale.
+        id: 'log_${stamp.millisecondsSinceEpoch + offset}_$childId',
+        childId: childId,
+        activityTypeId: activityTypeId,
+        timestamp: stamp,
+        note: (note == null || note.trim().isEmpty) ? null : note.trim(),
+        evaluationStatusId: evaluationStatusId,
+      );
+      offset++;
+      _activities.insert(0, log);
+      _write(_db.saveActivity(log));
+      created.add(log);
+    }
+    if (created.isNotEmpty) {
+      _notify();
+      unawaited(_scheduleReminderIfEnabled());
+    }
+    return created;
+  }
+
+  /// Fait demarrer ces eleves a l'etape [atelierId] du parcours
+  /// [progressionId] ; [atelierId] nul les remet au debut. Les etapes avant
+  /// leur depart ne leur sont plus demandees (voir [ParcoursStart]).
+  /// Renvoie le nombre d'eleves modifies.
+  int setParcoursStart({
+    required Iterable<String> childIds,
+    required String progressionId,
+    String? atelierId,
+  }) {
+    var changed = 0;
+    for (final id in childIds.toSet()) {
+      final index = _children.indexWhere((c) => c.id == id);
+      if (index < 0) continue;
+      final child = _children[index];
+      final starts = Map<String, String>.from(child.parcoursStarts);
+      if (atelierId == null) {
+        if (starts.remove(progressionId) == null) continue;
+      } else {
+        if (starts[progressionId] == atelierId) continue;
+        starts[progressionId] = atelierId;
+      }
+      final updated = child.copyWith(parcoursStarts: starts);
+      _children[index] = updated;
+      _write(_db.saveChild(updated));
+      changed++;
+    }
+    if (changed > 0) _notify();
+    return changed;
+  }
+
   void updateActivityLog(ActivityLog updatedActivity) {
     final index = _activities.indexWhere((a) => a.id == updatedActivity.id);
     if (index >= 0) {

@@ -1,6 +1,7 @@
 import '../models/activity_type.dart';
 import '../models/child.dart';
 import '../providers/app_provider.dart';
+import 'parcours_start.dart';
 
 /// Statut d'eligibilite d'un atelier pour un eleve donne.
 enum AtelierEligibility {
@@ -101,8 +102,11 @@ class AtelierEligibilityService {
     if (progression == null) return null;
     if (atelier.position < 0) return null;
 
-    final priorAteliers = provider
-        .ateliersInProgressionOrdered(progression.id)
+    // Les etapes avant le depart de l'eleve ne lui sont pas demandees.
+    final steps = provider.ateliersInProgressionOrdered(progression.id);
+    final startIndex = ParcoursStart.indexFor(child, progression.id, steps);
+    final priorAteliers = steps
+        .skip(startIndex)
         .where((a) => a.position >= 0 && a.position < atelier.position)
         .toList();
     if (priorAteliers.isEmpty) return null;

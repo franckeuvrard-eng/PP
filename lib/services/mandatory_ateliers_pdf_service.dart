@@ -13,6 +13,7 @@ import '../utils/pdf_viewer.dart';
 import 'atelier_eligibility_service.dart';
 import 'atelier_pdf_service.dart';
 import 'atelier_status_resolver.dart';
+import 'parcours_start.dart';
 
 /// Reglages d'un plan de travail (ateliers ou parcours), choisis avant
 /// l'export.
@@ -59,7 +60,7 @@ class MandatoryAteliersPdfService {
   // Plan de travail des ateliers : vignettes portrait compactes, 3 par ligne.
   static const _compactPerRow = 3;
   static const _compactGap = 8.0;
-  static const _compactPhotoHeight = 58.0;
+  static const _compactPhotoHeight = 50.0;
   static const _compactMaxObjectives = 2;
 
   static Future<Uint8List> buildBytes({
@@ -128,9 +129,12 @@ class MandatoryAteliersPdfService {
       final groups = <(String, List<pw.Widget>)>[];
       for (final p in parcours) {
         final steps = provider.ateliersInProgressionOrdered(p.id);
+        // Un eleve qui demarre en cours de parcours ne recoit que ses etapes.
+        final start = ParcoursStart.indexFor(child, p.id, steps);
         final planned = options.onlyPlannedThisWeek ? provider.plannedAteliersForWeek(child, DateTime.now()) : null;
         final vignettes = <pw.Widget>[
           for (final (i, s) in steps.indexed)
+            if (i >= start)
             if (planned == null || planned.contains(s.id))
             if (_vignette(
               provider: provider,
@@ -401,8 +405,8 @@ class MandatoryAteliersPdfService {
     return (levels.toList()..sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)))).join(' / ');
   }
 
-  /// Vignette portrait compacte d'un atelier : nom, photos, domaine, niveau et
-  /// objectifs, puis (selon les reglages) trois cases a cocher a la main et le
+  /// Vignette portrait compacte d'un atelier : nom, photos, domaine, sous-domaine
+  /// (ou niveau) et objectifs, puis (selon les reglages) trois cases a cocher a la main et le
   /// statut. Bordure verte une fois acquis. Null si le statut n'est pas retenu.
   static pw.Widget? _compactVignette({
     required AppStateProvider provider,
@@ -421,6 +425,9 @@ class MandatoryAteliersPdfService {
     final atelierColor = _color(atelier.colorHex);
     final images = AtelierPdfService.imagesOf(provider, atelier);
     final initial = atelier.name.trim().isEmpty ? '?' : atelier.name.trim()[0].toUpperCase();
+    // Le sous-domaine enregistre sur l'atelier ; a defaut, le niveau (PS / MS /
+    // GS) des objectifs du programme.
+    final sousDomaine = EduscolData.subdomainById(atelier.sousDomaineId)?.title;
     final niveau = _levelsOf(atelier);
     final shown = atelier.objectifs.take(_compactMaxObjectives).toList();
     final hidden = atelier.objectifs.length - shown.length;
@@ -466,7 +473,11 @@ class MandatoryAteliersPdfService {
                     pw.Text(pdfSafe(atelier.domaine),
                         maxLines: 2,
                         style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
-                  if (niveau != null)
+                  if (sousDomaine != null)
+                    pw.Text(pdfSafe(sousDomaine),
+                        maxLines: 2,
+                        style: pw.TextStyle(fontSize: 6.5, color: PdfColors.grey700, fontStyle: pw.FontStyle.italic))
+                  else if (niveau != null)
                     pw.Text('Niveau : ${pdfSafe(niveau)}',
                         style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey700)),
                   pw.SizedBox(height: 1.5),
