@@ -12,23 +12,36 @@ import '../services/parcours_start.dart';
 import '../utils/color_utils.dart';
 import '../widgets/child_multi_picker.dart';
 
-/// Valide un atelier (ou une etape de parcours) pour plusieurs eleves d'un
-/// coup : meme niveau, meme date, meme note, une observation par eleve.
+/// Mode « Plusieurs eleves » du Scan & Go : on choisit l'atelier (ou l'etape
+/// de parcours), puis on valide pour plusieurs eleves d'un coup : meme niveau,
+/// meme date, meme note, une observation par eleve.
 ///
 /// Les eleves pour qui l'etape est verrouillee restent visibles mais grises :
 /// la regle du parcours est la meme qu'a la saisie individuelle. Pour faire
 /// commencer des eleves plus loin dans un parcours, voir
 /// [ParcoursStartScreen].
 class BulkValidationScreen extends StatefulWidget {
-  const BulkValidationScreen({super.key, required this.atelier});
+  /// [atelier] : atelier deja choisi ; sinon l'ecran commence par le choix.
+  const BulkValidationScreen({super.key, this.atelier});
 
-  final ActivityType atelier;
+  final ActivityType? atelier;
 
   @override
   State<BulkValidationScreen> createState() => _BulkValidationScreenState();
 }
 
 class _BulkValidationScreenState extends State<BulkValidationScreen> {
+  /// Atelier choisi (null : choix en cours).
+  String? _atelierId;
+  final TextEditingController _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _atelierId = widget.atelier?.id;
+  }
+
   final Set<String> _selected = {};
   final TextEditingController _note = TextEditingController();
   String? _statusId;
@@ -37,6 +50,7 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
 
   @override
   void dispose() {
+    _search.dispose();
     _note.dispose();
     super.dispose();
   }
@@ -46,7 +60,7 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
   String? _defaultStatus(AppStateProvider app) {
     final statuses = app.evaluationStatuses;
     if (statuses.isEmpty) return null;
-    final parcours = app.progressionById(widget.atelier.progressionId);
+    final parcours = app.progressionById(app.activityTypeById(_atelierId)?.progressionId);
     final wanted = parcours?.minStatusId;
     if (wanted != null && statuses.any((s) => s.id == wanted)) return wanted;
     return statuses.last.id;
@@ -124,10 +138,101 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
     ));
   }
 
+  /// Premiere etape : choisir l'atelier ou l'etape de parcours.
+  Widget _buildAtelierChoice(AppStateProvider app) {
+    final q = _query.trim().toLowerCase();
+    final all = app.activityTypes.where((a) => !a.isDisabled).toList()
+      ..sort((a, b) {
+        final byPlace = (app.placeOf(a)?.name ?? '').toLowerCase().compareTo((app.placeOf(b)?.name ?? '').toLowerCase());
+        return byPlace != 0 ? byPlace : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+    final shown = [
+      for (final a in all)
+        if (q.isEmpty ||
+            a.name.toLowerCase().contains(q) ||
+            (app.placeOf(a)?.name ?? '').toLowerCase().contains(q) ||
+            a.domaine.toLowerCase().contains(q))
+          a,
+    ];
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Plusieurs élèves')),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Quel atelier ou quelle étape ?',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    const Text('Vous choisirez ensuite les élèves : la classe, une section, un groupe ou une liste.',
+                        style: TextStyle(fontSize: 12, color: kMutedTextColor)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _search,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Rechercher un atelier, un espace, un parcours…',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => setState(() => _query = v),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: shown.isEmpty
+                    ? const Center(
+                        child: Text('Aucun atelier trouvé.', style: TextStyle(color: kMutedTextColor)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                        itemCount: shown.length,
+                        itemBuilder: (context, i) {
+                          final a = shown[i];
+                          final place = app.placeOf(a);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: hexToColor(a.colorHex),
+                              child: Icon(a.inProgression ? Icons.flag : Icons.category,
+                                  color: Colors.white, size: 20),
+                            ),
+                            title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              [
+                                if (place != null) place.name,
+                                if (a.inProgression) 'étape de parcours',
+                              ].join(' · '),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onTap: () => setState(() {
+                              _atelierId = a.id;
+                              _statusChosen = false;
+                              _selected.clear();
+                            }),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = Provider.of<AppStateProvider>(context);
-    final atelier = app.activityTypeById(widget.atelier.id) ?? widget.atelier;
+    final chosen = app.activityTypeById(_atelierId);
+    if (chosen == null) return _buildAtelierChoice(app);
+    final atelier = chosen;
     final statuses = app.evaluationStatuses;
     if (!_statusChosen) {
       _statusId = _defaultStatus(app);
@@ -139,7 +244,7 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
     final place = app.placeOf(atelier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Valider plusieurs élèves')),
+      appBar: AppBar(title: const Text('Plusieurs élèves')),
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -150,10 +255,33 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Text(atelier.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    if (place != null)
-                      Text(place.name,
-                          style: TextStyle(color: hexToColor(atelier.colorHex), fontWeight: FontWeight.w600)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(atelier.name,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              if (place != null)
+                                Text(place.name,
+                                    style: TextStyle(
+                                        color: hexToColor(atelier.colorHex), fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => setState(() {
+                            // Un autre atelier : les eleves coches (et leur
+                            // eligibilite) ne valent plus.
+                            _atelierId = null;
+                            _selected.clear();
+                          }),
+                          icon: const Icon(Icons.swap_horiz, size: 18),
+                          label: const Text('Changer'),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     const Text('Niveau atteint', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     const SizedBox(height: 6),

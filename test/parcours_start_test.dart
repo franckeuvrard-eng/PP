@@ -237,6 +237,42 @@ void main() {
       await tester.pump(const Duration(seconds: 11));
     });
 
+    testWidgets('Scan & Go > Plusieurs eleves : choisir l\'atelier puis les eleves', (tester) async {
+      tester.view.physicalSize = const Size(1000, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final app = (await tester.runAsync(newApp))!;
+      app.logActivityForChildren(
+          childIds: ['lea', 'tom'], activityTypeId: 'e1', evaluationStatusId: app.evaluationStatuses.last.id);
+
+      // Aucun atelier d'avance : l'ecran commence par le choix.
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: app,
+        child: const MaterialApp(home: BulkValidationScreen()),
+      ));
+      await tester.pump();
+      expect(find.text('Quel atelier ou quelle étape ?'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Étape e2');
+      await tester.pump();
+      // Le texte saisi est aussi dans le champ : on vise la ligne de la liste.
+      await tester.tap(find.widgetWithText(ListTile, 'Étape e2'));
+      await tester.pump();
+
+      // L'etape est choisie : on peut en changer, et cocher les eleves.
+      expect(find.text('Changer'), findsOneWidget);
+      await tester.tap(find.text('MS'));
+      await tester.pump();
+      await tester.tap(find.textContaining('pour 2 élève(s)'));
+      await tester.pump();
+      expect(app.activitiesForChild('lea').where((l) => l.activityTypeId == 'e2'), isNotEmpty);
+      expect(app.activitiesForChild('tom').where((l) => l.activityTypeId == 'e2'), isNotEmpty);
+      expect(app.activitiesForChild('ana'), isEmpty);
+
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+      await tester.pump(const Duration(seconds: 11));
+    });
+
     testWidgets('ecran de depart : choisir l\'etape puis les eleves', (tester) async {
       tester.view.physicalSize = const Size(1000, 1400);
       tester.view.devicePixelRatio = 1;

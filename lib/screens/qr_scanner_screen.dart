@@ -18,6 +18,7 @@ import '../utils/app_icons.dart';
 import '../utils/color_utils.dart';
 import '../utils/platform_support.dart';
 import '../widgets/voice_note_field.dart';
+import 'bulk_validation_screen.dart';
 
 /// Mode de saisie choisi sur le premier ecran.
 enum _ScanMode { qr, manual }
@@ -559,6 +560,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           onTap: () => setState(() => _mode = _ScanMode.manual),
         ),
         card(
+          icon: Icons.groups,
+          color: const Color(0xFF1E88E5),
+          title: 'Plusieurs élèves',
+          text: 'Un atelier ou une étape, validé d\'un coup pour la classe, une section, un groupe ou une liste d\'élèves.',
+          onTap: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const BulkValidationScreen())),
+        ),
+        card(
           icon: Icons.child_care,
           color: const Color(0xFF8E24AA),
           title: 'Mode élève (tablette)',
@@ -588,7 +597,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               child: Text(qr ? 'Scan des QR codes' : 'Sélection manuelle',
                   style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             ),
-            // Ordinateur : pas d'ecran de choix, le mode eleve s'ouvre d'ici.
+            // Ordinateur : pas d'ecran de choix, le mode plusieurs eleves et le
+            // mode eleve s'ouvrent d'ici.
+            if (!isMobilePlatform)
+              TextButton.icon(
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const BulkValidationScreen())),
+                icon: const Icon(Icons.groups, size: 18),
+                label: const Text('Plusieurs élèves'),
+              ),
             if (!isMobilePlatform)
               TextButton.icon(
                 onPressed: () => Navigator.push(context,
