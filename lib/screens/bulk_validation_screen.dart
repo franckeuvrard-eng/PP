@@ -129,7 +129,7 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
           '${status == null ? '' : ' · ${status.label}'}.'),
       // Avec une action, Flutter garde le bandeau indefiniment : on force la
       // disparition apres quelques secondes.
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 3),
       persist: false,
       behavior: SnackBarBehavior.floating,
       action: SnackBarAction(

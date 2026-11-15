@@ -23,7 +23,7 @@ enum ParcoursCell { validated, open, locked, skipped }
 /// n'est supprime). Chaque geste propose « Annuler ». Le verrou du parcours est
 /// respecte : une etape se coche dans l'ordre, sauf avec « Valider jusqu'a
 /// l'etape… » qui enchaine toutes les etapes d'un eleve.
-class ParcoursTable extends StatelessWidget {
+class ParcoursTable extends StatefulWidget {
   const ParcoursTable({super.key, required this.progression, this.onOpenChild, this.onOpenStep});
 
   final Progression progression;
@@ -33,11 +33,6 @@ class ParcoursTable extends StatelessWidget {
 
   /// Ouvre la fiche d'une etape (en-tete de colonne).
   final ValueChanged<ActivityType>? onOpenStep;
-
-  static const double _nameWidth = 150;
-  static const double _colWidth = 78;
-  static const double _rowHeight = 46;
-  static const double _headHeight = 104;
 
   /// Niveau enregistre quand on coche : le seuil de passage du parcours.
   static String? thresholdId(AppStateProvider app, Progression parcours) {
@@ -77,11 +72,25 @@ class ParcoursTable extends StatelessWidget {
   }
 
   @override
+  State<ParcoursTable> createState() => _ParcoursTableState();
+}
+
+class _ParcoursTableState extends State<ParcoursTable> {
+  static const double _nameWidth = 150;
+  static const double _colWidth = 78;
+  static const double _rowHeight = 46;
+  static const double _headHeight = 104;
+
+  /// Observations creees par ce tableau depuis son ouverture : les decocher
+  /// les supprime (annulation propre) au lieu d'ajouter un niveau bas.
+  final Set<String> _mine = {};
+
+  @override
   Widget build(BuildContext context) {
     final app = Provider.of<AppStateProvider>(context);
-    final steps = app.ateliersInProgressionOrdered(progression.id);
-    final children = ParcoursProgress.childrenFollowing(app, progression);
-    final color = hexToColor(progression.colorHex);
+    final steps = app.ateliersInProgressionOrdered(widget.progression.id);
+    final children = ParcoursProgress.childrenFollowing(app, widget.progression);
+    final color = hexToColor(widget.progression.colorHex);
 
     if (app.evaluationStatuses.isEmpty) {
       return const Text('Aucun niveau d\'évaluation : configurez-les dans les Paramètres.',
@@ -95,7 +104,7 @@ class ParcoursTable extends StatelessWidget {
           style: TextStyle(color: kMutedTextColor));
     }
 
-    final states = {for (final c in children) c.id: statesFor(app, progression, steps, c)};
+    final states = {for (final c in children) c.id: ParcoursTable.statesFor(app, widget.progression, steps, c)};
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,6 +160,9 @@ class ParcoursTable extends StatelessWidget {
             ),
           ],
         ),
+        // Place sous la derniere ligne : la banniere (affichee en bas) ne
+        // masque jamais un eleve, il suffit de remonter un peu la page.
+        const SizedBox(height: 96),
       ],
     );
   }
@@ -208,7 +220,7 @@ class ParcoursTable extends StatelessWidget {
             _validate(context, app, [for (final c in eligible) c.id], step,
                 '« ${step.name} » : ${eligible.length} élève(s) validé(s).');
           } else if (v == 'open') {
-            onOpenStep?.call(step);
+            widget.onOpenStep?.call(step);
           }
         },
         itemBuilder: (_) => [
@@ -219,7 +231,7 @@ class ParcoursTable extends StatelessWidget {
                 ? 'Personne à valider (déjà fait, verrouillé ou non demandé)'
                 : 'Valider pour ${eligible.length} élève(s) éligible(s)'),
           ),
-          if (onOpenStep != null) const PopupMenuItem(value: 'open', child: Text('Ouvrir la fiche de l\'étape')),
+          if (widget.onOpenStep != null) const PopupMenuItem(value: 'open', child: Text('Ouvrir la fiche de l\'étape')),
         ],
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
@@ -261,10 +273,10 @@ class ParcoursTable extends StatelessWidget {
       child: PopupMenuButton<int>(
         key: Key('row_${child.id}'),
         tooltip: full,
-        enabled: remaining.isNotEmpty || onOpenChild != null,
+        enabled: remaining.isNotEmpty || widget.onOpenChild != null,
         onSelected: (v) {
           if (v < 0) {
-            onOpenChild?.call(child);
+            widget.onOpenChild?.call(child);
             return;
           }
           _validateUpTo(context, app, child, steps, states, v);
@@ -278,7 +290,7 @@ class ParcoursTable extends StatelessWidget {
               child: Text('Valider jusqu\'à l\'étape ${i + 1} · ${steps[i].name}',
                   overflow: TextOverflow.ellipsis),
             ),
-          if (onOpenChild != null) ...[
+          if (widget.onOpenChild != null) ...[
             const PopupMenuDivider(),
             const PopupMenuItem<int>(value: -1, child: Text('Voir son parcours')),
           ],
@@ -351,11 +363,14 @@ class ParcoursTable extends StatelessWidget {
     final step = steps[i];
     switch (state) {
       case ParcoursCell.open:
-        _validate(context, app, [child.id], step, '${child.firstname} : « ${step.name} » validée.');
+        // Pas de banniere : la case change tout de suite, et la retoucher
+        // annule proprement. Une banniere par case gene quand on en valide
+        // beaucoup (et masque la derniere ligne).
+        _validate(context, app, [child.id], step, '', announce: false);
       case ParcoursCell.validated:
         _unvalidate(context, app, child, step);
       case ParcoursCell.locked:
-        final states = statesFor(app, progression, steps, child);
+        final states = ParcoursTable.statesFor(app, widget.progression, steps, child);
         final blocking = states.indexOf(ParcoursCell.open);
         _say(context,
             'Verrouillée : validez d\'abord ${blocking >= 0 ? 'l\'étape ${blocking + 1} · ${steps[blocking].name}' : 'l\'étape précédente'}.');
@@ -364,20 +379,23 @@ class ParcoursTable extends StatelessWidget {
     }
   }
 
-  /// Valide [step] pour ces eleves, avec « Annuler ».
+  /// Valide [step] pour ces eleves. Avec [announce], une banniere « Annuler »
+  /// courte confirme le geste (actions en masse).
   void _validate(BuildContext context, AppStateProvider app, List<String> childIds, ActivityType step,
-      String message) {
-    final threshold = thresholdId(app, progression);
+      String message,
+      {bool announce = true}) {
+    final threshold = ParcoursTable.thresholdId(app, widget.progression);
     if (childIds.isEmpty || threshold == null) return;
     final created = app.logActivityForChildren(
         childIds: childIds, activityTypeId: step.id, evaluationStatusId: threshold);
-    _undoable(context, app, message, created);
+    _mine.addAll(created.map((l) => l.id));
+    if (announce) _undoable(context, app, message, created);
   }
 
   /// Valide toutes les etapes de [child] jusqu'a l'etape de rang [upTo] (comprise).
   void _validateUpTo(BuildContext context, AppStateProvider app, Child child, List<ActivityType> steps,
       List<ParcoursCell> states, int upTo) {
-    final threshold = thresholdId(app, progression);
+    final threshold = ParcoursTable.thresholdId(app, widget.progression);
     if (threshold == null) return;
     final stamp = DateTime.now();
     final created = <ActivityLog>[];
@@ -389,6 +407,7 @@ class ParcoursTable extends StatelessWidget {
           evaluationStatusId: threshold,
           timestamp: stamp));
     }
+    _mine.addAll(created.map((l) => l.id));
     _undoable(context, app,
         '${child.firstname} : ${created.length} étape(s) validée(s) jusqu\'à « ${steps[upTo].name} ».', created);
   }
@@ -397,6 +416,18 @@ class ParcoursTable extends StatelessWidget {
   /// qui conserve l'historique (notes, photos). Avec un seul niveau, la
   /// derniere observation est supprimee (et restituee par « Annuler »).
   void _unvalidate(BuildContext context, AppStateProvider app, Child child, ActivityType step) {
+    // Validee ici a l'instant : on retire simplement cette observation, sans
+    // laisser de trace (cocher puis decocher par erreur ne pollue pas l'historique).
+    ActivityLog? newest;
+    for (final l in app.activitiesForChild(child.id)) {
+      if (l.activityTypeId != step.id) continue;
+      if (newest == null || l.timestamp.isAfter(newest.timestamp)) newest = l;
+    }
+    if (newest != null && _mine.remove(newest.id)) {
+      app.deleteActivityLog(newest.id);
+      return;
+    }
+
     final statuses = app.evaluationStatuses;
     if (statuses.length >= 2) {
       final created = app.logActivityForChildren(
@@ -420,7 +451,7 @@ class ParcoursTable extends StatelessWidget {
         content: Text('${child.firstname} : « ${step.name} » retirée.'),
         // Avec une action, Flutter garde le bandeau indefiniment : on force la
         // disparition apres quelques secondes.
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         persist: false,
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(label: 'Annuler', onPressed: () => app.restoreActivityLog(removed)),
@@ -436,7 +467,7 @@ class ParcoursTable extends StatelessWidget {
         content: Text(message),
         // Avec une action, Flutter garde le bandeau indefiniment : on force la
         // disparition apres quelques secondes.
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         persist: false,
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
@@ -453,6 +484,10 @@ class ParcoursTable extends StatelessWidget {
   void _say(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ));
   }
 }

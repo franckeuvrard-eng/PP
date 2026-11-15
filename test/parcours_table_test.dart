@@ -97,7 +97,7 @@ void main() {
         [ParcoursCell.skipped, ParcoursCell.skipped, ParcoursCell.open, ParcoursCell.locked]);
   });
 
-  testWidgets('cocher une case enregistre au seuil du parcours, Annuler la retire', (tester) async {
+  testWidgets('cocher une case enregistre au seuil, la retoucher annule sans trace', (tester) async {
     final app = (await tester.runAsync(newApp))!;
     await pumpTable(tester, app);
 
@@ -110,9 +110,11 @@ void main() {
     expect(states(app, 'lea').first, ParcoursCell.validated);
     // Les autres eleves ne sont pas touches.
     expect(app.activitiesForChild('tom'), isEmpty);
+    // Une case seule n'affiche aucune banniere (elle gene quand on en valide beaucoup).
+    expect(find.text('Annuler'), findsNothing);
 
-    await tester.pump(const Duration(milliseconds: 600)); // bannière affichée
-    await tester.tap(find.text('Annuler'));
+    // Retoucher la case la retire : l'observation est supprimee, pas de niveau bas ajoute.
+    await tester.tap(find.byKey(const Key('cell_lea_e1')));
     await tester.pump();
     expect(app.activitiesForChild('lea'), isEmpty);
     expect(states(app, 'lea').first, ParcoursCell.open);
@@ -120,11 +122,29 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('la banniere de validation disparait toute seule', (tester) async {
+  testWidgets('valider beaucoup de cases d\'affilee : aucune banniere', (tester) async {
     final app = (await tester.runAsync(newApp))!;
     await pumpTable(tester, app);
 
-    await tester.tap(find.byKey(const Key('cell_lea_e1')));
+    for (final id in ['lea', 'tom', 'ana']) {
+      await tester.tap(find.byKey(Key('cell_${id}_e1')));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(find.byType(SnackBar), findsNothing);
+    for (final id in ['lea', 'tom', 'ana']) {
+      expect(states(app, id).first, ParcoursCell.validated, reason: id);
+    }
+
+    await settle(tester);
+  });
+
+  testWidgets('la banniere d\'une action en masse disparait toute seule', (tester) async {
+    final app = (await tester.runAsync(newApp))!;
+    await pumpTable(tester, app);
+
+    await tester.tap(find.byKey(const Key('col_e1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Valider pour 3 élève(s)'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Annuler'), findsOneWidget);
 
