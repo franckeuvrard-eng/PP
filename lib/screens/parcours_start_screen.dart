@@ -74,6 +74,11 @@ class _ParcoursStartScreenState extends State<ParcoursStartScreen> {
           : target == null
               ? '$changed élève(s) remis au début de « ${widget.progression.name} ».'
               : '$changed élève(s) démarrent « ${widget.progression.name} » à « $stepName ».'),
+      // Avec une action, Flutter garde le bandeau indefiniment : on force la
+      // disparition apres quelques secondes.
+      duration: const Duration(seconds: 4),
+      persist: false,
+      behavior: SnackBarBehavior.floating,
       action: changed == 0
           ? null
           : SnackBarAction(

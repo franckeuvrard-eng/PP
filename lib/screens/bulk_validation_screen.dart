@@ -127,6 +127,11 @@ class _BulkValidationScreenState extends State<BulkValidationScreen> {
     messenger.showSnackBar(SnackBar(
       content: Text('« ${atelier.name} » : ${created.length} élève(s) enregistré(s)'
           '${status == null ? '' : ' · ${status.label}'}.'),
+      // Avec une action, Flutter garde le bandeau indefiniment : on force la
+      // disparition apres quelques secondes.
+      duration: const Duration(seconds: 4),
+      persist: false,
+      behavior: SnackBarBehavior.floating,
       action: SnackBarAction(
         label: 'Annuler',
         onPressed: () {

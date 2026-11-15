@@ -120,6 +120,24 @@ void main() {
     await settle(tester);
   });
 
+  testWidgets('la banniere de validation disparait toute seule', (tester) async {
+    final app = (await tester.runAsync(newApp))!;
+    await pumpTable(tester, app);
+
+    await tester.tap(find.byKey(const Key('cell_lea_e1')));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Annuler'), findsOneWidget);
+
+    // Avec une action, Flutter garderait la banniere indefiniment (persist).
+    // Le compte a rebours demarre une fois la banniere entierement affichee.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('Annuler'), findsNothing);
+
+    await settle(tester);
+  });
+
   testWidgets('decocher ajoute un niveau bas sans supprimer l\'historique', (tester) async {
     final app = (await tester.runAsync(newApp))!;
     app.logActivityForChildren(

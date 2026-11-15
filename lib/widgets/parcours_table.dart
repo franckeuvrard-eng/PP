@@ -418,6 +418,11 @@ class ParcoursTable extends StatelessWidget {
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
         content: Text('${child.firstname} : « ${step.name} » retirée.'),
+        // Avec une action, Flutter garde le bandeau indefiniment : on force la
+        // disparition apres quelques secondes.
+        duration: const Duration(seconds: 4),
+        persist: false,
+        behavior: SnackBarBehavior.floating,
         action: SnackBarAction(label: 'Annuler', onPressed: () => app.restoreActivityLog(removed)),
       ));
   }
@@ -429,6 +434,11 @@ class ParcoursTable extends StatelessWidget {
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
         content: Text(message),
+        // Avec une action, Flutter garde le bandeau indefiniment : on force la
+        // disparition apres quelques secondes.
+        duration: const Duration(seconds: 4),
+        persist: false,
+        behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
           label: 'Annuler',
           onPressed: () {
