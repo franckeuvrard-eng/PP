@@ -2217,8 +2217,9 @@ class AppStateProvider extends ChangeNotifier {
     for (final childId in childIds.toSet()) {
       if (_childById[childId] == null) continue;
       final log = ActivityLog(
-        // millisecondsSinceEpoch seul se repeterait dans la boucle : on decale.
-        id: 'log_${stamp.millisecondsSinceEpoch + offset}_$childId',
+        // millisecondsSinceEpoch seul se repeterait dans la boucle : on decale, et
+        // l'atelier distingue deux etapes validees d'un coup pour le meme eleve.
+        id: 'log_${stamp.millisecondsSinceEpoch + offset}_${childId}_$activityTypeId',
         childId: childId,
         activityTypeId: activityTypeId,
         timestamp: stamp,

@@ -17,6 +17,7 @@ import 'atelier_detail_screen.dart';
 import 'parcours_start_screen.dart';
 import 'progressions_settings_tab.dart';
 import '../services/qr_sheets_pdf_service.dart';
+import '../widgets/parcours_table.dart';
 
 /// Écran « Parcours » : onglet Suivi (chaque parcours est un fil, ses étapes
 /// en sont les jalons ; vue classe ou vue d'un élève) et onglet Gérer
@@ -36,6 +37,9 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
 
   /// Null : vue classe.
   String? _childId;
+
+  /// Vue « Tableau » : les eleves en lignes, une case par etape.
+  bool _table = false;
 
   @override
   void initState() {
@@ -160,19 +164,20 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              SegmentedButton<bool>(
+              SegmentedButton<int>(
                 segments: const [
-                  ButtonSegment(value: false, icon: Icon(Icons.groups), label: Text('La classe')),
-                  ButtonSegment(value: true, icon: Icon(Icons.person), label: Text('Un élève')),
+                  ButtonSegment(value: 0, icon: Icon(Icons.groups), label: Text('La classe')),
+                  ButtonSegment(value: 1, icon: Icon(Icons.person), label: Text('Un élève')),
+                  ButtonSegment(value: 2, icon: Icon(Icons.grid_on), label: Text('Tableau')),
                 ],
-                selected: {child != null},
+                selected: {_table ? 2 : (child != null ? 1 : 0)},
                 onSelectionChanged: (sel) => setState(() {
-                  _childId = sel.first
-                      ? (children.isEmpty ? null : (child ?? children.first).id)
-                      : null;
+                  final v = sel.first;
+                  _table = v == 2;
+                  _childId = v == 1 ? (children.isEmpty ? null : (child ?? children.first).id) : null;
                 }),
               ),
-              if (child != null)
+              if (child != null && !_table)
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 260),
                   child: DropdownButtonFormField<String>(
@@ -194,11 +199,24 @@ class _ProgressionsScreenState extends State<ProgressionsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          ProgressionCard(
-            progression: progression,
-            child: child,
-            onChildTap: (c) => setState(() => _childId = c.id),
-          ),
+          if (_table)
+            ParcoursTable(
+              progression: progression,
+              onOpenChild: (c) => setState(() {
+                _table = false;
+                _childId = c.id;
+              }),
+              onOpenStep: (step) => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AtelierDetailScreen(atelier: step)),
+              ),
+            )
+          else
+            ProgressionCard(
+              progression: progression,
+              child: child,
+              onChildTap: (c) => setState(() => _childId = c.id),
+            ),
         ],
     );
   }
